@@ -1,0 +1,115 @@
+%!TEX root = ../doc.tex
+\chapter{Fundamentals}
+\label{sec:Fundamentals}
+The following chapter describes methods and technologies that are used within this thesis.
+\section{Mathematics for Rotation and Translation}
+\label{sec:LinAlgRotation}
+Augmented reality relies on having accurate positional and angular information, to estimate the requred size and warp of a virtual object that is projected into the real world. To assist the positional tracking, a MEMS-module containing a gyroscope and an accelerometer provides rotation and acceleration information to the system. 
+\subsection{Euler Rotations and Linear Algebra}
+A common way to calculate rotations and translations are matrix-vector multiplications. The standard matrices for rotating with the angle $\phi$ around $X$, $Y$ and $Z$ are shown in the following:
+\begin{equation*}
+    A_{rot,X} = 
+    \begin{bmatrix}
+    1 & 0 & 0 \\
+    0 & cos \phi & -sin \phi \\
+    0 & sin \phi & cos \phi
+    \end{bmatrix}
+    \quad
+    A_{rot,Y} = 
+    \begin{bmatrix}
+    cos \phi & 0 & sin \phi \\
+    0 & 1 & 0 \\
+    -sin \phi & 0 & cos \phi
+    \end{bmatrix}    
+    \quad
+    A_{rot,Z} = 
+    \begin{bmatrix}
+    cos \phi & sin \phi & 0 \\
+    -sin \phi & cos \phi & 0 \\
+    0 & 0 & 1
+    \end{bmatrix} 
+\end{equation*}
+A combination of the three matrices leads to a rotation matrix with a rotation axis that is not strictly bound to $X$, $Y$ or $Z$. A matrix multiplication is not commutative, so the order of the multiplications matters. In the following example, the vector would be rotated first around $X$, then $Y$ and around $Z$ in the end - in the equation from right to left.
+\begin{equation*}
+    A_{rot} = 
+    \begin{bmatrix}
+    a_{0,0} & a_{0,1} & a_{0,2}  \\
+    a_{1,0} & a_{1,1} & a_{1,2}  \\
+    a_{2,0} & a_{2,1} & a_{2,2} 
+    \end{bmatrix}
+    =A_{rot,Z} \cdot A_{rot,Y} \cdot A_{rot,X}
+\end{equation*}
+With this matrix, a three dimensional vector can be rotated at once around an arbitrary axis for the desired angle. Applying this transformation to each vertex of a virtual 3D object results in a rotation of the whole object around the origin $(0,0,0)$.\\
+\begin{equation*}
+    \begin{pmatrix}
+    x'  \\
+    y'  \\
+    z' 
+    \end{pmatrix} 
+    = 
+    \begin{bmatrix}
+a_{0,0} & a_{0,1} & a_{0,2}  \\
+a_{1,0} & a_{1,1} & a_{1,2}  \\
+a_{2,0} & a_{2,1} & a_{2,2} 
+\end{bmatrix}
+\cdot 
+\begin{pmatrix}
+    x  \\
+    y  \\
+    z 
+    \end{pmatrix}
+\end{equation*}
+To avoid using an inhomogenous linear system for moving an object, a fourth dimension is needed. By extending the vectors with a $1$ and using the fourth column in the matrix to alter $X$, $Y$ and $Z$, these vector entries can be moved without applying any rotation. 
+\begin{equation*}
+    \begin{pmatrix}
+        x+\Delta X  \\
+        y+\Delta Y  \\
+        z+\Delta Z  \\
+        1
+        \end{pmatrix} 
+        = 
+    \begin{pmatrix}
+    x'  \\
+    y'  \\
+    z'  \\
+    1
+    \end{pmatrix} 
+    = 
+    \begin{bmatrix}
+1 & 0 & 0 & \Delta X \\
+0 & 1 & 0 & \Delta Y  \\
+0 & 0 & 1 & \Delta Z  \\
+0 & 0 & 0 & 1
+\end{bmatrix}
+\cdot 
+\begin{pmatrix}
+    x  \\
+    y  \\
+    z  \\
+    1
+    \end{pmatrix}
+\end{equation*}
+To combine the rotation matrix $A_{rot}$ with the translation matrix $A_{trans}$ gets placed top-left into the 4x4 unit matrix. Now, the rotation matrix also being a 4x4 matrix, rotations and translations can be chained up following the common laws of linear algebra.
+\begin{equation*}
+    \begin{pmatrix}
+    x'  \\
+    y'  \\
+    z'  \\
+    1
+    \end{pmatrix} 
+    = 
+    \begin{bmatrix}
+a_{0,0} & a_{0,1} & a_{0,2} & 0 \\
+a_{1,0} & a_{1,1} & a_{1,2} & 0 \\
+a_{2,0} & a_{2,1} & a_{2,2} & 0 \\
+0 & 0 & 0 & 1
+\end{bmatrix}
+\cdot 
+\begin{pmatrix}
+    x  \\
+    y  \\
+    z  \\
+    1
+    \end{pmatrix}
+\end{equation*}
+The dependency on the order of the rotations poses a problem: The values returned by a gyroscope would need to be applied all at once and not one after another. 

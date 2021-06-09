@@ -1,0 +1,138 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  _____       ______   ____									%
+% |_   _|     |  ____|/ ____|  Institute of Embedded Systems	%
+%   | |  _ __ | |__  | (___    Wireless Group					%
+%   | | | '_ \|  __|  \___ \   Zuercher Hochschule Winterthur	%
+%  _| |_| | | | |____ ____) |  (University of Applied Sciences)	%
+% |_____|_| |_|______|_____/   8401 Winterthur, Switzerland		%
+%																%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% The ZHAW INES latex style scrip
+\documentclass{clsFile/zhawines}
+
+% Command redefinitions
+
+% To use new glossaries package uncomment this line. This requires Perl to be installed on the computer (http://strawberryperl.com/)
+% Comment this line if you want to use the old manual glossary (see file /content/glossar)
+%\newcommand*{\USEGLOSSARIES}{} 
+
+%Include your own packages that are needed for you document, here the packages for the example are added
+\usepackage{scrpage2}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage[squaren]{SIunits}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{float}
+\usepackage{pbox}
+
+\ifdefined\USEGLOSSARIES
+	\usepackage[acronyms]{glossaries}
+	\makeglossaries
+	\include{glossaries/glossaries}
+\fi
+
+\begin{document}
+%How the hyperlinks are shown, remove this or change it if you want the colorful links
+\hypersetup{
+    colorlinks = false,
+    urlbordercolor = {1 1 1},
+    linkbordercolor = {white},
+}
+
+%Select language, all generated content will be in the selected language
+\selectlanguage{english} %possible german/english
+
+% Generate your title page, it takes the arguments author, title
+% and email. The title page is then generated with maketitle
+\author{Marcel Wegmann \newline }
+\title{Vulkan-CUDA Co-Design for Real-Time Object Classification}
+\email{wegr@zhaw.ch}
+\newcommand{\version}{1.0}
+
+% Add Copyright informations and Contact infos
+ \newcommand{\confidential}{no}  %write yes to have a confidential mark on every normal page
+
+\maketitle
+
+
+% Generate the header and footer of the document
+\headings
+
+% Stop page numbering for abstract and anti-plagiarism statement
+\pagenumbering{gobble}
+
+% Include anti-plagiarism statement. The Word template is located in the same folder
+\includepdf[scale=0.9,pages=1]{pdf/plagiatserklaerung.pdf}
+
+% Include abstract
+\include{content/abstract} 
+
+% Start page numbering
+\pagenumbering{arabic}
+
+%Include table of content
+\tableofcontents
+
+% Starts the page count from here, pdf viewers will be able to jump to the corret page.
+\setcounter{page}{1}
+
+%Include all chapters. Chapters itself are in the content subfolder
+%\include{content/howtoLaTeX} % Remove for final document
+\include{content/einleitung}
+\include{content/concept}
+\include{content/grundlagen} 
+\include{content/vorgehen} 
+\include{content/resultate}
+\include{content/diskussion} 
+
+% Generate title for lists
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Verzeichnisse}
+
+% Generate the bibliography and add it to the table of contents, there is an extra bib file where you can add entries(subfolder BibTeX-Literaturverzeichnis)
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{\bibname}
+\bibliographystyle{unsrt}
+\bibliography{BibTex/literatur}
+
+% Additional lists
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{\listfigurename}
+\listoffigures
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{\listtablename}
+\listoftables
+
+\ifdefined\USEGLOSSARIES
+	\cleardoublepage
+	\phantomsection
+	\addcontentsline{toc}{section}{Akronyme}
+	\printglossary[type=\acronymtype]
+	
+	\cleardoublepage
+	\phantomsection
+	\addcontentsline{toc}{section}{Glossar}
+	\printglossary
+\else
+	\cleardoublepage
+	\phantomsection
+	\addcontentsline{toc}{section}{Abkürzungsverzeichnis}
+	\include{content/glossar}
+\fi
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{Listings}
+
+
+\include{content/anhang} % Anhang
+
+\end{document}

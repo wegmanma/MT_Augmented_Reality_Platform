@@ -1,0 +1,18 @@
+%!TEX root = ../doc.tex
+\chapter{Introduction}
+\label{sec:Introduction}
+Modern embedded devices often serve in applications that needed at least a fully-fledged personal computer in the past, like real-time image processing and rendering. The fast-moving industries created different frameworks that are running on other systems, often competing with comparable functionalities. 
+While in the preceding thesis, a system running both computations, and rendering, entirely in Vulkan got developed, the GPU computation interface which runs best on Nvidia Jetson devices is Nvidia's proprietary CUDA API. Therefore, it became a reasonable approach to improve the image processing algorithm that got started in the previous thesis. 
+\section{Scope}
+\label{sec:Scope}
+The evaluation of CUDA and its operability with Vulkan in image processing and 3D rendering is the main scope of this thesis. Further on, the investigation of a known feature detector – the scale-invariant feature transform (SIFT) – for object recognition is serving as the sample application for the technical foundation. 
+\section{Initial Situation}
+\label{sec:Situation}
+A Vulkan-based framework was developed, which allows both 2D image rendering and polygon-based 3D object rendering in the previous thesis because other rendering API caused a variety of problems in the past. CUDA is the compute API of choice when developing with Nvidia Jetson devices, Vulkan and CUDA's interoperability has not been implemented prior into this Vulkan framework.\\
+The previous thesis's sample application, 3D reconstruction of stereo imaging, had to be simplified because of a limited time frame and failed at generating a 3D reconstruction. 
+\section{Goals}
+\label{sec:Goals}
+Implementing the CUDA to Vulkan interoperability without relying on resource-heavy memory copy instructions is the primary goal of this thesis. For demonstration, a stereo camera setup got to be built, which provides the necessary input images. 
+\section{Target audience}
+\label{sec:Ziel}
+This document is targeted at readers with a basic understanding of computer science and computer vision. Prior knowledge in CUDA or Vulkan is beneficial.
