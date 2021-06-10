@@ -42,10 +42,7 @@ int8_t BMI160::I2cInit(int8_t i2c_device, int8_t i2c_addr)
 
 int8_t BMI160::SPIInit()
 {
-    //SPI.begin();
-    //pinMode(10,OUTPUT);
-    //Obmi160->id = 0;
-    //Obmi160->interface = BMI160_SPI_INTF;
+    printf("Error: SPI not supported\n");
     return BMI160_OK;
 }
 
@@ -419,7 +416,6 @@ int8_t BMI160::setAccelPwr(struct bmi160Dev *dev)
 {
     int8_t rslt = 0;
     uint8_t data = 0;
-
     if ((dev->accelCfg.power >= BMI160_ACCEL_SUSPEND_MODE) &&
         (dev->accelCfg.power <= BMI160_ACCEL_LOWPOWER_MODE))
     {
@@ -431,14 +427,14 @@ int8_t BMI160::setAccelPwr(struct bmi160Dev *dev)
                 /* Write accel power */
                 rslt = BMI160::setRegs(BMI160_COMMAND_REG_ADDR, &dev->accelCfg.power, 1, dev);
                 /* Add delay of 5 ms */
-                if (dev->prevAccelCfg.power == BMI160_ACCEL_SUSPEND_MODE)
+                if (1)
                 {
                     usleep(BMI160_ACCEL_DELAY_MS * 1000);
                 }
                 dev->prevAccelCfg.power = dev->accelCfg.power;
             }
             uint8_t ret_val[1];
-            BMI160::getRegs(BMI160_COMMAND_REG_ADDR, ret_val,1,dev);
+            BMI160::getRegs(BMI160_COMMAND_REG_ADDR, ret_val, 1, dev);
         }
     }
     else
@@ -882,9 +878,7 @@ int8_t BMI160::getRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi
         //Configuring reg_addr for SPI Interface
         if (dev->interface == BMI160_SPI_INTF)
         {
-            //  reg_addr = (reg_addr | BMI160_SPI_RD_MASK);
-            //  Serial.print("reg_addr=");Serial.println(reg_addr);
-            //  rslt = BMI160::SPIGetRegs(dev, reg_addr, data, len);
+            printf("Error: SPI not supported\n");
         }
         else
         {
@@ -968,89 +962,43 @@ int8_t BMI160::setRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi
 
 int8_t BMI160::I2cSetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data, uint16_t len)
 {
-    if ((dev->prevAccelCfg.power == BMI160_ACCEL_NORMAL_MODE) || (dev->prevGyroCfg.power == BMI160_GYRO_NORMAL_MODE))
-    {
-        int file;
-        char filename[15] = {};
-        sprintf(filename, "/dev/i2c-%d", dev->i2c_dev);
-        if ((file = open(filename, O_RDWR)) < 0)
-        {
-            /* ERROR HANDLING: you can check errno to see what went wrong */
-            perror("Failed to open the i2c bus");
-            exit(1);
-        }
 
-        if (ioctl(file, I2C_SLAVE, dev->id) < 0)
-        {
-            printf("Failed to acquire bus access and/or talk to slave.\n");
-            /* ERROR HANDLING; you can check errno to see what went wrong */
-            exit(1);
-        }
-        uint8_t buf[len + 1];
-        buf[0] = reg_addr;
-        for (int i = 0; i < len; i++)
-        {
-            buf[i + 1] = data[i];
-        }
-        ssize_t written_bytes = write(file, buf, len + 1);
-        close(file);
-    }
-    else
+    int file;
+    char filename[15] = {};
+    sprintf(filename, "/dev/i2c-%d", dev->i2c_dev);
+    if ((file = open(filename, O_RDWR)) < 0)
     {
-        for (int i = 0; i < len; i++)
-        {
-            int file;
-            char filename[15] = {};
-            sprintf(filename, "/dev/i2c-%d", dev->i2c_dev);
-            if ((file = open(filename, O_RDWR)) < 0)
-            {
-                /* ERROR HANDLING: you can check errno to see what went wrong */
-                perror("Failed to open the i2c bus");
-                exit(1);
-            }
-
-            if (ioctl(file, I2C_SLAVE, dev->id) < 0)
-            {
-                printf("Failed to acquire bus access and/or talk to slave.\n");
-                /* ERROR HANDLING; you can check errno to see what went wrong */
-                exit(1);
-            }
-            usleep(1000);
-            ssize_t written_bytes = write(file, &reg_addr, 1);
-            usleep(400);
-            written_bytes = write(file, &data[i], 1);
-            usleep(1000);
-            close(file);
-            //Wire.beginTransmission(dev->id);
-            //Wire.write(reg_addr);
-            //Wire.write(data[i]);
-            //Wire.endTransmission(true);
-            //usleep(1000);
-        }
+        /* ERROR HANDLING: you can check errno to see what went wrong */
+        perror("Failed to open the i2c bus");
+        exit(1);
     }
+
+    if (ioctl(file, I2C_SLAVE, dev->id) < 0)
+    {
+        printf("Failed to acquire bus access and/or talk to slave.\n");
+        /* ERROR HANDLING; you can check errno to see what went wrong */
+        exit(1);
+    }
+    uint8_t buf[len + 1];
+    buf[0] = reg_addr;
+    for (int i = 0; i < len; i++)
+    {
+        buf[i + 1] = data[i];
+    }
+    ssize_t written_bytes = write(file, buf, len + 1);
+    close(file);
+
     return BMI160_OK;
 }
 
 int8_t BMI160::SPIGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data, uint16_t len)
 {
-    //Serial.println("SPIGetRegs");
-    //Serial.println(data[0]);
-    //digitalWrite(10,LOW);
-    ////SPI.transfer(0x6B);
-    ////SPI.transfer(0x10);
-    //uint8_t buff[10]={0};
-    //for(int i = 0; i < 10; i++){
-    //  buff[i] = SPI.transfer(0x00);
-    //  Serial.println(buff[i]);
-    //}
-    //
-    //Serial.println("bmi160SPIGetRegs2");
-    //digitalWrite(10,HIGH);
+    printf("Error: SPI not supported\n");
     return BMI160_OK;
 }
 int8_t BMI160::SPISetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data, uint16_t len)
 {
-    // Serial.println("SPISetRegs");
+    printf("Error: SPI not supported\n");
     return BMI160_OK;
 }
 

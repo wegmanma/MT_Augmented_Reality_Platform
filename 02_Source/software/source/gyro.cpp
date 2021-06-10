@@ -13,22 +13,22 @@ int main(int argc, char **argv)
 {
   const int8_t i2c_addr = 0x69;
   BMI160 bmi160;
+  if (bmi160.softReset() != BMI160_OK)
+  {
+      std::cout << "reset false" << std::endl;
+  }
   if (bmi160.I2cInit(2, i2c_addr) != BMI160_OK)
   {
     std::cout << "init false" << std::endl;
     return 1;
   }
-  //if (bmi160.softReset() != BMI160_OK)
-  //{
-  //    std::cout << "reset false" << std::endl;
-  //}
-
+  
   while (1)
   {
     int i = 0;
     int rslt;
     int16_t accelGyro[6] = {0};
-//
+
     //get both accel and gyro data from bmi160
     //parameter accelGyro is the pointer to store the data
     rslt = bmi160.getAccelGyroData(accelGyro);

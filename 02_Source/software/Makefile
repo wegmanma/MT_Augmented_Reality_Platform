@@ -21,9 +21,6 @@ bin/gyro.o: source/gyro.cpp
 bin/BMI160.o: source/BMI160.cpp include/BMI160.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -I$(INCLUDE) -o bin/BMI160.o source/BMI160.cpp $(LDFLAGS)
-bin/main.o: source/main.cpp include/VulkanFramework.hpp
-	@ mkdir -p bin
-	g++ -c $(CFLAGS) -c -I$(INCLUDE) -o bin/main.o source/main.cpp $(LDFLAGS)
 bin/VulkanFramework.o: source/VulkanFramework.cpp include/VulkanFramework.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/VulkanFramework.o source/VulkanFramework.cpp $(LDFLAGS)
