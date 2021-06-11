@@ -30,7 +30,7 @@ public:
     void run();
 
     const std::vector<const char*> validationLayers = {
-    "VK_LAYER_LUNARG_standard_validation"
+    "VK_LAYER_KHRONOS_validation"
     };
 
     const std::vector<const char*> deviceExtensions = {
@@ -41,8 +41,6 @@ public:
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
     };
 
-
-    VideoDisplay videoDisplay{};
 
     GLFWwindow* window{};
 
@@ -83,14 +81,14 @@ private:
     std::vector<VkFence> imagesInFlight{};
     size_t currentFrame = 0;
 
-    VkSemaphore cudaUpdateVkVertexBufSemaphore{};
-    int cudaUpdateVkVertexBufSemaphoreHandle{};
-    VkSemaphore vkUpdateCudaVertexBufSemaphore{};
-    int vkUpdateCudaVertexBufSemaphoreHandle{};
+    // VkSemaphore cudaUpdateVkVertexBufSemaphore{};
+    // int cudaUpdateVkVertexBufSemaphoreHandle{};
+    // VkSemaphore vkUpdateCudaVertexBufSemaphore{};
+    // int vkUpdateCudaVertexBufSemaphoreHandle{};
 
     bool framebufferResized = false;    
 
-    VkDescriptorPool descriptorPool;
+    VkDescriptorPool descriptorPool = {VK_NULL_HANDLE};
 
     VkSampleCountFlagBits msaaSamples{ VK_SAMPLE_COUNT_1_BIT };
 

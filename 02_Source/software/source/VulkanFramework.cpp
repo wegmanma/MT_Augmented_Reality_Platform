@@ -30,7 +30,7 @@
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
-const bool enableValidationLayers = false;
+const bool enableValidationLayers = true;
 #endif
 #pragma warning(push)
 #pragma warning(disable : 26812) // disabling a warning when including a header works normally for most warnings.
@@ -118,7 +118,6 @@ void VulkanFramework::initVulkan() {
     createSyncObjects();
     // pointCloud.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size());
     createCommandBuffers();
-    
 
 }
 
@@ -127,7 +126,6 @@ void VulkanFramework::mainLoop() {
     while (!glfwWindowShouldClose(window)) {
         
         startTime = std::chrono::steady_clock::now();
-        
         glfwPollEvents();
         //compute();
         drawFrame();
@@ -158,7 +156,8 @@ void VulkanFramework::cleanupSwapChain() {
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 
     // pointCloud.cleanupSwapChain(device, swapChainImages.size());
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    if (descriptorPool != VK_NULL_HANDLE)
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
 }
 
@@ -235,9 +234,6 @@ void VulkanFramework::createInstance() {
 
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
             throw std::runtime_error("failed to create instance!");
-        }
-        else {
-            std::cout << "Instance created successfully!!\n";
         }
 
         // pointCloud.fpGetPhysicalDeviceProperties2 = (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
@@ -347,7 +343,7 @@ void VulkanFramework::createLogicalDevice() {
         }
         createInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensionNameList.size());
         createInfo.ppEnabledExtensionNames = enabledExtensionNameList.data();
-        std::cout << "creating logical device!" << std::endl;
+        // std::cout << "creating logical device!" << std::endl;
         if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
             throw std::runtime_error("failed to create logical device!");
         }
@@ -564,11 +560,9 @@ void VulkanFramework::createCommandBuffers() {
     allocInfo.commandPool = commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
-
     if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
-
     for (size_t i = 0; i < commandBuffers.size(); i++) {
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -597,7 +591,7 @@ void VulkanFramework::createCommandBuffers() {
         // vkCmdBindIndexBuffer(commandBuffers[i], pointCloud.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         // vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pointCloud.pipelineLayout, 0, 1, &pointCloud.descriptorSets[i], 0, nullptr);
         // printf("NumPointsTodraw: %d",pointCloud.siftData1.numPts );
-        vkCmdDrawIndexed(commandBuffers[i], 1920*1080*6, 1, 0, 0, 0);
+        // vkCmdDrawIndexed(commandBuffers[i], 1920*1080*6, 1, 0, 0, 0);
         //vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(pointCloud.computation.vertexBufSize), 1, 0, 0);
         // Second Subpass
 
@@ -633,22 +627,22 @@ void VulkanFramework::createSyncObjects() {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     }
-    std::cout << "Created rendering semaphores" << std::endl;
+    // std::cout << "Created rendering semaphores" << std::endl;
     VkExportSemaphoreCreateInfoKHR vulkanExportSemaphoreCreateInfo = {};
     vulkanExportSemaphoreCreateInfo.sType       = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR;
     vulkanExportSemaphoreCreateInfo.pNext       = NULL;      
     vulkanExportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;    
     semaphoreInfo.pNext = &vulkanExportSemaphoreCreateInfo;
 
-    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &cudaUpdateVkVertexBufSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &vkUpdateCudaVertexBufSemaphore) != VK_SUCCESS )
-    {
-            throw std::runtime_error("failed to create synchronization objects for a CUDA-Vulkan!");
-    }
-    std::cout << "Created CUDA semaphores" << std::endl;
+    // if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &cudaUpdateVkVertexBufSemaphore) != VK_SUCCESS ||
+    //     vkCreateSemaphore(device, &semaphoreInfo, nullptr, &vkUpdateCudaVertexBufSemaphore) != VK_SUCCESS )
+    // {
+    //         throw std::runtime_error("failed to create synchronization objects for a CUDA-Vulkan!");
+    // }
+    // std::cout << "Created CUDA semaphores" << std::endl;
     // pointCloud.computation.vkUpdateCudaVertexBufSemaphoreHandle = getVkSemaphoreHandle(VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT, vkUpdateCudaVertexBufSemaphore);
     // pointCloud.computation.cudaUpdateVkVertexBufSemaphoreHandle = getVkSemaphoreHandle(VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT, cudaUpdateVkVertexBufSemaphore);
-    std::cout << "Got Semaphore Handles" << std::endl;
+    // std::cout << "Got Semaphore Handles" << std::endl;
 }
 
 void VulkanFramework::drawFrame() {
@@ -666,7 +660,6 @@ void VulkanFramework::drawFrame() {
         vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
-
     if (!startSubmit)
     {
         VkSubmitInfo submitInfo = {};
@@ -680,12 +673,13 @@ void VulkanFramework::drawFrame() {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
 
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame], vkUpdateCudaVertexBufSemaphore};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]}; // , vkUpdateCudaVertexBufSemaphore};
 
-        submitInfo.signalSemaphoreCount = 2;
+        submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        vkResetFences(device, 1, &inFlightFences[currentFrame]); 
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
         startSubmit = 1;
@@ -695,20 +689,20 @@ void VulkanFramework::drawFrame() {
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame], cudaUpdateVkVertexBufSemaphore};
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]}; // , cudaUpdateVkVertexBufSemaphore};
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
-        submitInfo.waitSemaphoreCount = 2;
+        submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
 
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame], vkUpdateCudaVertexBufSemaphore};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]}; // , vkUpdateCudaVertexBufSemaphore};
 
-        submitInfo.signalSemaphoreCount = 2;
+        submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
-
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
     }
