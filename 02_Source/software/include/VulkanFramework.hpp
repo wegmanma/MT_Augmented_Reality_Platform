@@ -20,8 +20,8 @@
 #include <chrono>   
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
-#include "VideoDisplay.hpp"
-
+#include "ProjectedSurface.hpp"
+#include "PositionEstimate.hpp"
 
 class VulkanFramework {
 
@@ -41,6 +41,9 @@ public:
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
     };
 
+    ProjectedSurface projectedSurface{};
+
+    PositionEstimate *positionEstimate = {};
 
     GLFWwindow* window{};
 
@@ -52,6 +55,7 @@ private:
     const int MAX_FRAMES_IN_FLIGHT = 1;
     bool startSubmit = 0;
     
+
 
     VkInstance instance{};
     VkDebugReportCallbackEXT callback{};
@@ -85,6 +89,15 @@ private:
     // int cudaUpdateVkVertexBufSemaphoreHandle{};
     // VkSemaphore vkUpdateCudaVertexBufSemaphore{};
     // int vkUpdateCudaVertexBufSemaphoreHandle{};
+
+    VkBuffer stagingProjectedBuffer;
+    VkDeviceMemory stagingProjectedBufferMemory;
+
+    VkImage projectedImage;
+    VkDeviceMemory projectedImageMemory;
+
+    VkImageView projectedImageView;
+    VkSampler projectedSampler;
 
     bool framebufferResized = false;    
 
@@ -145,9 +158,17 @@ private:
 
     //void compute();
 
-    int getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda);
+    void createTextureImage();
 
-    int getVkMemHandle(VkExternalMemoryHandleTypeFlagsKHR externalMemoryHandleType);
+    void updateTextureImage();
+
+    void createTextureImageView();
+
+    void createTextureSampler();
+
+    // int getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda);
+
+    // int getVkMemHandle(VkExternalMemoryHandleTypeFlagsKHR externalMemoryHandleType);
 
 };
 

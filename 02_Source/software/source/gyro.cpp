@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     {
       std::cout << std::endl;
     }
-    usleep(100000);
+    // usleep(100000);
 
     ////only read accel data from bmi160
     //int16_t onlyAccel[3] = {0};

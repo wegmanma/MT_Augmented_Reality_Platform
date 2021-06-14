@@ -31,6 +31,16 @@ BMI160::BMI160()
     Ogyro = (struct bmi160SensorData *)malloc(sizeof(struct bmi160SensorData));
 }
 
+BMI160::BMI160(int8_t i2c_device, int8_t i2c_addr)
+{
+    Obmi160 = (struct bmi160Dev *)malloc(sizeof(struct bmi160Dev));
+    Obmi160->id = i2c_addr;
+    Obmi160->i2c_dev = i2c_device;
+    Obmi160->interface = BMI160_I2C_INTF;    
+    Oaccel = (struct bmi160SensorData *)malloc(sizeof(struct bmi160SensorData));
+    Ogyro = (struct bmi160SensorData *)malloc(sizeof(struct bmi160SensorData));
+}
+
 int8_t BMI160::I2cInit(int8_t i2c_device, int8_t i2c_addr)
 {
 
@@ -104,7 +114,8 @@ int8_t BMI160::softReset(struct bmi160Dev *dev)
     int8_t rslt = BMI160_OK;
     uint8_t data = BMI160_SOFT_RESET_CMD;
     if (dev == NULL)
-    {
+    {   
+        printf("dev == NULL\n");
         rslt = BMI160_E_NULL_PTR;
     }
     rslt = BMI160::setRegs(BMI160_COMMAND_REG_ADDR, &data, 1, dev);
@@ -149,7 +160,7 @@ int8_t BMI160::setSensConf(struct bmi160Dev *dev)
 
     dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
 
-    dev->gyroCfg.odr = BMI160_GYRO_ODR_1600HZ;
+    dev->gyroCfg.odr = BMI160_GYRO_ODR_3200HZ;
     dev->gyroCfg.range = BMI160_GYRO_RANGE_2000_DPS;
     dev->gyroCfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
 
@@ -866,11 +877,11 @@ int8_t BMI160::getAccelGyroData(uint8_t len, struct bmi160SensorData *accel, str
 
 int8_t BMI160::getRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi160Dev *dev)
 {
-
     int8_t rslt = BMI160_OK;
     //Null-pointer check
     if (dev == NULL)
     {
+        printf("dev == NULL\n");
         rslt = BMI160_E_NULL_PTR;
     }
     else
@@ -915,7 +926,6 @@ int8_t BMI160::I2cGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     uint8_t reg[1] = {reg_addr};
     ssize_t written_bytes = write(file, reg, 1);
     uint8_t output[len];
-
     if (read(file, output, len) != len)
     {
         printf("Error : Input/Output error \n");
@@ -969,7 +979,8 @@ int8_t BMI160::I2cSetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     if ((file = open(filename, O_RDWR)) < 0)
     {
         /* ERROR HANDLING: you can check errno to see what went wrong */
-        perror("Failed to open the i2c bus");
+        perror("I2cSetRegs: Failed to open the i2c bus");
+        printf("Filename = %s\n",filename);
         exit(1);
     }
 

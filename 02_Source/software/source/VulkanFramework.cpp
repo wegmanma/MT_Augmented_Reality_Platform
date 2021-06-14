@@ -24,8 +24,10 @@
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
 #include "VideoDisplay.hpp"
-// #include "computation.cuh"
+#include "PositionEstimate.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -34,6 +36,8 @@ const bool enableValidationLayers = true;
 #endif
 #pragma warning(push)
 #pragma warning(disable : 26812) // disabling a warning when including a header works normally for most warnings.
+
+#define FPS_MAX_INV 2000 // milliseconds
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanFramework::debugCallback(
     VkDebugReportFlagsEXT flags,
@@ -76,8 +80,6 @@ void signalHandler( int signum) {
 
 void VulkanFramework::run() {
     signal(SIGINT, signalHandler); 
-    // pointCloud.captureLeft.CudaCaptureInit(0);
-    // pointCloud.captureRight.CudaCaptureInit(1);
     initWindow();
     initVulkan();
     mainLoop();
@@ -102,6 +104,7 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 }
 
 void VulkanFramework::initVulkan() {
+    positionEstimate = new PositionEstimate();
     createInstance();
     setupDebugCallback();
     createSurface();
@@ -115,8 +118,12 @@ void VulkanFramework::initVulkan() {
     createFramebuffers();
     createCommandPool();
 
+    createTextureImage();
+    createTextureImageView();
+    createTextureSampler();
     createSyncObjects();
-    // pointCloud.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size());
+    
+    projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
     createCommandBuffers();
 
 }
@@ -126,15 +133,16 @@ void VulkanFramework::mainLoop() {
     while (!glfwWindowShouldClose(window)) {
         
         startTime = std::chrono::steady_clock::now();
+
         glfwPollEvents();
-        //compute();
+
         drawFrame();
+
         endTime = std::chrono::steady_clock::now();
 
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
 
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-
         std::cout << "Calculation and rendering in " << 1/nseconds << "fps"<<  std::endl;
     }
 
@@ -155,7 +163,7 @@ void VulkanFramework::cleanupSwapChain() {
 
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 
-    // pointCloud.cleanupSwapChain(device, swapChainImages.size());
+    projectedSurface.cleanupSwapChain(device, swapChainImages.size());
     if (descriptorPool != VK_NULL_HANDLE)
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
@@ -164,6 +172,15 @@ void VulkanFramework::cleanupSwapChain() {
 
 void VulkanFramework::cleanup() {
 
+
+    vkDestroyBuffer(device, stagingProjectedBuffer, nullptr);
+    vkFreeMemory(device, stagingProjectedBufferMemory, nullptr);
+
+    vkDestroySampler(device, projectedSampler, nullptr);
+    vkDestroyImageView(device, projectedImageView, nullptr);
+
+    vkDestroyImage(device, projectedImage, nullptr);
+    vkFreeMemory(device, projectedImageMemory, nullptr);
     cleanupSwapChain();
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -171,7 +188,7 @@ void VulkanFramework::cleanup() {
         vkDestroyFence(device, inFlightFences[i], nullptr);
     }
 
-    // pointCloud.cleanup(device);
+    projectedSurface.cleanup(device);
     vkDestroyCommandPool(device, commandPool, nullptr);
 
     vkDestroyDevice(device, nullptr);
@@ -428,18 +445,25 @@ void VulkanFramework::recreateSwapChain() {
         glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
     }
-
+    std::cout << "1" << std::endl;
 
     vkDeviceWaitIdle(device);
+    std::cout << "2" << std::endl;
     cleanupSwapChain();
+    std::cout << "3" << std::endl;
     createSwapChain();
+    std::cout << "4" << std::endl;
     createImageViews();
+    std::cout << "5" << std::endl;
     createRenderPass();  
+    std::cout << "6" << std::endl;
     createFramebuffers();
+    std::cout << "7" << std::endl;
 
-    // pointCloud.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size());
+    projectedSurface.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
+    std::cout << "8" << std::endl;
     createCommandBuffers();
-    
+    std::cout << "fin" << std::endl;
 }
 
 void VulkanFramework::createImageViews() {
@@ -514,9 +538,6 @@ void VulkanFramework::createRenderPass() {
 }
 
 
-
-
-
 void VulkanFramework::createFramebuffers() {
     swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -584,18 +605,13 @@ void VulkanFramework::createCommandBuffers() {
         
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        // VkBuffer vertexBuffers3D[] = { pointCloud.vertexBuffer };
-        VkDeviceSize offsets3D[] = { 0 };
-        // vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pointCloud.graphicsPipeline); //
-        // vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers3D, offsets3D);
-        // vkCmdBindIndexBuffer(commandBuffers[i], pointCloud.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        // vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pointCloud.pipelineLayout, 0, 1, &pointCloud.descriptorSets[i], 0, nullptr);
-        // printf("NumPointsTodraw: %d",pointCloud.siftData1.numPts );
-        // vkCmdDrawIndexed(commandBuffers[i], 1920*1080*6, 1, 0, 0, 0);
-        //vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(pointCloud.computation.vertexBufSize), 1, 0, 0);
-        // Second Subpass
-
-        
+       VkBuffer vertexBuffers[] = { projectedSurface.vertexBuffer };
+       VkDeviceSize offsets[] = { 0 };
+       vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
+       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+       vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+       vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
+       vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
 
 
         vkCmdEndRenderPass(commandBuffers[i]);
@@ -646,19 +662,27 @@ void VulkanFramework::createSyncObjects() {
 }
 
 void VulkanFramework::drawFrame() {
+    printf("wait for fences1\n");
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        //recreateSwapChain();
+        std::cout << "recreate Swap Chain 1" << std::endl;
+        recreateSwapChain();
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
+
+    projectedSurface.update(device,commandPool, graphicsQueue, swapChainExtent, imageIndex);
+    
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+        printf("wait for fences\n");
         vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
+
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
     if (!startSubmit)
     {
@@ -677,7 +701,7 @@ void VulkanFramework::drawFrame() {
 
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
-
+        // printf("reset fences\n");
         vkResetFences(device, 1, &inFlightFences[currentFrame]); 
         if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
@@ -702,9 +726,11 @@ void VulkanFramework::drawFrame() {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
+        printf("submit\n");
         if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
+        printf("submit fin\n");
     }
 
     VkPresentInfoKHR presentInfo = {};
@@ -718,9 +744,9 @@ void VulkanFramework::drawFrame() {
     presentInfo.pSwapchains = swapChains;
 
     presentInfo.pImageIndices = &imageIndex;
-
+    printf("present\n");
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    
+    printf("present fin\n");
 
     
     // pointCloud.update(device, swapChainExtent, imageIndex);
@@ -729,7 +755,9 @@ void VulkanFramework::drawFrame() {
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
         framebufferResized = false;
-        //recreateSwapChain();
+        std::cout << "recreate Swap Chain 2" << std::endl;
+        recreateSwapChain();
+        return;
     }
     else if (result != VK_SUCCESS) {
         throw std::runtime_error("failed to present swap chain image!");
@@ -739,20 +767,90 @@ void VulkanFramework::drawFrame() {
 }
 
 
-int VulkanFramework::getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda)
-{
-    if (externalSemaphoreHandleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
-        int fd;
-        VkSemaphoreGetFdInfoKHR vulkanSemaphoreGetFdInfoKHR = {};
-        vulkanSemaphoreGetFdInfoKHR.sType      = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
-        vulkanSemaphoreGetFdInfoKHR.pNext      = NULL;
-        vulkanSemaphoreGetFdInfoKHR.semaphore  = semVkCuda;
-        vulkanSemaphoreGetFdInfoKHR.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
-        // pointCloud.fpGetSemaphoreFdKHR(device, &vulkanSemaphoreGetFdInfoKHR, &fd);
-        return fd;
+void VulkanFramework::createTextureImage() {
+    
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load("textures/donut_left.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
     }
-    return -1;
+
+    void* data;
+    // left
+    vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingProjectedBuffer, stagingProjectedBufferMemory);
+    vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
+    memcpy((void*)(((char*)data)), pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingProjectedBufferMemory);
+    vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, projectedImage, projectedImageMemory);
+    
+    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 }
+
+
+void VulkanFramework::createTextureImageView() {
+    projectedImageView = vkh::createImageView(device, projectedImage, VK_FORMAT_R8G8B8A8_UNORM); 
+}
+
+void VulkanFramework::createTextureSampler() {
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.pNext = nullptr;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = 16;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &projectedSampler) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture sampler!");
+    }
+}
+
+void VulkanFramework::updateTextureImage() {
+    
+
+    int texWidth = 64;
+    int texHeight = 64;
+    int texChannels = 4;
+    unsigned char* pixels;
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    void* data;
+    vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingProjectedBufferMemory);
+
+  
+    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+
+}
+
+// int VulkanFramework::getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda)
+// {
+//     if (externalSemaphoreHandleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
+//         int fd;
+//         VkSemaphoreGetFdInfoKHR vulkanSemaphoreGetFdInfoKHR = {};
+//         vulkanSemaphoreGetFdInfoKHR.sType      = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+//         vulkanSemaphoreGetFdInfoKHR.pNext      = NULL;
+//         vulkanSemaphoreGetFdInfoKHR.semaphore  = semVkCuda;
+//         vulkanSemaphoreGetFdInfoKHR.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+//         // pointCloud.fpGetSemaphoreFdKHR(device, &vulkanSemaphoreGetFdInfoKHR, &fd);
+//         return fd;
+//     }
+//     return -1;
+// }
 
 bool VulkanFramework::checkValidationLayerSupport() {
     uint32_t layerCount;
@@ -778,3 +876,4 @@ bool VulkanFramework::checkValidationLayerSupport() {
 
     return true;
 }
+

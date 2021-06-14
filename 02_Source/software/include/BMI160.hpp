@@ -1,3 +1,5 @@
+#pragma once
+
 /*
 ===============================================
 BMI160 accelerometer/gyroscope library for Intel(R) Curie(TM) devices.
@@ -1039,6 +1041,7 @@ enum bmi160StepDetectMode
 class BMI160
 {
 public:
+  BMI160(int8_t i2c_device, int8_t i2c_addr);
   BMI160();
 
   /*
