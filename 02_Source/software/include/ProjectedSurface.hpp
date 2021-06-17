@@ -11,7 +11,7 @@ class ProjectedSurface  {
 public:
 
     const std::vector<uint32_t> indices = {
-    0, 1, 2, 2, 3, 0
+    2, 1, 0, 2, 0, 3
     };
 
     VkPipelineLayout pipelineLayout{};

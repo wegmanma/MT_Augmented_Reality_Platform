@@ -857,13 +857,13 @@ int8_t BMI160::getAccelGyroData(uint8_t len, struct bmi160SensorData *accel, str
             time_0 = data_array[idx++];
             time_1 = (uint16_t)(data_array[idx++] << 8);
             time_2 = (uint32_t)(data_array[idx++] << 16);
-            //accel->sensortime = (uint32_t)(time_2 | time_1 | time_0);
-            //gyro->sensortime = (uint32_t)(time_2 | time_1 | time_0);
+            accel->sensortime = (uint32_t)(time_2 | time_1 | time_0);
+            gyro->sensortime = (uint32_t)(time_2 | time_1 | time_0);
         }
         else
         {
-            //accel->sensortime = 0;
-            //gyro->sensortime = 0;
+            accel->sensortime = 0;
+            gyro->sensortime = 0;
             ;
         }
     }
@@ -1428,6 +1428,16 @@ int8_t BMI160::setStepPowerMode(uint8_t model, struct bmi160Dev *dev)
     }
 
     return rslt;
+}
+
+int8_t BMI160::setGyroFOC() {
+    int8_t rslt;
+    uint8_t msg = BMI160_GYRO_FOC_EN_MSK;
+    rslt = BMI160::setRegs(BMI160_FOC_CONF_ADDR, &msg, 1, Obmi160);
+    usleep(10000);
+    msg = BMI160_START_FOC_CMD;
+    rslt = BMI160::setRegs(BMI160_COMMAND_REG_ADDR, &msg, 1, Obmi160);  
+    return rslt;  
 }
 
 int8_t BMI160::setStepCounter()

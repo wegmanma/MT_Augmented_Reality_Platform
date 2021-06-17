@@ -24,6 +24,10 @@ void PositionEstimate::get_gyro_data(vec3 gyro_data) {
 void PositionEstimate::thrBMI160()
 {
 
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point endTime;
+    std::chrono::steady_clock::duration timeSpan;
+
     if (bmi160->softReset() != BMI160_OK)
     {
         std::cout << "reset false" << std::endl;
@@ -33,6 +37,8 @@ void PositionEstimate::thrBMI160()
         std::cout << "init false" << std::endl;
         return;
     }
+    
+
     int i = 0;
     int rslt;
     int16_t accelGyro[6] = {0};
@@ -47,17 +53,28 @@ void PositionEstimate::thrBMI160()
         }
     }
 
-
+    bmi160->setGyroFOC();
     while (1)
     {
-
+        
         //get both accel and gyro data from bmi160
         //parameter accelGyro is the pointer to store the data
+        startTime = std::chrono::steady_clock::now();
         rslt = bmi160->getAccelGyroData(accelGyro);
+        endTime = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
+        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
         for (i = 0; i < 3; i++)
         {
                 // kill offset for gyro
-                cumulated_rotation_xyz[i] += (accelGyro[i] * 3.14 / 180.0);      
+                
+                cumulated_rotation_xyz[i] += (accelGyro[i]*0.061*nseconds);   
+                if (cumulated_rotation_xyz[i] >= 360.0f) {
+                    cumulated_rotation_xyz[i] -= 360.0f;
+                }   
+                if (cumulated_rotation_xyz[i] <= 0.0f) {
+                    cumulated_rotation_xyz[i] += 360.0f;
+                }  
         }
         //if (rslt == 0)
         //{

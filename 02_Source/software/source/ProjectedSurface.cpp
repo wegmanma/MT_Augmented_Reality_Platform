@@ -8,10 +8,9 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "PositionEstimate.hpp"
 #include "ProjectedSurface.hpp"
 #include "VulkanHelper.hpp"
-#include "PositionEstimate.hpp"
-
 
 void ProjectedSurface::cleanupSwapChain(VkDevice device, size_t numSwapChainImages)
 {
@@ -215,10 +214,10 @@ void ProjectedSurface::createVertexBuffer(VkDevice device, VkPhysicalDevice phys
 
     std::vector<vkh::Vertex> vertices = {
         // indices
-        {{-1.0f, 0.4f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 0
-        {{-0.1f, 0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}, // 1
-        {{-0.1f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 2
-        {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}  // 3
+        {{0.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},   // 0
+        {{0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},  // 1
+        {{0.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 2
+        {{0.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}   // 3
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -280,25 +279,73 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     vec3 gyroData;
     positionEstimate->get_gyro_data(gyroData);
-    std::cout << "GyroData: " << gyroData[0] << " " << gyroData[1] << " " << gyroData[2] << " " << std::endl;
-
-
-
+    //std::cout << "GyroData: " << (int)gyroData[0] << " " << (int)gyroData[1] << " " << (int)gyroData[2] << " " << std::endl;
+    printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};
-    // the image in not rotated.
+
     mat4x4_identity(ubo.model);
     mat4x4 Model;
     mat4x4_dup(Model, ubo.model);
-    mat4x4_rotate(ubo.model, Model, 1.0f, 0.0f, 1.0f, degreesToRadians(0.0f));
+    mat4x4 translation;
+    mat4x4 rotation;
+    mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(0.0f));
+    mat4x4_translate(translation, 2.0f, 0.0f, 0.0f);
+    mat4x4_mul(ubo.model, translation, rotation);
 
-    vec3 eye = {2.0f, 2.0f, 1.0f};
-    vec3 center = {0.0f, 0.0f, 0.0f};
+    // std::cout << "ubo.model = " << std::endl;
+    // std::cout << "|" << ubo.model[0][0] << " " << ubo.model[1][0] << " " << ubo.model[2][0] << " " << ubo.model[3][0] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][1] << " " << ubo.model[1][1] << " " << ubo.model[2][1] << " " << ubo.model[3][1] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][2] << " " << ubo.model[1][2] << " " << ubo.model[2][2] << " " << ubo.model[3][2] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][3] << " " << ubo.model[1][3] << " " << ubo.model[2][3] << " " << ubo.model[3][3] << "|" << std::endl;
+
+    vec3 eye = {0.0f, 0.0f, 0.0f};
+    vec4 center_before = {1.0f, 0.0f, 0.0f, 1.0f};
+    vec4 center_after; 
     vec3 up = {0.0f, 0.0f, 1.0f};
+    mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(gyroData[2]));
+    mat4x4_mul_vec4(center_after, rotation, center_before);
+    vec3 center = {center_after[0],center_after[1],center_after[2]};
+
     mat4x4_look_at(ubo.view, eye, center, up);
-    mat4x4_perspective(ubo.proj, degreesToRadians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+
+    // std::cout << "ubo.view = " << std::endl;
+    // std::cout << "|" << ubo.view[0][0] << " " << ubo.view[1][0] << " " << ubo.view[2][0] << " " << ubo.view[3][0] << "|" << std::endl;
+    // std::cout << "|" << ubo.view[0][1] << " " << ubo.view[1][1] << " " << ubo.view[2][1] << " " << ubo.view[3][1] << "|" << std::endl;
+    // std::cout << "|" << ubo.view[0][2] << " " << ubo.view[1][2] << " " << ubo.view[2][2] << " " << ubo.view[3][2] << "|" << std::endl;
+    // std::cout << "|" << ubo.view[0][3] << " " << ubo.view[1][3] << " " << ubo.view[2][3] << " " << ubo.view[3][3] << "|" << std::endl;
+
+    mat4x4_perspective(ubo.proj, degreesToRadians(80.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
     ubo.proj[1][1] *= -1;
 
+    // std::cout << "ubo.proj = " << std::endl;
+    // std::cout << "|" << ubo.proj[0][0] << " " << ubo.proj[1][0] << " " << ubo.proj[2][0] << " " << ubo.proj[3][0] << "|" << std::endl;
+    // std::cout << "|" << ubo.proj[0][1] << " " << ubo.proj[1][1] << " " << ubo.proj[2][1] << " " << ubo.proj[3][1] << "|" << std::endl;
+    // std::cout << "|" << ubo.proj[0][2] << " " << ubo.proj[1][2] << " " << ubo.proj[2][2] << " " << ubo.proj[3][2] << "|" << std::endl;
+    // std::cout << "|" << ubo.proj[0][3] << " " << ubo.proj[1][3] << " " << ubo.proj[2][3] << " " << ubo.proj[3][3] << "|" << std::endl;
+
+    // mat4x4 totalMatrix;
+    // mat4x4 perspView;
+    // vec4 source = {1.0f, 1.0f, 1.0f, 1.0};
+    // vec4 result;
+    // mat4x4_mul(perspView,ubo.proj,ubo.view);
+    // mat4x4_mul(totalMatrix, perspView,ubo.model);
+    // mat4x4_mul_vec4(result, totalMatrix, source);
+    // std::cout << "(1,1,1) result = " << std::endl;
+    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
+    // source[1] = -1.0f;
+    // mat4x4_mul_vec4(result, totalMatrix, source);
+    // std::cout << "(1,-1,1) result = " << std::endl;
+    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
+    // source[2] = -1.0f;
+    // mat4x4_mul_vec4(result, totalMatrix, source);
+    // std::cout << "(1,-1,-1) result = " << std::endl;
+    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
+    // source[1] = 1.0f;
+    // mat4x4_mul_vec4(result, totalMatrix, source);
+    // std::cout << "(1,1,-1) result = " << std::endl;
+    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
     void *data;
+
     vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device, uniformBuffersMemory[currentImage]);

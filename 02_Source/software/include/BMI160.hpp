@@ -1117,6 +1117,12 @@ public:
      */
   int8_t setStepPowerMode(uint8_t model);
 
+  /*
+     * @brief perform a Offset correction on Gyro
+     * @return BMI160_OK(0) means success
+     */
+  int8_t setGyroFOC();
+
   uint8_t onlyAccel = 1;
   uint8_t onlyGyro = 2;
   uint8_t bothAccelGyro = 3;

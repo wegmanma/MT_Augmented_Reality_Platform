@@ -143,7 +143,7 @@ void VulkanFramework::mainLoop() {
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
 
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        std::cout << "Calculation and rendering in " << 1/nseconds << "fps"<<  std::endl;
+        // std::cout << "Calculation and rendering in " << 1/nseconds << "fps"<<  std::endl;
     }
 
     vkDeviceWaitIdle(device);
@@ -662,13 +662,11 @@ void VulkanFramework::createSyncObjects() {
 }
 
 void VulkanFramework::drawFrame() {
-    printf("wait for fences1\n");
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        std::cout << "recreate Swap Chain 1" << std::endl;
         recreateSwapChain();
         return;
     }
@@ -679,7 +677,6 @@ void VulkanFramework::drawFrame() {
     projectedSurface.update(device,commandPool, graphicsQueue, swapChainExtent, imageIndex);
     
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-        printf("wait for fences\n");
         vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
 
@@ -726,11 +723,9 @@ void VulkanFramework::drawFrame() {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
-        printf("submit\n");
         if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
-        printf("submit fin\n");
     }
 
     VkPresentInfoKHR presentInfo = {};
@@ -744,9 +739,7 @@ void VulkanFramework::drawFrame() {
     presentInfo.pSwapchains = swapChains;
 
     presentInfo.pImageIndices = &imageIndex;
-    printf("present\n");
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    printf("present fin\n");
 
     
     // pointCloud.update(device, swapChainExtent, imageIndex);
@@ -763,7 +756,7 @@ void VulkanFramework::drawFrame() {
         throw std::runtime_error("failed to present swap chain image!");
     }
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    //std::this_thread::sleep_for(std::chrono::microseconds(5000));
+    std::this_thread::sleep_for(std::chrono::microseconds(5000));
 }
 
 
