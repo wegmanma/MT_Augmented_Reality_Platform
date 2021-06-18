@@ -279,7 +279,7 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     vec3 gyroData;
     positionEstimate->get_gyro_data(gyroData);
-    //std::cout << "GyroData: " << (int)gyroData[0] << " " << (int)gyroData[1] << " " << (int)gyroData[2] << " " << std::endl;
+    
     printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};
 
@@ -288,6 +288,13 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     mat4x4_dup(Model, ubo.model);
     mat4x4 translation;
     mat4x4 rotation;
+    
+    // std::cout << "rotation = " << std::endl;
+    // std::cout << "|" << rotation[0][0] << " " << rotation[1][0] << " " << rotation[2][0] << " " << rotation[3][0] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][1] << " " << rotation[1][1] << " " << rotation[2][1] << " " << rotation[3][1] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][2] << " " << rotation[1][2] << " " << rotation[2][2] << " " << rotation[3][2] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][3] << " " << rotation[1][3] << " " << rotation[2][3] << " " << rotation[3][3] << "|" << std::endl;
+
     mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(0.0f));
     mat4x4_translate(translation, 2.0f, 0.0f, 0.0f);
     mat4x4_mul(ubo.model, translation, rotation);
@@ -301,11 +308,14 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     vec3 eye = {0.0f, 0.0f, 0.0f};
     vec4 center_before = {1.0f, 0.0f, 0.0f, 1.0f};
     vec4 center_after; 
-    vec3 up = {0.0f, 0.0f, 1.0f};
-    mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(gyroData[2]));
+    vec4 up_before = {0.0f, 0.0f, 1.0f, 1.0f};
+    vec4 up_after;
+    // mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(gyroData[2]));
+    positionEstimate->get_gyro_matrix(rotation);
     mat4x4_mul_vec4(center_after, rotation, center_before);
+    mat4x4_mul_vec4(up_after, rotation, up_before);
     vec3 center = {center_after[0],center_after[1],center_after[2]};
-
+    vec3 up = {up_after[0],up_after[1],up_after[2]};
     mat4x4_look_at(ubo.view, eye, center, up);
 
     // std::cout << "ubo.view = " << std::endl;
