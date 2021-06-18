@@ -22,6 +22,7 @@
 #include "VulkanHelper.hpp"
 #include "ProjectedSurface.hpp"
 #include "PositionEstimate.hpp"
+#include "MainCamera.hpp"
 
 class VulkanFramework {
 
@@ -41,6 +42,7 @@ public:
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
     };
 
+    MainCamera mainCamera{};
     ProjectedSurface projectedSurface{};
 
     PositionEstimate *positionEstimate = {};
@@ -98,6 +100,15 @@ private:
 
     VkImageView projectedImageView;
     VkSampler projectedSampler;
+
+    VkBuffer stagingMainBuffer;
+    VkDeviceMemory stagingMainBufferMemory;
+
+    VkImage mainImage;
+    VkDeviceMemory mainImageMemory;
+
+    VkImageView mainImageView;
+    VkSampler mainSampler;
 
     bool framebufferResized = false;    
 

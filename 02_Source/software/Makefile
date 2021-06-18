@@ -30,6 +30,9 @@ bin/VulkanHelper.o: source/VulkanHelper.cpp include/VulkanHelper.hpp
 bin/ProjectedSurface.o: source/ProjectedSurface.cpp include/ProjectedSurface.hpp
 	@ mkdir -p bin
 	g++ -c -I../../common/inc $(CFLAGS) -c -I$(INCLUDE) -o bin/ProjectedSurface.o source/ProjectedSurface.cpp $(LDFLAGS)
+bin/MainCamera.o: source/MainCamera.cpp include/MainCamera.hpp
+	@ mkdir -p bin
+	g++ -c -I../../common/inc $(CFLAGS) -c -I$(INCLUDE) -o bin/MainCamera.o source/MainCamera.cpp $(LDFLAGS)
 bin/FrameCapture.o: source/FrameCapture.cpp include/FrameCapture.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/FrameCapture.o source/FrameCapture.cpp $(LDFLAGS)
@@ -41,7 +44,7 @@ bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 gyro: bin/BMI160.o bin/gyro.o 
 	g++ $(NVFLAGS) $^ -o $@ $(LDFLAGS)
 
-ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/FrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o
+ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/FrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o
 	g++ $(NVFLAGS) $^ -o $@ $(LDFLAGS)
 	
 .PHONY: directories test clean 

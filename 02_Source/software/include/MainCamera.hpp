@@ -11,7 +11,7 @@ class MainCamera  {
 public:
 
     const std::vector<uint32_t> indices = {
-    2, 1, 0, 2, 0, 3
+    0, 1, 2, 2, 3, 0
     };
 
     VkPipelineLayout pipelineLayout{};
@@ -30,7 +30,7 @@ public:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
 
 
-    void create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler, PositionEstimate *positionEstimatePtr);
+    void create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler);
 
     void recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler);
 
@@ -57,6 +57,4 @@ public:
     void createDescriptorSetLayout(VkDevice device);
 
 private:
-
-    PositionEstimate *positionEstimate{0};
 };

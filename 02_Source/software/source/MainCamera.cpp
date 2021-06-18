@@ -35,9 +35,8 @@ void MainCamera::cleanup(VkDevice device)
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 }
 
-void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler, PositionEstimate *positionEstimatePtr)
+void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
 {
-    positionEstimate = positionEstimatePtr;
     createDescriptorSetLayout(device);
     createGraphicsPipeline(device, renderPass, swapChainExtent);
     createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue);
@@ -214,10 +213,10 @@ void MainCamera::createVertexBuffer(VkDevice device, VkPhysicalDevice physicalDe
 
     std::vector<vkh::Vertex> vertices = {
         // indices
-        {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},   // 0
-        {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},  // 1
-        {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 2
-        {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}   // 3
+        {{-1.0f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
+        {{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
+        {{1.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
+        {{-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();

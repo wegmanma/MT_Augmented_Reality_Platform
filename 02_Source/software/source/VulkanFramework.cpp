@@ -24,6 +24,7 @@
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
 #include "PositionEstimate.hpp"
+#include "MainCamera.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -91,7 +92,7 @@ void VulkanFramework::initWindow() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    window = glfwCreateWindow(1600, 1080, "VT2 Wegr", nullptr, nullptr);
+    window = glfwCreateWindow(1920, 1080, "MT Wegr", nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
@@ -123,6 +124,7 @@ void VulkanFramework::initVulkan() {
     createSyncObjects();
     
     projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
+    mainCamera.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), mainImageView, mainSampler);
     createCommandBuffers();
 
 }
@@ -161,7 +163,7 @@ void VulkanFramework::cleanupSwapChain() {
     }
 
     vkDestroySwapchainKHR(device, swapChain, nullptr);
-
+    mainCamera.cleanupSwapChain(device, swapChainImages.size());
     projectedSurface.cleanupSwapChain(device, swapChainImages.size());
     if (descriptorPool != VK_NULL_HANDLE)
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
@@ -180,13 +182,22 @@ void VulkanFramework::cleanup() {
 
     vkDestroyImage(device, projectedImage, nullptr);
     vkFreeMemory(device, projectedImageMemory, nullptr);
+
+    vkDestroyBuffer(device, stagingMainBuffer, nullptr);
+    vkFreeMemory(device, stagingMainBufferMemory, nullptr);
+
+    vkDestroySampler(device, mainSampler, nullptr);
+    vkDestroyImageView(device, mainImageView, nullptr);
+
+    vkDestroyImage(device, mainImage, nullptr);
+    vkFreeMemory(device, mainImageMemory, nullptr);
     cleanupSwapChain();
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(device, inFlightFences[i], nullptr);
     }
-
+    mainCamera.cleanup(device);
     projectedSurface.cleanup(device);
     vkDestroyCommandPool(device, commandPool, nullptr);
 
@@ -460,6 +471,7 @@ void VulkanFramework::recreateSwapChain() {
     std::cout << "7" << std::endl;
 
     projectedSurface.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
+    mainCamera.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
     std::cout << "8" << std::endl;
     createCommandBuffers();
     std::cout << "fin" << std::endl;
@@ -604,10 +616,19 @@ void VulkanFramework::createCommandBuffers() {
         
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-       VkBuffer vertexBuffers[] = { projectedSurface.vertexBuffer };
+
+       VkBuffer vertexBufferMain[] = { mainCamera.vertexBuffer };
        VkDeviceSize offsets[] = { 0 };
+       vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mainCamera.graphicsPipeline);
+       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferMain, offsets);
+       vkCmdBindIndexBuffer(commandBuffers[i], mainCamera.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+       vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mainCamera.pipelineLayout, 0, 1, &mainCamera.descriptorSets[i], 0, nullptr);
+       vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mainCamera.indices.size()), 1, 0, 0, 0);   
+
+
+       VkBuffer vertexBufferProjected[] = { projectedSurface.vertexBuffer };
        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
-       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
        vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
@@ -672,7 +693,7 @@ void VulkanFramework::drawFrame() {
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
-
+    mainCamera.update(device,commandPool, graphicsQueue, swapChainExtent, imageIndex);
     projectedSurface.update(device,commandPool, graphicsQueue, swapChainExtent, imageIndex);
     
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
@@ -762,7 +783,7 @@ void VulkanFramework::drawFrame() {
 void VulkanFramework::createTextureImage() {
     
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("textures/donut_left.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("textures/Cam2.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels) {
@@ -770,7 +791,7 @@ void VulkanFramework::createTextureImage() {
     }
 
     void* data;
-    // left
+
     vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingProjectedBuffer, stagingProjectedBufferMemory);
     vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((char*)data)), pixels, static_cast<size_t>(imageSize));
@@ -780,11 +801,32 @@ void VulkanFramework::createTextureImage() {
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
     vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+
+ 
+    pixels = stbi_load("textures/Cam1.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    imageSize = texWidth * texHeight * 4;
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMainBuffer, stagingMainBufferMemory);
+    vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
+    memcpy((void*)(((char*)data)), pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingMainBufferMemory);
+    vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mainImage, mainImageMemory);
+    
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+
+
 }
 
 
 void VulkanFramework::createTextureImageView() {
     projectedImageView = vkh::createImageView(device, projectedImage, VK_FORMAT_R8G8B8A8_UNORM); 
+    mainImageView = vkh::createImageView(device, mainImage, VK_FORMAT_R8G8B8A8_UNORM); 
 }
 
 void VulkanFramework::createTextureSampler() {
@@ -805,6 +847,9 @@ void VulkanFramework::createTextureSampler() {
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
     if (vkCreateSampler(device, &samplerInfo, nullptr, &projectedSampler) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture sampler!");
+    }
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &mainSampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler!");
     }
 }

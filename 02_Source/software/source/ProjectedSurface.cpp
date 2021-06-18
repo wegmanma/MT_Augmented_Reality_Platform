@@ -214,10 +214,10 @@ void ProjectedSurface::createVertexBuffer(VkDevice device, VkPhysicalDevice phys
 
     std::vector<vkh::Vertex> vertices = {
         // indices
-        {{0.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},   // 0
-        {{0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},  // 1
-        {{0.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 2
-        {{0.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}   // 3
+        {{0.0f, 1.0f, 0.5625f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
+        {{0.0f, -1.0f, 0.5625f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
+        {{0.0f, -1.0f, -0.5625f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
+        {{0.0f, 1.0f, -0.5625f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -279,7 +279,7 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     vec3 gyroData;
     positionEstimate->get_gyro_data(gyroData);
-    
+
     printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};
 
