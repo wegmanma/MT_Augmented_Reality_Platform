@@ -4,14 +4,13 @@
 #include <vulkan/vulkan.h>
 
 #include "FrameCapture.hpp"
-#include "PositionEstimate.hpp"
 
 class MainCamera  {
 
 public:
 
     const std::vector<uint32_t> indices = {
-    0, 1, 2, 2, 3, 0
+    2, 1, 0, 0, 3, 2
     };
 
     VkPipelineLayout pipelineLayout{};

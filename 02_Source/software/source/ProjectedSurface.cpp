@@ -280,7 +280,7 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     vec3 gyroData;
     positionEstimate->get_gyro_data(gyroData);
 
-    printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
+    // printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};
 
     mat4x4_identity(ubo.model);

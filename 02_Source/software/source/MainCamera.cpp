@@ -8,7 +8,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "PositionEstimate.hpp"
+
 #include "MainCamera.hpp"
 #include "VulkanHelper.hpp"
 
@@ -213,10 +213,10 @@ void MainCamera::createVertexBuffer(VkDevice device, VkPhysicalDevice physicalDe
 
     std::vector<vkh::Vertex> vertices = {
         // indices
-        {{-1.0f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
-        {{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
-        {{1.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
-        {{-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
+        {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
+        {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
+        {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
+        {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -272,13 +272,7 @@ void MainCamera::createUniformBuffers(VkDevice device, VkPhysicalDevice physical
 
 void MainCamera::updateUniformBuffer(VkDevice device, VkExtent2D swapChainExtent, uint32_t currentImage)
 {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
     vkh::UniformBufferObject ubo = {};
-
     mat4x4_identity(ubo.model);
     mat4x4_identity(ubo.view);
     mat4x4_identity(ubo.proj);

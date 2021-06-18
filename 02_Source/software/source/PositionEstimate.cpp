@@ -3,6 +3,9 @@
 
 #include <PositionEstimate.hpp>
 
+#define GYRO_THRESH 12
+#define GYRO_RESOLUTION 0.061
+
 PositionEstimate::PositionEstimate()
 {
     bmi160 = new BMI160(2, 0x69);
@@ -56,16 +59,24 @@ void PositionEstimate::thrBMI160()
     vec3 gyro_degree;
     mat4x4_identity(cumulated_mat);
     mat4x4_identity(temp_mat);
-    rslt = bmi160->getAccelGyroData(accelGyro);
-    if (rslt == 0)
-    {
+    
+    for (int n = 0;n<100;n++) {
+        rslt = bmi160->getAccelGyroData(accelGyro);
         for (i = 0; i < 3; i++)
         {
             // kill offset for gyro
-            zero_rotation_xyz[i] = accelGyro[i] * 3.14 / 180.0;
+            zero_rotation_xyz[i] += accelGyro[i];
+        }
+        for (i = 3; i < 6; i++)
+        {
+            
         }
     }
-
+    for (i = 0; i < 3; i++)
+    {
+        // kill offset for gyro
+        zero_rotation_xyz[i] /= 100;
+    }    
     bmi160->setGyroFOC();
     while (1)
     {
@@ -77,10 +88,13 @@ void PositionEstimate::thrBMI160()
         endTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+        // std::cout << "Gyro" << std::endl;
         for (i = 0; i < 3; i++)
         {
-            gyro_degree[i] = (accelGyro[i] * 0.061 * nseconds);//  / 180.0 * pi;
-            cumulated_rotation_xyz[i] += (accelGyro[i] * 0.061 * nseconds);
+            // std::cout << accelGyro[i] << std::endl;
+            gyro_degree[i] = ((accelGyro[i]-zero_rotation_xyz[i]) * GYRO_RESOLUTION * nseconds);
+            // if ((accelGyro[i] <= GYRO_THRESH)&&(accelGyro[i] >= -GYRO_THRESH)) gyro_degree[i] = 0.0;
+            cumulated_rotation_xyz[i] += (accelGyro[i] * GYRO_RESOLUTION * nseconds);
             if (cumulated_rotation_xyz[i] >= 360.0f)
             {
                 cumulated_rotation_xyz[i] -= 360.0f;
@@ -89,6 +103,11 @@ void PositionEstimate::thrBMI160()
             {
                 cumulated_rotation_xyz[i] += 360.0f;
             }
+        }
+        // std::cout << "Accel" << std::endl;
+        for (i = 3; i < 6; i++)
+        {
+            // std::cout << accelGyro[i]/ 16384.0 << std::endl;
         }
         inv_omega_len = Q_rsqrt((float)(gyro_degree[0] * gyro_degree[0] + gyro_degree[1] * gyro_degree[1] + gyro_degree[2] * gyro_degree[2]));
         if (inv_omega_len != 0)

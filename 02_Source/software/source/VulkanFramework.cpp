@@ -615,10 +615,10 @@ void VulkanFramework::createCommandBuffers() {
         renderPassInfo.pClearValues = &clearColor;
         
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
+        VkDeviceSize offsets[] = { 0 };
 
        VkBuffer vertexBufferMain[] = { mainCamera.vertexBuffer };
-       VkDeviceSize offsets[] = { 0 };
+       
        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mainCamera.graphicsPipeline);
        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferMain, offsets);
        vkCmdBindIndexBuffer(commandBuffers[i], mainCamera.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
