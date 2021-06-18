@@ -23,7 +23,6 @@
 #include "VulkanFramework.hpp"
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
-#include "VideoDisplay.hpp"
 #include "PositionEstimate.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
