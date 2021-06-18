@@ -27,12 +27,15 @@
 \usepackage{array}
 \usepackage{float}
 \usepackage{pbox}
-
+\usepackage{caption}
 \ifdefined\USEGLOSSARIES
 	\usepackage[acronyms]{glossaries}
 	\makeglossaries
 	\include{glossaries/glossaries}
 \fi
+
+\DeclareCaptionFormat{myformat}{#1#2#3\hrulefill}
+\captionsetup[figure]{format=myformat}
 
 \begin{document}
 %How the hyperlinks are shown, remove this or change it if you want the colorful links
