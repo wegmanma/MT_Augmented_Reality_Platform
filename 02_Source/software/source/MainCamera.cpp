@@ -8,11 +8,11 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "PositionEstimate.hpp"
-#include "ProjectedSurface.hpp"
+
+#include "MainCamera.hpp"
 #include "VulkanHelper.hpp"
 
-void ProjectedSurface::cleanupSwapChain(VkDevice device, size_t numSwapChainImages)
+void MainCamera::cleanupSwapChain(VkDevice device, size_t numSwapChainImages)
 {
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -25,7 +25,7 @@ void ProjectedSurface::cleanupSwapChain(VkDevice device, size_t numSwapChainImag
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
 
-void ProjectedSurface::cleanup(VkDevice device)
+void MainCamera::cleanup(VkDevice device)
 {
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -35,9 +35,8 @@ void ProjectedSurface::cleanup(VkDevice device)
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 }
 
-void ProjectedSurface::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler, PositionEstimate *positionEstimatePtr)
+void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
 {
-    positionEstimate = positionEstimatePtr;
     createDescriptorSetLayout(device);
     createGraphicsPipeline(device, renderPass, swapChainExtent);
     createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue);
@@ -47,7 +46,7 @@ void ProjectedSurface::create(VkDevice device, VkPhysicalDevice physicalDevice, 
     createDescriptorSets(device, numSwapChainImages, projectedImageView, projectedSampler);
 }
 
-void ProjectedSurface::recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
+void MainCamera::recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
 {
     createGraphicsPipeline(device, renderPass, swapChainExtent);
     createUniformBuffers(device, physicalDevice, numSwapChainImages);
@@ -55,12 +54,12 @@ void ProjectedSurface::recreate(VkDevice device, VkPhysicalDevice physicalDevice
     createDescriptorSets(device, numSwapChainImages, projectedImageView, projectedSampler);
 }
 
-void ProjectedSurface::update(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, uint32_t currentImage)
+void MainCamera::update(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, uint32_t currentImage)
 {
     updateUniformBuffer(device, swapChainExtent, currentImage);
 }
 
-void ProjectedSurface::createDescriptorSetLayout(VkDevice device)
+void MainCamera::createDescriptorSetLayout(VkDevice device)
 {
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
     uboLayoutBinding.binding = 0;
@@ -88,7 +87,7 @@ void ProjectedSurface::createDescriptorSetLayout(VkDevice device)
     }
 }
 
-void ProjectedSurface::createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkExtent2D swapChainExtent)
+void MainCamera::createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkExtent2D swapChainExtent)
 {
     auto vertShaderCode = vkh::readFile("shaders/vert.spv");
     auto fragShaderCode = vkh::readFile("shaders/frag.spv");
@@ -209,15 +208,15 @@ void ProjectedSurface::createGraphicsPipeline(VkDevice device, VkRenderPass rend
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
-void ProjectedSurface::createVertexBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue)
+void MainCamera::createVertexBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue)
 {
 
     std::vector<vkh::Vertex> vertices = {
         // indices
-        {{0.0f, 1.0f, 0.5625f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
-        {{0.0f, -1.0f, 0.5625f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
-        {{0.0f, -1.0f, -0.5625f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
-        {{0.0f, 1.0f, -0.5625f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
+        {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   // 0
+        {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
+        {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 2
+        {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}   // 3
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -236,7 +235,7 @@ void ProjectedSurface::createVertexBuffer(VkDevice device, VkPhysicalDevice phys
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void ProjectedSurface::createIndexBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue)
+void MainCamera::createIndexBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue)
 {
 
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
@@ -257,7 +256,7 @@ void ProjectedSurface::createIndexBuffer(VkDevice device, VkPhysicalDevice physi
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void ProjectedSurface::createUniformBuffers(VkDevice device, VkPhysicalDevice physicalDevice, size_t numSwapChainImages)
+void MainCamera::createUniformBuffers(VkDevice device, VkPhysicalDevice physicalDevice, size_t numSwapChainImages)
 {
     VkDeviceSize bufferSize = sizeof(vkh::UniformBufferObject);
 
@@ -271,97 +270,20 @@ void ProjectedSurface::createUniformBuffers(VkDevice device, VkPhysicalDevice ph
     std::cout << "Uniformbuffers: createBuffer worked " << std::endl;
 }
 
-void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChainExtent, uint32_t currentImage)
+void MainCamera::updateUniformBuffer(VkDevice device, VkExtent2D swapChainExtent, uint32_t currentImage)
 {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-    vec3 gyroData;
-    positionEstimate->get_gyro_data(gyroData);
-
-    // printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};
-
     mat4x4_identity(ubo.model);
-    mat4x4 Model;
-    mat4x4_dup(Model, ubo.model);
-    mat4x4 translation;
-    mat4x4 rotation;
-    
-    // std::cout << "rotation = " << std::endl;
-    // std::cout << "|" << rotation[0][0] << " " << rotation[1][0] << " " << rotation[2][0] << " " << rotation[3][0] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][1] << " " << rotation[1][1] << " " << rotation[2][1] << " " << rotation[3][1] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][2] << " " << rotation[1][2] << " " << rotation[2][2] << " " << rotation[3][2] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][3] << " " << rotation[1][3] << " " << rotation[2][3] << " " << rotation[3][3] << "|" << std::endl;
+    mat4x4_identity(ubo.view);
+    mat4x4_identity(ubo.proj);
 
-    mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(0.0f));
-    mat4x4_translate(translation, 2.0f, 0.0f, 0.0f);
-    mat4x4_mul(ubo.model, translation, rotation);
-
-    // std::cout << "ubo.model = " << std::endl;
-    // std::cout << "|" << ubo.model[0][0] << " " << ubo.model[1][0] << " " << ubo.model[2][0] << " " << ubo.model[3][0] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][1] << " " << ubo.model[1][1] << " " << ubo.model[2][1] << " " << ubo.model[3][1] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][2] << " " << ubo.model[1][2] << " " << ubo.model[2][2] << " " << ubo.model[3][2] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][3] << " " << ubo.model[1][3] << " " << ubo.model[2][3] << " " << ubo.model[3][3] << "|" << std::endl;
-
-    vec3 eye = {0.0f, 0.0f, 0.0f};
-    vec4 center_before = {1.0f, 0.0f, 0.0f, 1.0f};
-    vec4 center_after; 
-    vec4 up_before = {0.0f, 0.0f, 1.0f, 1.0f};
-    vec4 up_after;
-    // mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(gyroData[2]));
-    positionEstimate->get_gyro_matrix(rotation);
-    mat4x4_mul_vec4(center_after, rotation, center_before);
-    mat4x4_mul_vec4(up_after, rotation, up_before);
-    vec3 center = {center_after[0],center_after[1],center_after[2]};
-    vec3 up = {up_after[0],up_after[1],up_after[2]};
-    mat4x4_look_at(ubo.view, eye, center, up);
-
-    // std::cout << "ubo.view = " << std::endl;
-    // std::cout << "|" << ubo.view[0][0] << " " << ubo.view[1][0] << " " << ubo.view[2][0] << " " << ubo.view[3][0] << "|" << std::endl;
-    // std::cout << "|" << ubo.view[0][1] << " " << ubo.view[1][1] << " " << ubo.view[2][1] << " " << ubo.view[3][1] << "|" << std::endl;
-    // std::cout << "|" << ubo.view[0][2] << " " << ubo.view[1][2] << " " << ubo.view[2][2] << " " << ubo.view[3][2] << "|" << std::endl;
-    // std::cout << "|" << ubo.view[0][3] << " " << ubo.view[1][3] << " " << ubo.view[2][3] << " " << ubo.view[3][3] << "|" << std::endl;
-
-    mat4x4_perspective(ubo.proj, degreesToRadians(80.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
-    ubo.proj[1][1] *= -1;
-
-    // std::cout << "ubo.proj = " << std::endl;
-    // std::cout << "|" << ubo.proj[0][0] << " " << ubo.proj[1][0] << " " << ubo.proj[2][0] << " " << ubo.proj[3][0] << "|" << std::endl;
-    // std::cout << "|" << ubo.proj[0][1] << " " << ubo.proj[1][1] << " " << ubo.proj[2][1] << " " << ubo.proj[3][1] << "|" << std::endl;
-    // std::cout << "|" << ubo.proj[0][2] << " " << ubo.proj[1][2] << " " << ubo.proj[2][2] << " " << ubo.proj[3][2] << "|" << std::endl;
-    // std::cout << "|" << ubo.proj[0][3] << " " << ubo.proj[1][3] << " " << ubo.proj[2][3] << " " << ubo.proj[3][3] << "|" << std::endl;
-
-    // mat4x4 totalMatrix;
-    // mat4x4 perspView;
-    // vec4 source = {1.0f, 1.0f, 1.0f, 1.0};
-    // vec4 result;
-    // mat4x4_mul(perspView,ubo.proj,ubo.view);
-    // mat4x4_mul(totalMatrix, perspView,ubo.model);
-    // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,1,1) result = " << std::endl;
-    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
-    // source[1] = -1.0f;
-    // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,-1,1) result = " << std::endl;
-    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
-    // source[2] = -1.0f;
-    // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,-1,-1) result = " << std::endl;
-    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
-    // source[1] = 1.0f;
-    // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,1,-1) result = " << std::endl;
-    // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
     void *data;
-
     vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
 
-void ProjectedSurface::createDescriptorPool(VkDevice device, size_t numSwapChainImages)
+void MainCamera::createDescriptorPool(VkDevice device, size_t numSwapChainImages)
 {
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     // graphics queue needs Uniform Buffer
@@ -370,9 +292,6 @@ void ProjectedSurface::createDescriptorPool(VkDevice device, size_t numSwapChain
     // graphics queue needs the regular texture
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = static_cast<uint32_t>(numSwapChainImages);
-    // graphics queue needs a height map
-    // poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    // poolSizes[2].descriptorCount = static_cast<uint32_t>(numSwapChainImages);
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -387,7 +306,7 @@ void ProjectedSurface::createDescriptorPool(VkDevice device, size_t numSwapChain
     }
 }
 
-void ProjectedSurface::createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
+void MainCamera::createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
 {
     std::vector<VkDescriptorSetLayout> layouts(numSwapChainImages, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};

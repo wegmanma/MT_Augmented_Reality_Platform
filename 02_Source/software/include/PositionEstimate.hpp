@@ -29,7 +29,7 @@ private:
     vec3 zero_rotation_xyz = { 0.0, 0.0, 0.0}; 
 
     vec3 cumulated_rotation_xyz = { 0.0, 0.0, 0.0}; 
-    vec3 cumulated_translation_xyz = { 0.0, 0.0, 0.0};
+    vec4 cumulated_translation_xyz = { 0.0, 0.0, 0.0, 1.0};
     const float pi = 3.14159265;
     std::thread tid;
 
