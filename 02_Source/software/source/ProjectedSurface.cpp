@@ -277,8 +277,6 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
 
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-    vec3 gyroData;
-    positionEstimate->get_gyro_data(gyroData);
 
     // printf("Gyro data: %05.1f %05.1f %05.1f\n", gyroData[0], gyroData[1] ,gyroData[2]);
     vkh::UniformBufferObject ubo = {};

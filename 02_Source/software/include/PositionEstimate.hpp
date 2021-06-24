@@ -10,7 +10,6 @@ public:
 PositionEstimate();
 ~PositionEstimate();
 
-void get_gyro_data(vec3 gyro_data);
 void get_gyro_matrix(mat4x4 gyro_matrix);
 
 private:
@@ -26,7 +25,9 @@ private:
     mat4x4 temp_mat;
     mat4x4 cumulated_mat;
 
-    vec3 zero_rotation_xyz = { 0.0, 0.0, 0.0}; 
+    vec3 zero_rotation_abc = { 0.0, 0.0, 0.0}; 
+    vec3 accel_gain_correct = { 0.0, 0.0, 0.0};
+    vec3 zero_translation_abc = { 0.0, 0.0, 0.0}; 
 
     vec3 cumulated_rotation_xyz = { 0.0, 0.0, 0.0}; 
     vec4 cumulated_translation_xyz = { 0.0, 0.0, 0.0, 1.0};

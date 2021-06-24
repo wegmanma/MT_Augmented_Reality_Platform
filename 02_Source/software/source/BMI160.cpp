@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
+#include <thread>
 #include <iostream>
 #include <linux/i2c-dev.h>
 #include <stdio.h>
@@ -155,7 +156,7 @@ int8_t BMI160::setSensConf(struct bmi160Dev *dev)
 {
     int8_t rslt = BMI160_OK;
     dev->accelCfg.odr = BMI160_ACCEL_ODR_1600HZ;
-    dev->accelCfg.range = BMI160_ACCEL_RANGE_2G;
+    dev->accelCfg.range = BMI160_ACCEL_RANGE_16G;
     dev->accelCfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
 
     dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
@@ -626,7 +627,7 @@ int8_t BMI160::getGyroData(int16_t *data)
 int8_t BMI160::getAccelGyroData(int16_t *data)
 {
     int8_t rslt = BMI160_OK;
-    rslt = getSensorData((BMI160_ACCEL_SEL | BMI160_GYRO_SEL), Oaccel, Ogyro, Obmi160);
+    rslt = getSensorData((BMI160_ACCEL_SEL | BMI160_GYRO_SEL | BMI160_TIME_SEL), Oaccel, Ogyro, Obmi160);
     if (rslt == BMI160_OK)
     {
         data[0] = Ogyro->x;
@@ -635,6 +636,8 @@ int8_t BMI160::getAccelGyroData(int16_t *data)
         data[3] = Oaccel->x;
         data[4] = Oaccel->y;
         data[5] = Oaccel->z;
+        data[6] = Ogyro->sensortime;
+        data[7] = Oaccel->sensortime;
     }
     return rslt;
 }
@@ -895,7 +898,6 @@ int8_t BMI160::getRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi
         {
             rslt = BMI160::I2cGetRegs(dev, reg_addr, data, len);
         }
-        usleep(1000);
         if (rslt != BMI160_OK)
         {
             rslt = BMI160_E_COM_FAIL;
@@ -926,12 +928,18 @@ int8_t BMI160::I2cGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     uint8_t reg[1] = {reg_addr};
     ssize_t written_bytes = write(file, reg, 1);
     uint8_t output[len];
+    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
+
     if (read(file, output, len) != len)
     {
         printf("Error : Input/Output error \n");
         exit(1);
     }
-
+        std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
+        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+        // std::cout << "read: " << nseconds << std::endl;
     for (int i = 0; i < len; i++)
     {
         data[i] = output[i];
@@ -961,8 +969,6 @@ int8_t BMI160::setRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi
         {
             rslt = BMI160::I2cSetRegs(dev, reg_addr, data, len);
         }
-        usleep(1000);
-
         if (rslt != BMI160_OK)
             rslt = BMI160_E_COM_FAIL;
     }
@@ -1392,7 +1398,7 @@ int8_t BMI160::setStepPowerMode(uint8_t model, struct bmi160Dev *dev)
     {
         dev->accelCfg.odr = BMI160_ACCEL_ODR_1600HZ;
         dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
-        dev->gyroCfg.odr = BMI160_GYRO_ODR_3200HZ;
+        dev->gyroCfg.odr = BMI160_GYRO_ODR_1600HZ;
         dev->gyroCfg.power = BMI160_GYRO_NORMAL_MODE;
     }
     else if (model == stepLowPowerMode)
