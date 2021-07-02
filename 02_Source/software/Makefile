@@ -36,6 +36,9 @@ bin/MainCamera.o: source/MainCamera.cpp include/MainCamera.hpp
 bin/FrameCapture.o: source/FrameCapture.cpp include/FrameCapture.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/FrameCapture.o source/FrameCapture.cpp $(LDFLAGS)
+bin/TCPFrameCapture.o: source/TCPFrameCapture.cpp include/TCPFrameCapture.hpp
+	@ mkdir -p bin
+	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
 bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/PositionEstimate.o source/PositionEstimate.cpp $(LDFLAGS)
@@ -44,7 +47,7 @@ bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 gyro: bin/BMI160.o bin/gyro.o 
 	g++ $(NVFLAGS) $^ -o $@ $(LDFLAGS)
 
-ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/FrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o
+ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/FrameCapture.o bin/TCPFrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o
 	g++ $(NVFLAGS) $^ -o $@ $(LDFLAGS)
 	
 .PHONY: directories test clean 

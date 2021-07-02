@@ -23,6 +23,7 @@
 #include "ProjectedSurface.hpp"
 #include "PositionEstimate.hpp"
 #include "MainCamera.hpp"
+#include "TCPFrameCapture.hpp"
 
 class VulkanFramework {
 
@@ -44,6 +45,8 @@ public:
 
     MainCamera mainCamera{};
     ProjectedSurface projectedSurface{};
+
+    TCPFrameCapture tcpCapture{};
 
     PositionEstimate *positionEstimate = {};
 

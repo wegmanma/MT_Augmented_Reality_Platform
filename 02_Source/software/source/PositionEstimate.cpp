@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
-
+#include <iomanip>
 #include <PositionEstimate.hpp>
 
 #define CONST_G 9.81
@@ -10,7 +10,7 @@
 #define NO_MOVEMENT_MAX_COUNT 5
 
 #define GYRO_RESOLUTION 0.061
-#define ACCEL_RESOLUTION 1670.13*8
+#define ACCEL_RESOLUTION 1670.13 * 4
 
 #define SENS_TIME_RESOLUTION 0.000039
 
@@ -18,18 +18,88 @@
 #define CAL_GYRO_X 2.381310
 #define CAL_GYRO_Y -2.783860
 #define CAL_GYRO_Z 6.784730
-#define CAL_ACC_X -65.8768
-#define CAL_ACC_Y -90.7988
-#define CAL_ACC_Z 41.24667
+#define CAL_ACC_X -153.7980625 // -65.8768
+#define CAL_ACC_Y -105.7320625 // -90.7988
+#define CAL_ACC_Z 30.81325  // 41.24667
+// orientational corrections
+#define FACE_UP_CORR 0.9821081568 //0.00163
+#define FACE_DOWN_CORR 0.9966960825 //0.018828
+#define FLIP_LEFT_CORR 0.9882184034 //0.011186
+#define FLIP_RIGHT_CORR 0.9936513847 //0.006859
+#define FLIP_FRONT_CORR 0.9944487206 //0.001764
+#define FLIP_BACK_CORR 1.0004113867 //-0.006346
 
-bool check_around_zero(float val, float tresh) {
-    if ((val < tresh)&&(val > (-1.0)*tresh)) return true;
-    else return false;
+void print_quat(std::string name, quat e)
+{
+    std::cout << std::fixed << std::setprecision(5);
+    std::cout << name << " = (" << std::setw(8) << e[3] << " | " << std::setw(8) << e[0] << ", " << std::setw(8) << e[1] << ", " << std::setw(8) << e[2] << ")" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
 }
 
-bool vec3_check_around_zero(vec3 val, float tresh) {
-    for (int i = 0; i<3; i++) {
-        if (!check_around_zero(val[i], tresh)) return false;
+void PositionEstimate::quat_from_angle_axis(quat R, float radians, vec3 axis)
+{
+    vec3 axis_norm;
+    vec3_norm(axis_norm, axis);
+    R[3] = cos(radians / 2);
+    R[0] = axis_norm[0] * sin(radians / 2);
+    R[1] = axis_norm[1] * sin(radians / 2);
+    R[2] = axis_norm[2] * sin(radians / 2);
+}
+
+void PositionEstimate::quat_RotationBetweenVectors(quat R, vec3 S, vec3 D)
+{
+    vec3 start, dest;
+    vec3_norm(start, S);
+    vec3_norm(dest, D);
+
+    float cosTheta = vec3_mul_inner(start, dest);
+    vec3 rotationAxis;
+
+    if (cosTheta < -1 + 0.001f)
+    {
+        // special case when vectors in opposite directions:
+        // there is no "ideal" rotation axis
+        // So guess one; any will do as long as it's perpendicular to start
+        vec3 ref = {0.0f, 0.0f, 1.0f};
+        vec3_mul_cross(rotationAxis, ref, start);
+        if (vec3_len(rotationAxis) < 0.01)
+        {
+            // bad luck, they were parallel, try again!
+            ref[0] = 1.0f;
+            ref[2] = 0.0f;
+            vec3_mul_cross(rotationAxis, ref, start);
+        }
+        vec3_norm(rotationAxis, rotationAxis);
+        quat_from_angle_axis(R, pi, rotationAxis);
+        return;
+    }
+
+    vec3_mul_cross(rotationAxis, start, dest);
+
+    float s = sqrt((1 + cosTheta) * 2);
+    float invs = 1 / s;
+
+    R[3] = s * 0.5f;
+    R[0] = rotationAxis[0] * invs;
+    R[1] = rotationAxis[1] * invs;
+    R[2] = rotationAxis[2] * invs;
+    return;
+}
+
+bool check_around_zero(float val, float tresh)
+{
+    if ((val < tresh) && (val > (-1.0) * tresh))
+        return true;
+    else
+        return false;
+}
+
+bool vec3_check_around_zero(vec3 val, float tresh)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        if (!check_around_zero(val[i], tresh))
+            return false;
     }
     return true;
 }
@@ -37,7 +107,8 @@ bool vec3_check_around_zero(vec3 val, float tresh) {
 PositionEstimate::PositionEstimate()
 {
     bmi160 = new BMI160(2, 0x69);
-    quat_integrated[0] = 1; // Initial Quaternion: (1,0,0,0)
+    quat_integrated[3] = 1; // Initial Quaternion: (1|0,0,0)
+    quat_correction[3] = 1; // Initial Quaternion: (1|0,0,0)
     tid = std::thread(&PositionEstimate::thrBMI160, this);
     tid.detach();
 }
@@ -48,7 +119,7 @@ PositionEstimate::~PositionEstimate()
 
 void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
 {
-    mat4x4_dup(gyro_matrix, cumulated_mat);
+    mat4x4_dup(gyro_matrix, quat_matrix);
 }
 
 void PositionEstimate::thrBMI160()
@@ -80,73 +151,65 @@ void PositionEstimate::thrBMI160()
     float inv_omega_len;
     quat temp_quat;
     vec3 norm_orientation;
+    quat time_delta{};
+    quat accel_old;
 
     // general positioning calculation
-    vec4 up_direction_abc = {0.0f, 0.0f, 0.0f, 1.0f};
-    vec3 speed_abc;
-    vec3 pos_abc;
     vec3 gyro_rad_per_s;
-    float LPF_Beta = 0.1; // 0<ß<1
-    vec4 accel_m_per_sq_s_raw{};    
+    float LPF_Beta = 1; // 0<ß<1
+    vec4 accel_m_per_sq_s_raw{};
     vec4 accel_m_per_sq_s{};
     accel_m_per_sq_s[3] = 1.0f;
-    vec4 sensor_position{};
-    sensor_position[3] = 1.0f;
     // no movement detection
 
     int no_movement_counter{};
 
-
     // debug
+
+    // double cal_value_rotation[3]{};
+    // double cal_value_translation[3]{};
+    // std::ofstream myfile;
+    // myfile.open ("data.txt");
+
+    // vec3 showValue{};
+
+    // std::cout << "Calculating values..." << std::endl;
+    //  for (int n = 0;n<OFFSET_MEAS_TIME;n++) {
+    //      rslt = bmi160->getAccelGyroData(accelGyro);
+    //      std::cout << n << "\t\t";
+    //      myfile << n << ";";
+    //      for (i = 0; i < 3; i++)
+    //      {
+    //          cal_value_rotation[i] += (double)accelGyro[i];
+    //          // std::cout << (double)accelGyro[i] << ";";
+    //          myfile << (double)accelGyro[i] << ";";
+    //      }
+    //      for (i = 3; i < 6; i++)
+    //      {
+    //          cal_value_translation[i-3] += (double)accelGyro[i];
+    //          showValue[i-3] *= 0.9;
+    //          showValue[i-3] += 0.1*accelGyro[i];
+    //          std::cout << showValue[i-3] << "    \t";
+    //          myfile << (double)accelGyro[i] << ";";
+    //      }
+    //      std::cout << std::endl;
+    //      myfile << std::endl;
+    //  }
+
+    //  myfile.close();
+    //  std::cout << "Cal values" << std::endl;
+    //  for (i = 0; i < 3; i++)
+    //  {
+    //      // kill offset for gyro
+    //      cal_value_rotation[i] /= OFFSET_MEAS_TIME;
+    //      cal_value_translation[i] /= OFFSET_MEAS_TIME;
+    //      printf("%d: Rotation: %f, Translation: %f\n",i, cal_value_rotation[i],cal_value_translation[i]);
+
+    //  }
+    // return;
 
     vec3 max{}, min{};
 
-
-    mat4x4_identity(cumulated_mat);
-    mat4x4_identity(temp_mat);
-    double cal_value_rotation[3]{};
-    double cal_value_translation[3]{};
-    std::ofstream myfile;
-    myfile.open ("data.txt");
-    
-    /* vec3 showValue{};
-    
-    std::cout << "Calculating values..." << std::endl;
-     for (int n = 0;n<OFFSET_MEAS_TIME;n++) {
-         rslt = bmi160->getAccelGyroData(accelGyro);
-         std::cout << n << "\t\t";
-         myfile << n << ";";
-         for (i = 0; i < 3; i++)
-         {
-             cal_value_rotation[i] += (double)accelGyro[i];
-             // std::cout << (double)accelGyro[i] << ";";
-             myfile << (double)accelGyro[i] << ";";
-         }
-         for (i = 3; i < 6; i++)
-         {
-             cal_value_translation[i-3] += (double)accelGyro[i];
-             showValue[i-3] *= 0.9;
-             showValue[i-3] += 0.1*accelGyro[i];
-             std::cout << showValue[i-3] << "    \t";
-             myfile << (double)accelGyro[i] << ";";
-         }
-         std::cout << std::endl;
-         myfile << std::endl;
-     }
-
-     myfile.close();
-     std::cout << "Cal values" << std::endl;
-     for (i = 0; i < 3; i++)
-     {
-         // kill offset for gyro
-         cal_value_rotation[i] /= OFFSET_MEAS_TIME;
-         cal_value_translation[i] /= OFFSET_MEAS_TIME;
-         printf("%d: Rotation: %f, Translation: %f\n",i, cal_value_rotation[i],cal_value_translation[i]);
-
-
-     }
-    return;
-     zero_translation_abc[2] -= 16384; */
     zero_rotation_abc[0] = CAL_GYRO_X;
     zero_rotation_abc[1] = CAL_GYRO_Y;
     zero_rotation_abc[2] = CAL_GYRO_Z;
@@ -156,206 +219,209 @@ void PositionEstimate::thrBMI160()
 
     float vec_len{};
 
-    // Calibration step ("up direction initially depends on Accelerometer (Gravity)")
     rslt = bmi160->getAccelGyroData(accelGyro);
-    sensorTime_last = accelGyro[7]; 
+    sensorTime_last = accelGyro[7];
     vec_len = 0.0f;
-    for (i = 0; i < 3; i++)
-    {
-        gyro_rad_per_s[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
-        accel_m_per_sq_s[i] = (accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION;
-        vec_len += accel_m_per_sq_s[i] * accel_m_per_sq_s[i];
-    }
-    vec_len = sqrt(vec_len);
+        for (i = 0; i < 3; i++)
+        {
+            gyro_rad_per_s[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
+            accel_m_per_sq_s[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
+        }
+
+        // gain correction
+        if (accel_m_per_sq_s[0] <= 0)
+            accel_m_per_sq_s[0] *= FACE_DOWN_CORR; // x_neg
+        else
+            accel_m_per_sq_s[0] *= FACE_UP_CORR; // x_pos
+
+        if (accel_m_per_sq_s[1] <= 0)
+            accel_m_per_sq_s[1] *= FLIP_RIGHT_CORR; // y_neg
+        else
+            accel_m_per_sq_s[1] *= FLIP_LEFT_CORR; // y_pos
+
+        if (accel_m_per_sq_s[2] <= 0)
+            accel_m_per_sq_s[2] *= FLIP_BACK_CORR; // z_neg
+        else
+            accel_m_per_sq_s[2] *= FLIP_FRONT_CORR; // z_pos
+        // Calculate vector length
+        for (i = 0; i < 3; i++)
+        {
+            vec_len += accel_m_per_sq_s[i] * accel_m_per_sq_s[i];
+        }
+        vec_len = sqrt(vec_len);
 
     for (i = 0; i < 3; i++)
     {
-        up_direction_abc[i] = accel_m_per_sq_s[i] / vec_len;
-        std::cout << up_direction_abc[i] << ", ";
+        initial_orientation[i] = accel_m_per_sq_s[i] / vec_len;
     }
-    
+
     float height = 0.0f;
     while (1)
     {
 
         //get both accel and gyro data from bmi160
         //parameter accelGyro is the pointer to store the data
-        startTime = std::chrono::steady_clock::now();
         rslt = bmi160->getAccelGyroData(accelGyro);
-        endTime = std::chrono::steady_clock::now();
-        timeSpan = endTime - startTime;
-        nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        
-        if (sensorTime_last > accelGyro[6]) { // wrap around
-            std::cout << "nseconds: " << nseconds << " Sensortime:" << (double)(accelGyro[6]-sensorTime_last+65536)*SENS_TIME_RESOLUTION << " Sensortime raw:" << accelGyro[6] << " WRAP WRAP WRAP!" << std::endl;
-            nseconds = (double)(accelGyro[6]-sensorTime_last+65536)*SENS_TIME_RESOLUTION;
-        } else {
-            std::cout << "nseconds: " << nseconds << " Sensortime:" << (double)(accelGyro[6]-sensorTime_last)*SENS_TIME_RESOLUTION << " Sensortime raw:" << accelGyro[6] << std::endl;
-            nseconds = (double)(accelGyro[6]-sensorTime_last)*SENS_TIME_RESOLUTION;
-        }
-        // std::cout << "Accel" << std::endl;
+        // get sensor timestamp
+        if (sensorTime_last > accelGyro[6])
+            nseconds = (double)(accelGyro[6] - sensorTime_last + 65536) * SENS_TIME_RESOLUTION;
+        else
+            nseconds = (double)(accelGyro[6] - sensorTime_last) * SENS_TIME_RESOLUTION;
+
+        // extract all raw measurements with offset-correction
         vec_len = 0.0f;
+        std::cout << "accel raw values: ( ";
         for (i = 0; i < 3; i++)
         {
+            std::cout << accelGyro[i + 3] << ", ";
             gyro_rad_per_s[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
-            accel_m_per_sq_s_raw[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
-            accel_m_per_sq_s[i] = accel_m_per_sq_s[i] - (LPF_Beta * (accel_m_per_sq_s[i] - accel_m_per_sq_s_raw[i]));
+            accel_m_per_sq_s[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
+        }
+        std::cout << ")" << std::endl;
+
+        // gain correction
+        if (accel_m_per_sq_s[0] <= 0)
+            accel_m_per_sq_s[0] *= FLIP_BACK_CORR; // x_neg
+        else
+            accel_m_per_sq_s[0] *= FLIP_FRONT_CORR; // x_pos
+
+        if (accel_m_per_sq_s[1] <= 0)
+            accel_m_per_sq_s[1] *= FLIP_RIGHT_CORR; // y_neg
+        else
+            accel_m_per_sq_s[1] *= FLIP_LEFT_CORR; // y_pos
+
+        if (accel_m_per_sq_s[2] <= 0)
+            accel_m_per_sq_s[2] *= FACE_DOWN_CORR; // z_neg
+        else
+            accel_m_per_sq_s[2] *= FACE_UP_CORR; // z_pos
+        // Calculate vector length
+        for (i = 0; i < 3; i++)
+        {
             vec_len += accel_m_per_sq_s[i] * accel_m_per_sq_s[i];
-            std::cout << gyro_rad_per_s[i] << " rad/s" << std::endl;
-            std::cout << accel_m_per_sq_s[i] << " m/s^2" << std::endl;
         }
         vec_len = sqrt(vec_len);
 
-        // cross sensitivity correction
-        if (accel_m_per_sq_s[0]<=0) { // x_neg
-        std::cout << "x neg: " << accel_m_per_sq_s[0]*0.00143 << std::endl;
-        vec_len += accel_m_per_sq_s[0]*0.00143;
-        } else { // x_pos
-        std::cout << "x pos: " << accel_m_per_sq_s[0]*-0.000143 << std::endl;
-        vec_len += accel_m_per_sq_s[0]*-0.000143;
-        }
-        if (accel_m_per_sq_s[1]<=0) { // y_neg
-        std::cout << "y neg: " << accel_m_per_sq_s[1]*0.005872 << std::endl;
-        vec_len += accel_m_per_sq_s[1]*0.005872;
-        } else { // y_pos
-        std::cout << "y pos: " << accel_m_per_sq_s[1]*-0.008039 << std::endl;
-        vec_len += accel_m_per_sq_s[1]*-0.008039;            
-        }
-        if (accel_m_per_sq_s[2]<=0) { // z_neg
-        std::cout << "z neg: " << accel_m_per_sq_s[2]*0.010122 << std::endl;
-        vec_len += accel_m_per_sq_s[2]*0.010122;
-        } else { // z_pos
-        std::cout << "z pos: " << accel_m_per_sq_s[2]*-0.01125 << std::endl;      
-        vec_len += accel_m_per_sq_s[2]*-0.01125;
-        }
-        
-
-
+        // get rotation quaternion from gyro data
         inv_omega_len = Q_rsqrt((float)(gyro_rad_per_s[0] * gyro_rad_per_s[0] + gyro_rad_per_s[1] * gyro_rad_per_s[1] + gyro_rad_per_s[2] * gyro_rad_per_s[2]));
         if (inv_omega_len != 0)
         {
             theta = nseconds / inv_omega_len;
-            norm_orientation[0] = gyro_rad_per_s[0] * inv_omega_len;
-            norm_orientation[1] = gyro_rad_per_s[1] * inv_omega_len;
-            norm_orientation[2] = gyro_rad_per_s[2] * inv_omega_len;
-            quat_gyro[0] = cos(theta / 2);
-            quat_gyro[1] = norm_orientation[0] * sin(theta / 2);
-            quat_gyro[2] = norm_orientation[1] * sin(theta / 2);
-            quat_gyro[3] = norm_orientation[2] * sin(theta / 2);
-            //====================================
-
-            // std::cout << "Gyro Quaternion: (" << quat_gyro[0] << ", " << quat_gyro[1] << ", " << quat_gyro[2] << ", " << quat_gyro[3] << ")" << std::endl;
-            // std::cout << "Rotation Quaternion: (" << rot_quat[0] << ", " << rot_quat[1] << ", " << rot_quat[2] << ", " << rot_quat[3] << ")" << std::endl;
-
-            quat_matrix[0][0] = (quat_gyro[0] * quat_gyro[0]) + (quat_gyro[1] * quat_gyro[1]) - (quat_gyro[2] * quat_gyro[2]) - (quat_gyro[3] * quat_gyro[3]);
-            quat_matrix[0][1] = 2.0 * (quat_gyro[1] * quat_gyro[2]) - 2.0 * (quat_gyro[0] * quat_gyro[3]);
-            quat_matrix[0][2] = 2.0 * (quat_gyro[0] * quat_gyro[2]) + 2.0 * (quat_gyro[1] * quat_gyro[3]);
-            quat_matrix[1][0] = 2.0 * (quat_gyro[0] * quat_gyro[3]) + 2.0 * (quat_gyro[1] * quat_gyro[2]);
-            quat_matrix[1][1] = (quat_gyro[0] * quat_gyro[0]) - (quat_gyro[1] * quat_gyro[1]) + (quat_gyro[2] * quat_gyro[2]) - (quat_gyro[3] * quat_gyro[3]);
-            quat_matrix[1][2] = 2.0 * (quat_gyro[2] * quat_gyro[3]) - 2.0 * (quat_gyro[0] * quat_gyro[1]);
-            quat_matrix[2][0] = 2.0 * (quat_gyro[1] * quat_gyro[3]) - 2.0 * (quat_gyro[0] * quat_gyro[2]);
-            quat_matrix[2][1] = 2.0 * (quat_gyro[0] * quat_gyro[1]) + 2.0 * (quat_gyro[2] * quat_gyro[3]);
-            quat_matrix[2][2] = (quat_gyro[0] * quat_gyro[0]) - (quat_gyro[1] * quat_gyro[1]) - (quat_gyro[2] * quat_gyro[2]) + (quat_gyro[3] * quat_gyro[3]);
-            mat4x4_mul(temp_mat, quat_matrix, cumulated_mat);
-
-            mat4x4_dup(cumulated_mat, temp_mat);
-            cumulated_mat[3][3] = 1.0f;
-            std::cout << "cumulated_mat = " << std::endl;
-            std::cout << "|" << cumulated_mat[0][0] << " " << cumulated_mat[1][0] << " " << cumulated_mat[2][0] << " " << cumulated_mat[3][0] << "|" << std::endl;
-            std::cout << "|" << cumulated_mat[0][1] << " " << cumulated_mat[1][1] << " " << cumulated_mat[2][1] << " " << cumulated_mat[3][1] << "|" << std::endl;
-            std::cout << "|" << cumulated_mat[0][2] << " " << cumulated_mat[1][2] << " " << cumulated_mat[2][2] << " " << cumulated_mat[3][2] << "|" << std::endl;
-            std::cout << "|" << cumulated_mat[0][3] << " " << cumulated_mat[1][3] << " " << cumulated_mat[2][3] << " " << cumulated_mat[3][3] << "|" << std::endl;
+            quat_from_angle_axis(quat_gyro, -theta, gyro_rad_per_s);
         }
-
-        // else use gyro to find rotation change
-        else {
-            vec4 temp;
-            mat4x4_mul_vec4(temp, quat_matrix, up_direction_abc);
-            up_direction_abc[0] = temp[0];
-            up_direction_abc[1] = temp[1];
-            up_direction_abc[2] = temp[2];
+        else // no rotation, identity quaternion "does nothing"
+        {
+            quat_identity(quat_gyro);
         }
-        std::cout << "Up: (";
+        // update rotation quaternion
+        {
+            quat temp;
+            quat_mul(temp, quat_gyro, quat_integrated);
+            quat_integrated[0] = temp[0];
+            quat_integrated[1] = temp[1];
+            quat_integrated[2] = temp[2];
+            quat_integrated[3] = temp[3];
+        }
+        // compute current measured orientation - might be unstable, only apply when stable
         for (i = 0; i < 3; i++)
         {
-            std::cout << up_direction_abc[i] << ", ";
+            measured_orientation[i] = accel_m_per_sq_s[i] / vec_len;
         }
-        std::cout << ")" << std::endl;
-        std::cout << "vector length = " << vec_len << std::endl;
-
-        vec4 delta_vector_xyz{};  
-        vec4 delta_temp_vector_abc{};
-        mat4x4 cumulated_inverted{};  
-        mat4x4_invert(cumulated_inverted,cumulated_mat);    
-        std::cout << "cumulated_inverted = " << std::endl;
-        std::cout << "|" << cumulated_inverted[0][0] << " " << cumulated_inverted[1][0] << " " << cumulated_inverted[2][0] << " " << cumulated_inverted[3][0] << "|" << std::endl;
-        std::cout << "|" << cumulated_inverted[0][1] << " " << cumulated_inverted[1][1] << " " << cumulated_inverted[2][1] << " " << cumulated_inverted[3][1] << "|" << std::endl;
-        std::cout << "|" << cumulated_inverted[0][2] << " " << cumulated_inverted[1][2] << " " << cumulated_inverted[2][2] << " " << cumulated_inverted[3][2] << "|" << std::endl;
-        std::cout << "|" << cumulated_inverted[0][3] << " " << cumulated_inverted[1][3] << " " << cumulated_inverted[2][3] << " " << cumulated_inverted[3][3] << "|" << std::endl;
-        delta_vector_xyz[3] = 1.0f;    
-        for (i = 0; i < 3; i++)
+        // compute orientation as seen by quat_integrated
         {
-              delta_temp_vector_abc[i] =  accel_m_per_sq_s[i] - up_direction_abc[i]*CONST_G;
+            quat quat_integrated_conj;
+            quat temp;
+            quat_conj(quat_integrated_conj, quat_integrated);
+            quat_mul(temp, quat_integrated, initial_orientation);
+            quat_mul(updated_orientation, temp, quat_integrated_conj);
         }
-        mat4x4_mul_vec4(delta_vector_xyz,cumulated_inverted, delta_temp_vector_abc);
+        // compute correction rotation
+        {
+            quat_RotationBetweenVectors(quat_correction, updated_orientation, measured_orientation);
+        }
+
+        // compute velocity without gravity
+        {
+            quat delta_vector_abc{};
+            quat delta_vector_xyz{};
+            quat quat_integrated_conj;
+            quat temp{};
+            for (i = 0; i < 3; i++)
+            {
+                delta_vector_abc[i] = accel_m_per_sq_s[i] - updated_orientation[i] * CONST_G;
+            }
+            quat_conj(quat_integrated_conj, quat_integrated);
+            quat_mul(temp, quat_integrated_conj, delta_vector_abc);
+            quat_mul(delta_vector_xyz, temp, quat_integrated);
+            print_quat("delta_vector_abc", delta_vector_abc);
+            print_quat("delta_vector_xyz", delta_vector_xyz);
+            for (int i = 0; i < 3; i++)
+            {
+                velocity_xyz[i] += delta_vector_xyz[i] * nseconds;
+            }
+            
+        }
+
         // if no movement and no rotation: Use accelerometer to find G
 
         if ((vec_len >= 9.77) && (vec_len <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH))
         {
-            for (i = 0; i < 3; i++)
+            std::cout << "Stable: \U00002705 (no motion)" << std::endl;
+            quat_identity(velocity_xyz);
+            // correct rotation quaternion
             {
-                up_direction_abc[i] = accel_m_per_sq_s[i] / vec_len;
+                quat temp;
+                quat_mul(temp, quat_correction, quat_integrated);
+                quat_integrated[0] = temp[0];
+                quat_integrated[1] = temp[1];
+                quat_integrated[2] = temp[2];
+                quat_integrated[3] = temp[3];
             }
             no_movement_counter++;
-            if (no_movement_counter >= NO_MOVEMENT_MAX_COUNT) {
-                std::cout << "zeroing: yes =================================================================" << std::endl;
-                speed_abc[0] = 0.0f;
-                speed_abc[1] = 0.0f;
-                speed_abc[2] = 0.0f;  
-                delta_vector_xyz[0] = 0.0f;     
-                delta_vector_xyz[1] = 0.0f;       
-                delta_vector_xyz[2] = 0.0f;                
-            } else
-                std::cout << "zeroing: no, counting " << no_movement_counter << std::endl;
-        } else {
+            if (no_movement_counter >= NO_MOVEMENT_MAX_COUNT)
+            {
+
+            } // else
+              // std::cout << "zeroing: no, counting " << no_movement_counter << std::endl;
+        }
+        else
+        {
+            std::cout << "Stable: \U0000274C (motion detected)" << std::endl;
             no_movement_counter = 0;
-            std::cout << "zeroing: no" << std::endl;
+            // std::cout << "zeroing: no" << std::endl;
         }
-        std::cout << "delta: (";
-        for (i = 0; i < 3; i++)
-        {        
-            if (max[i] < delta_vector_xyz[i]) max[i] = delta_vector_xyz[i];
-            if (min[i] > delta_vector_xyz[i]) min[i] = delta_vector_xyz[i];
-            speed_abc[i] += delta_vector_xyz[i]*nseconds;
-            pos_abc[i] += speed_abc[i]*nseconds;
-            std::cout << delta_vector_xyz[i] << ", ";
-        }
-        std::cout << ")" << std::endl;
-        std::cout << "speed: (";
-        for (i = 0; i < 3; i++)
+        // calculate position from velocity
+        for (int i = 0; i < 3; i++)
         {
-            std::cout << speed_abc[i] << ", ";
+            position_xyz[i] += velocity_xyz[i] * nseconds;
         }
-        std::cout << ")" << std::endl;
-        std::cout << "pos: (";
-        for (i = 0; i < 3; i++)
+        print_quat("velocity_xyz", velocity_xyz);
+        print_quat("position_xyz", position_xyz);
+
         {
-            std::cout << pos_abc[i] << ", ";
+            quat meas_up = {sqrt(0.5), 0.0, sqrt(0.5), 0.0};      // true value, input by accelerometer
+            quat old_up = {sqrt(0.4), sqrt(0.1), sqrt(.5), 0.0f}; // gyroscope integration
+            quat rotat = {0.0, sqrt(0.5), 0.0, sqrt(0.5)};
+            quat temp;
+            quat_RotationBetweenVectors(rotat, old_up, meas_up);
+            quat rotat_conj;
+            quat_conj(rotat_conj, rotat);
+            quat res;
+            quat_mul(temp, rotat, old_up);
+            quat_mul(res, temp, rotat_conj);
+            print_quat("res", res);
+            // update the matrix
+            mat4x4_from_quat(quat_matrix, quat_integrated);
         }
-        std::cout << ")" << std::endl;
-        std::cout << "max: (";
-        for (i = 0; i < 3; i++)
-        {
-            std::cout << max[i] << ", ";
-        }
-        std::cout << ")" << std::endl;
-        std::cout << "min: (";
-        for (i = 0; i < 3; i++)
-        {
-            std::cout << min[i] << ", ";
-        }
-        std::cout << ")" << std::endl;
-        std::cout << pos_abc[2] << std::endl;
+        print_quat("initial_orientation", initial_orientation);
+        print_quat("updated_orientation", updated_orientation);
+        print_quat("measured_orientation", measured_orientation);
+
+        print_quat("quat_gyro", quat_gyro);
+        print_quat("quat_integrated", quat_integrated);
+        print_quat("quat_correction", quat_correction);
+        print_quat("accel_m_per_sq_s", accel_m_per_sq_s);
+        std::cout << "vector length = " << vec_len << std::endl;
+        std::cout << "------------------------------------------------------------------------------" << std::endl;
         sensorTime_last = accelGyro[6];
     }
 }

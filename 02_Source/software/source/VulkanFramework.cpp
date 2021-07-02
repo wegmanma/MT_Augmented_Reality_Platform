@@ -25,6 +25,8 @@
 #include "VulkanHelper.hpp"
 #include "PositionEstimate.hpp"
 #include "MainCamera.hpp"
+#include "TCPFrameCapture.hpp"
+
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -105,6 +107,7 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 
 void VulkanFramework::initVulkan() {
     positionEstimate = new PositionEstimate();
+    tcpCapture.start();
     createInstance();
     setupDebugCallback();
     createSurface();
@@ -136,6 +139,8 @@ void VulkanFramework::mainLoop() {
         startTime = std::chrono::steady_clock::now();
 
         glfwPollEvents();
+
+        updateTextureImage();
 
         drawFrame();
 
@@ -206,7 +211,7 @@ void VulkanFramework::cleanup() {
     if (enableValidationLayers) {
         DestroyDebugReportCallbackEXT(instance, callback, nullptr);
     }
-
+    tcpCapture.cleanup();
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
 
@@ -803,8 +808,22 @@ void VulkanFramework::createTextureImage() {
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
  
-    pixels = stbi_load("textures/Cam1.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    imageSize = texWidth * texHeight * 4;
+    texWidth = 352;
+    texHeight = 286;
+    imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
+    int mtx = tcpCapture.lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
+    // memset(pixels,0,imageSize);
+    // for (int i = 0; i<352*286; i++) {
+    //     pixels[8*i+0] = 0;
+    //     pixels[8*i+1] = 0;
+    //     pixels[8*i+2] = 0;
+    //     pixels[8*i+3] = 0;
+    //     pixels[8*i+4] = 255;
+    //     pixels[8*i+5] = 255;
+    //     pixels[8*i+6] = 0;
+    //     pixels[8*i+7] = 0;        
+    // }
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
@@ -812,13 +831,15 @@ void VulkanFramework::createTextureImage() {
 
     vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMainBuffer, stagingMainBufferMemory);
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
-    memcpy((void*)(((char*)data)), pixels, static_cast<size_t>(imageSize));
+
+    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
-    vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mainImage, mainImageMemory);
+    tcpCapture.unlockMutex(mtx);
+    vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mainImage, mainImageMemory);
     
-    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
     vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
-    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
 
 }
@@ -826,7 +847,7 @@ void VulkanFramework::createTextureImage() {
 
 void VulkanFramework::createTextureImageView() {
     projectedImageView = vkh::createImageView(device, projectedImage, VK_FORMAT_R8G8B8A8_UNORM); 
-    mainImageView = vkh::createImageView(device, mainImage, VK_FORMAT_R8G8B8A8_UNORM); 
+    mainImageView = vkh::createImageView(device, mainImage, VK_FORMAT_R16G16B16A16_UNORM); 
 }
 
 void VulkanFramework::createTextureSampler() {
@@ -863,14 +884,36 @@ void VulkanFramework::updateTextureImage() {
     unsigned char* pixels;
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     void* data;
-    vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingProjectedBufferMemory);
+    // vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
+    // memcpy(data, pixels, static_cast<size_t>(imageSize));
+    // vkUnmapMemory(device, stagingProjectedBufferMemory);
+// 
+  // 
+    // vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    // vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
+    // vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
-  
-    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
-    vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
-    vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+
+    texWidth = 352;
+    texHeight = 286;
+    imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
+    //int mtx = tcpCapture.lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
+    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingMainBufferMemory);
+    // tcpCapture.unlockMutex(mtx);
+    
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
+    vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
+    vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
+
+
 
 }
 
