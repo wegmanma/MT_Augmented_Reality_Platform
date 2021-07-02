@@ -104,7 +104,6 @@ void TCPFrameCapture::run()
     if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
     {
         perror("connect failed. Error");
-        return;
     }
     uint16_t ampl[352*286];
     uint8_t conf[352*286];
@@ -112,7 +111,6 @@ void TCPFrameCapture::run()
 
     while (running)
     {
-        printf("recv\n");
         //Receive a reply from the server
         size_t len = receive_all(sock, server_data, MAX);
         if (len < 0)
@@ -121,7 +119,7 @@ void TCPFrameCapture::run()
             break;
         }
 
-        printf("Server reply len: = %ld\n", len);
+        // printf("Server reply len: = %ld\n", len);
 
         int offset_src = 0;
         int offset_dest = 0;

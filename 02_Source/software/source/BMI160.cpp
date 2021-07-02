@@ -37,7 +37,7 @@ BMI160::BMI160(int8_t i2c_device, int8_t i2c_addr)
     Obmi160 = (struct bmi160Dev *)malloc(sizeof(struct bmi160Dev));
     Obmi160->id = i2c_addr;
     Obmi160->i2c_dev = i2c_device;
-    Obmi160->interface = BMI160_I2C_INTF;    
+    Obmi160->interface = BMI160_I2C_INTF;
     Oaccel = (struct bmi160SensorData *)malloc(sizeof(struct bmi160SensorData));
     Ogyro = (struct bmi160SensorData *)malloc(sizeof(struct bmi160SensorData));
 }
@@ -115,7 +115,7 @@ int8_t BMI160::softReset(struct bmi160Dev *dev)
     int8_t rslt = BMI160_OK;
     uint8_t data = BMI160_SOFT_RESET_CMD;
     if (dev == NULL)
-    {   
+    {
         printf("dev == NULL\n");
         rslt = BMI160_E_NULL_PTR;
     }
@@ -161,7 +161,7 @@ int8_t BMI160::setSensConf(struct bmi160Dev *dev)
 
     dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
 
-    dev->gyroCfg.odr = BMI160_GYRO_ODR_100HZ;
+    dev->gyroCfg.odr = BMI160_ACCEL_ODR_100HZ;
     dev->gyroCfg.range = BMI160_GYRO_RANGE_2000_DPS;
     dev->gyroCfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
 
@@ -700,9 +700,6 @@ int8_t BMI160::getAccelData(uint8_t len, struct bmi160SensorData *accel, struct 
     int8_t rslt;
     uint8_t idx = 0;
     uint8_t data_array[9] = {0};
-    uint8_t time_0 = 0;
-    uint16_t time_1 = 0;
-    uint32_t time_2 = 0;
     uint8_t lsb;
     uint8_t msb;
     float msblsb;
@@ -736,9 +733,6 @@ int8_t BMI160::getGyroData(uint8_t len, struct bmi160SensorData *gyro, struct bm
     int8_t rslt;
     uint8_t idx = 0;
     uint8_t data_array[15] = {0};
-    uint8_t time_0 = 0;
-    uint16_t time_1 = 0;
-    uint32_t time_2 = 0;
     uint8_t lsb;
     uint8_t msb;
     float msblsb;
@@ -792,9 +786,6 @@ int8_t BMI160::getGyroData(uint8_t len, struct bmi160SensorData *gyro, struct bm
             gyro->z = msblsb; /* gyro Z axis data */
 
             idx = idx + 6;
-            time_0 = data_array[idx++];
-            time_1 = (uint16_t)(data_array[idx++] << 8);
-            time_2 = (uint32_t)(data_array[idx++] << 16);
             //gyro->sensortime = (uint32_t)(time_2 | time_1 | time_0);
         }
         else
@@ -927,19 +918,15 @@ int8_t BMI160::I2cGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     }
     uint8_t reg[1] = {reg_addr};
     ssize_t written_bytes = write(file, reg, 1);
+    if (written_bytes < 0)
+        printf("problem writing.");
     uint8_t output[len];
-    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
-
 
     if (read(file, output, len) != len)
     {
         printf("Error : Input/Output error \n");
         exit(1);
     }
-        std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
-        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
-        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        // std::cout << "read: " << nseconds << std::endl;
     for (int i = 0; i < len; i++)
     {
         data[i] = output[i];
@@ -951,7 +938,6 @@ int8_t BMI160::I2cGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
 int8_t BMI160::setRegs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi160Dev *dev)
 {
     int8_t rslt = BMI160_OK;
-    uint8_t count = 0;
     //Null-pointer check
     if (dev == NULL)
     {
@@ -986,7 +972,7 @@ int8_t BMI160::I2cSetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     {
         /* ERROR HANDLING: you can check errno to see what went wrong */
         perror("I2cSetRegs: Failed to open the i2c bus");
-        printf("Filename = %s\n",filename);
+        printf("Filename = %s\n", filename);
         exit(1);
     }
 
@@ -1003,6 +989,8 @@ int8_t BMI160::I2cSetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
         buf[i + 1] = data[i];
     }
     ssize_t written_bytes = write(file, buf, len + 1);
+    if (written_bytes < 0)
+        printf("problem writing.");
     close(file);
 
     return BMI160_OK;
@@ -1436,14 +1424,15 @@ int8_t BMI160::setStepPowerMode(uint8_t model, struct bmi160Dev *dev)
     return rslt;
 }
 
-int8_t BMI160::setGyroFOC() {
+int8_t BMI160::setGyroFOC()
+{
     int8_t rslt;
     uint8_t msg = BMI160_GYRO_FOC_EN_MSK;
     rslt = BMI160::setRegs(BMI160_FOC_CONF_ADDR, &msg, 1, Obmi160);
     usleep(10000);
     msg = BMI160_START_FOC_CMD;
-    rslt = BMI160::setRegs(BMI160_COMMAND_REG_ADDR, &msg, 1, Obmi160);  
-    return rslt;  
+    rslt = BMI160::setRegs(BMI160_COMMAND_REG_ADDR, &msg, 1, Obmi160);
+    return rslt;
 }
 
 int8_t BMI160::setStepCounter()
@@ -1521,4 +1510,93 @@ int8_t BMI160::readStepCounter(uint16_t *stepVal, struct bmi160Dev *dev)
     }
 
     return rslt;
+}
+
+int BMI160::I2CGetDataOpenDevice()
+{
+
+    int file;
+    char filename[15] = {};
+    sprintf(filename, "/dev/i2c-%d", Obmi160->i2c_dev);
+    if ((file = open(filename, O_RDWR)) < 0)
+    {
+        /* ERROR HANDLING: you can check errno to see what went wrong */
+        perror("Failed to open the i2c bus");
+        exit(1);
+    }
+    if (ioctl(file, I2C_SLAVE, Obmi160->id) < 0)
+    {
+        printf("Failed to acquire bus access and/or talk to slave.\n");
+        /* ERROR HANDLING; you can check errno to see what went wrong */
+        exit(1);
+    }
+    uint8_t reg[1] = {BMI160_GYRO_DATA_ADDR};
+    ssize_t written_bytes = write(file, reg, 1);
+    if (written_bytes < 0)
+        printf("problem writing.");
+    return file;
+}
+
+int8_t BMI160::getAccelGyroDataFast(int file, int16_t *data)
+{
+    uint8_t idx = 0;
+    uint8_t data_array[15] = {0};
+    uint8_t time_0 = 0;
+    uint16_t time_1 = 0;
+    uint32_t time_2 = 0;
+    uint8_t lsb;
+    uint8_t msb;
+    int16_t msblsb;
+
+    if (read(file, data_array, 15) != 15)
+    {
+        printf("Error : Input/Output error \n");
+        exit(1);
+    }
+
+    /* Gyro Data */
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[0] = msblsb; /* gyro X axis data */
+
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[1] = msblsb; /* gyro Y axis data */
+
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[2] = msblsb; /* gyro Z axis data */
+
+    /* Accel Data */
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[3] = (int16_t)msblsb; /* accel X axis data */
+
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[4] = (int16_t)msblsb; /* accel Y axis data */
+
+    lsb = data_array[idx++];
+    msb = data_array[idx++];
+    msblsb = (int16_t)((msb << 8) | lsb);
+    data[5] = (int16_t)msblsb; /* accel Z axis data */
+
+    time_0 = data_array[idx++];
+    time_1 = (uint16_t)(data_array[idx++] << 8);
+    time_2 = (uint32_t)(data_array[idx++] << 16);
+    data[7] = (uint32_t)(time_2 | time_1 | time_0);
+    data[6] = (uint32_t)(time_2 | time_1 | time_0);
+
+    return BMI160_OK;
+}
+
+int8_t BMI160::I2CGetDataCloseDevice(int file)
+{
+    close(file);
+    return BMI160_OK;
 }

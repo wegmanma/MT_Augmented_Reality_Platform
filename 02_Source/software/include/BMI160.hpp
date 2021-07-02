@@ -1123,6 +1123,11 @@ public:
      */
   int8_t setGyroFOC();
 
+  int I2CGetDataOpenDevice();
+  int8_t getAccelGyroDataFast(int device, int16_t *data);
+  int8_t I2CGetDataCloseDevice(int device);  
+
+
   uint8_t onlyAccel = 1;
   uint8_t onlyGyro = 2;
   uint8_t bothAccelGyro = 3;
