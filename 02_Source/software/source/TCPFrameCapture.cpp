@@ -1,6 +1,8 @@
 #include <vector>
+#include <iostream>
 #include <thread>
 #include <mutex>
+#include <fstream>
 #include <stdio.h>      //printf
 #include <string.h>     //strlen
 #include <sys/socket.h> //socket
@@ -39,7 +41,7 @@ void TCPFrameCapture::start()
     buffers[1] = (uint16_t *)malloc(352 * 286 * 4 * sizeof(uint16_t));
     write_buf_id = 0;
     running = true;
-    tid = std::thread (&TCPFrameCapture::run, this);
+    tid = std::thread(&TCPFrameCapture::run, this);
 }
 
 void TCPFrameCapture::cleanup()
@@ -48,7 +50,6 @@ void TCPFrameCapture::cleanup()
     tid.join();
     free(buffers[0]);
     free(buffers[1]);
-    
 }
 
 uint16_t *TCPFrameCapture::getToFFrame()
@@ -105,10 +106,10 @@ void TCPFrameCapture::run()
     {
         perror("connect failed. Error");
     }
-    uint16_t ampl[352*286];
-    uint8_t conf[352*286];
-    uint16_t radial[352*286];
-
+    uint16_t ampl[352 * 286];
+    uint8_t conf[352 * 286];
+    uint16_t radial[352 * 286];
+    int cnt = 0;
     while (running)
     {
         //Receive a reply from the server
@@ -122,30 +123,53 @@ void TCPFrameCapture::run()
         // printf("Server reply len: = %ld\n", len);
 
         int offset_src = 0;
-        int offset_dest = 0;
         mtx[write_buf_id].lock();
         memcpy(ampl, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(conf, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
         offset_src += 352 * 286 * sizeof(uint8_t);
         memcpy(radial, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-        for (int i = 0; i < 352 * 286; i++) {
-            buffers[write_buf_id][i*4+0] = radial[i];
-            buffers[write_buf_id][i*4+1] = radial[i]; // 
-            buffers[write_buf_id][i*4+2] = radial[i];
+
+        if (cnt == 100)
+        {
+            std::cout << "WRITING IMAGE DATA!" << std::endl;
+            std::ofstream radialData;
+            radialData.open("radial.txt");
+            std::ofstream amplitudeData;
+            amplitudeData.open("ampl.txt");
+            for (int i = 0; i < 352 * 286; i++)
+            {
+                if (i < ((352 * 286) - 1))
+                {
+                    radialData << radial[i] << ";";
+                    amplitudeData << ampl[i] << ";";
+                }
+                else
+                {
+                    radialData << radial[i];
+                    amplitudeData << ampl[i];
+                }
+            }
+            radialData.close();
+            amplitudeData.close();
+        }
+        cnt++;
+        for (int i = 0; i < 352 * 286; i++)
+        {
+            buffers[write_buf_id][i * 4 + 0] = ampl[i];
+            buffers[write_buf_id][i * 4 + 1] = ((uint16_t)conf[i]) << 8; //
+            buffers[write_buf_id][i * 4 + 2] = radial[i];
         }
         if (write_buf_id == 0)
         {
             write_buf_id = 1;
             mtx[0].unlock();
-            
         }
         else
         {
-            write_buf_id = 0; 
+            write_buf_id = 0;
             mtx[1].unlock();
         }
-        
     }
 
     close(sock);
