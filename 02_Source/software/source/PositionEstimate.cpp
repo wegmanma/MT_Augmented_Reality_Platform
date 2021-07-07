@@ -410,10 +410,10 @@ void PositionEstimate::thrBMI160()
         // std::cout << delta_vector_xyz[0] << ";" << delta_vector_xyz[1] << ";" << delta_vector_xyz[2] << ";";
         // std::cout << velocity_xyz[0] << ";" << velocity_xyz[1] << ";" << velocity_xyz[2] << ";";
         // std::cout << position_xyz[0] << ";" << position_xyz[1] << ";" << position_xyz[2] << std::endl;
-        print_quat("Delta_vector_moving", delta_vector_xyz_moving);
-        print_quat("Delta_vector", delta_vector_xyz);
-        print_quat("Velocity",velocity_xyz);
-        print_quat("Position",position_xyz);
+        // print_quat("Delta_vector_moving", delta_vector_xyz_moving);
+        // print_quat("Delta_vector", delta_vector_xyz);
+        // print_quat("Velocity",velocity_xyz);
+        // print_quat("Position",position_xyz);
         {
             // update the matrix
             mtx.lock();
