@@ -162,7 +162,7 @@ void TCPFrameCapture::run()
         memcpy(z, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
 
         std::cout << cnt << std::endl;
-        if (cnt == 1000)
+        if (cnt == 50)
         {
             if(ampl[0]!=0) {
             write_data("ampl",ampl,n);
