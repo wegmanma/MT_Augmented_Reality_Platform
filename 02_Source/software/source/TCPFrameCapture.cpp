@@ -11,6 +11,7 @@
 #include <any>
 
 #define MAX 11 * 352 * 286 // Bytes
+#define SAVE_IMAGES_TO_DISK
 
 #include "TCPFrameCapture.hpp"
 
@@ -39,6 +40,10 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
     int size_recv, total_size = 0;
 
     //loop
+    // total_size = recv(socket_desc, client_message + total_size, 1107392, 0);
+    // if (size_recv != 12) {
+    //     return 0;
+    // }
     while (total_size < max_length)
     {
         memset(client_message + total_size, 0, 512); //clear the variable
@@ -52,7 +57,7 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
             total_size += size_recv;
         }
     }
-
+    printf("Bytes received: %d\n", total_size);
     return total_size;
 }
 
@@ -133,8 +138,10 @@ void TCPFrameCapture::run()
     uint16_t x[352 * 286];
     uint16_t y[352 * 286];
     uint16_t z[352 * 286];
+    #ifdef SAVE_IMAGES_TO_DISK
     int cnt = 0;
     int n = 0;
+    #endif
     while (running)
     {
         //Receive a reply from the server
@@ -144,6 +151,7 @@ void TCPFrameCapture::run()
             printf("recv failed");
             break;
         }
+        if (len != 1107392) continue;
 
         // printf("Server reply len: = %ld\n", len);
 
@@ -160,8 +168,7 @@ void TCPFrameCapture::run()
         memcpy(y, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(z, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-
-        std::cout << cnt << std::endl;
+        #ifdef SAVE_IMAGES_TO_DISK
         if (cnt == 50)
         {
             if(ampl[0]!=0) {
@@ -177,6 +184,7 @@ void TCPFrameCapture::run()
             cnt = 0;
         }
         cnt++;
+        #endif
         for (int i = 0; i < 352 * 286; i++)
         {
             buffers[write_buf_id][i * 4 + 0] = ampl[i];
