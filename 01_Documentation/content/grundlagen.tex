@@ -173,4 +173,17 @@ By division of the clip coordinate components $x_{c}$, $y_{c}$ and $z_{c}$ with 
 The transformation to the pixel coordinates are also done by Vulkan without requiring any action by the developer. The only noticable detail is the alignment of the normalized device coordinates. On the viewport surface, the point $(0 / 0)$ is located in the center. Top left is $(-1 / -1)$, top right is $(1 / -1)$, bottom left is $(-1 / 1)$ and bottom right is $(1 / 1)$.
 
 \subsection{Rotation with Quaternions}
-Quaternions - also known as "Hamilton Numbers" - are the three dimensional equivalent to complex numbers. Analogue to complex numbers, quaternions also consist of a real part, but add three imaginary parts $\textbf{i}$, $\textbf{j}$ and $\textbf{k}$. Most often, quaternions get represented in the form $a+b\textbf{i}+c\textbf{j}+d\textbf{k}$ or a four dimensional vector $(a, b, c, d)$
+Quaternions - also known as "Hamilton Numbers" - are the three dimensional equivalent to complex numbers. Analogue to complex numbers, quaternions also consist of a real part, but add three imaginary parts $\textbf{i}$, $\textbf{j}$ and $\textbf{k}$. Most often, quaternions get represented in the form $a+b\textbf{i}+c\textbf{j}+d\textbf{k}$ or a four dimensional vector $(a, b, c, d)$.\\
+The relations of the different imaginary parts in a quaternion are defined as following: $\textbf{i}^{2}=\textbf{j}^{2}=\textbf{k}^{2}=\textbf{ijk}=-1$, $\textbf{ij}=\textbf{k}, \textbf{jk}=\textbf{j}, \textbf{ki}=\textbf{j}$, and  $\textbf{ji}=-\textbf{k}, \textbf{kj}=-\textbf{i}, \textbf{ik}=-\textbf{j}$. These definitions cause the quaternion multiplication (or Hamilton product) to be non-commutative. 
+\begin{equation*}
+    (a_{1}+b_{1}\textbf{i}+c_{1}\textbf{j}+d_{1}\textbf{k})(a_{2}+b_{2}\textbf{i}+c_{2}\textbf{j}+d_{2}\textbf{k})
+    =
+    \begin{pmatrix}
+        &a_1a_2 &&- b_1b_2 &&- c_1c_2 &&- d_1d_2\\
+        {}+{} (&a_1b_2 &&+ b_1a_2 &&+ c_1d_2 &&- d_1c_2) \textbf{i}\\
+        {}+{} (&a_1c_2 &&- b_1d_2 &&+ c_1a_2 &&+ d_1b_2) \textbf{j}\\
+        {}+{} (&a_1d_2 &&+ b_1c_2 &&- c_1b_2 &&+ d_1a_2) \textbf{k}  
+        \end{pmatrix}     
+\end{equation*}
+The basic quaternion operations - like the multiplication - are included in the linmath-library. The linmath-library represents a quaternion as a four-dimensional float-vector in the ordering $(b, c, d, a)$ - the real part being the last element.\\
+textbf{
