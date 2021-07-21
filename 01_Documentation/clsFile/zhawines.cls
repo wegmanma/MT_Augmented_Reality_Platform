@@ -34,7 +34,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{listings}
 \usepackage{color}
-\usepackage{scrpage2}
+\usepackage{scrlayer-scrpage}
 \usepackage{mathptmx}
 \usepackage[T1]{fontenc}
 \usepackage{textcomp}
