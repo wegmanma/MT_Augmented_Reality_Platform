@@ -140,7 +140,7 @@ void PositionEstimate::thrBMI160()
     {
         std::cout << "reset false" << std::endl;
     }
-    if (bmi160->I2cInit(8, 0x69) != BMI160_OK)
+    if (bmi160->I2cInit(2, 0x69) != BMI160_OK)
     {
         std::cout << "init false" << std::endl;
         return;

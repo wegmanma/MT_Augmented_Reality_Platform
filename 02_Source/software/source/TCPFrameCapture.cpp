@@ -15,24 +15,25 @@
 
 #include "TCPFrameCapture.hpp"
 
-void write_data(std::string filename, uint16_t *buffer, int n) {
-                std::cout << "WRITING IMAGE DATA!" << std::endl;
-            std::ofstream fileData;
-            std::string num = std::to_string(n);
-            filename = "../data/ToFData/"+filename+"_test_diffusor_"+num+".txt";
-            fileData.open(filename);
-            for (int i = 0; i < 352 * 286; i++)
-            {
-                if (i < ((352 * 286) - 1))
-                {
-                    fileData << buffer[i] << ";";
-                }
-                else
-                {
-                    fileData << buffer[i];
-                }
-            }
-            fileData.close();
+void write_data(std::string filename, uint16_t *buffer, int n)
+{
+    std::cout << "WRITING IMAGE DATA! " << n << std::endl;
+    std::ofstream fileData;
+    std::string num = std::to_string(n);
+    filename = "../data/ToFData/" + filename + "_movement_" + num + ".txt";
+    fileData.open(filename);
+    for (int i = 0; i < 352 * 286; i++)
+    {
+        if (i < ((352 * 286) - 1))
+        {
+            fileData << buffer[i] << ";";
+        }
+        else
+        {
+            fileData << buffer[i];
+        }
+    }
+    fileData.close();
 }
 
 size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int max_length)
@@ -57,7 +58,6 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
             total_size += size_recv;
         }
     }
-    printf("Bytes received: %d\n", total_size);
     return total_size;
 }
 
@@ -138,10 +138,10 @@ void TCPFrameCapture::run()
     uint16_t x[352 * 286];
     uint16_t y[352 * 286];
     uint16_t z[352 * 286];
-    #ifdef SAVE_IMAGES_TO_DISK
+#ifdef SAVE_IMAGES_TO_DISK
     int cnt = 0;
     int n = 0;
-    #endif
+#endif
     while (running)
     {
         //Receive a reply from the server
@@ -151,7 +151,8 @@ void TCPFrameCapture::run()
             printf("recv failed");
             break;
         }
-        if (len != 1107392) continue;
+        if (len != 1107392)
+            continue;
 
         // printf("Server reply len: = %ld\n", len);
 
@@ -168,15 +169,20 @@ void TCPFrameCapture::run()
         memcpy(y, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(z, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-        #ifdef SAVE_IMAGES_TO_DISK
+#ifdef SAVE_IMAGES_TO_DISK
+        if (cnt >= 40)
+        {
+            if (ampl[0] != 0)
+            {
+                write_data("ampl", ampl, n);
+                write_data("radial", radial, n);
+                n++;
+            }
+        }
+
         if (cnt == 50)
         {
-            if(ampl[0]!=0) {
-            write_data("ampl",ampl,n);
-            write_data("radial",radial,n);
-            n++;
-            }
-
+            std::cout << "======================================== " << n << std::endl;
             // write_data("x",x,n);
             // write_data("y",y,n);
             // write_data("z",z,n);
@@ -184,7 +190,7 @@ void TCPFrameCapture::run()
             cnt = 0;
         }
         cnt++;
-        #endif
+#endif
         for (int i = 0; i < 352 * 286; i++)
         {
             buffers[write_buf_id][i * 4 + 0] = ampl[i];
