@@ -46,6 +46,14 @@ void print_quat(std::string name, quat e)
     std::cout << std::defaultfloat << std::setprecision(6);
 }
 
+void quat_rotate(quat result, quat rotation, quat vector) {
+    quat conj_rot;
+    quat temp;
+    quat_conj(conj_rot, rotation);
+    quat_mul(temp, conj_rot, vector);
+    quat_mul(result, temp, rotation);
+}
+
 void PositionEstimate::quat_from_angle_axis(quat R, float radians, vec3 axis)
 {
     vec3 axis_norm;
@@ -140,7 +148,7 @@ void PositionEstimate::thrBMI160()
     {
         std::cout << "reset false" << std::endl;
     }
-    if (bmi160->I2cInit(2, 0x69) != BMI160_OK)
+    if (bmi160->I2cInit(8, 0x69) != BMI160_OK)
     {
         std::cout << "init false" << std::endl;
         return;
@@ -414,6 +422,23 @@ void PositionEstimate::thrBMI160()
         // print_quat("Delta_vector", delta_vector_xyz);
         // print_quat("Velocity",velocity_xyz);
         // print_quat("Position",position_xyz);
+        {
+            quat quat1;
+            quat quat2;
+            quat fromAngle;
+            quat result;
+            quat1[0]=0.0f;
+            quat1[1]=0.0f;
+            quat1[2]=1.0f;
+            quat1[3]=0.0f;
+            quat2[0]=2.0f;
+            quat2[1]=3.0f;
+            quat2[2]=0.0f;
+            quat2[3]=0.0f;
+            print_quat("source",quat2);
+            quat_rotate(result,quat1,quat2);
+            print_quat("Rotate q1 q2",result);
+        }
         {
             // update the matrix
             mtx.lock();
