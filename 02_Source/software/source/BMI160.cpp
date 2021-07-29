@@ -155,13 +155,13 @@ int8_t BMI160::setSensConf()
 int8_t BMI160::setSensConf(struct bmi160Dev *dev)
 {
     int8_t rslt = BMI160_OK;
-    dev->accelCfg.odr = BMI160_ACCEL_ODR_100HZ;
+    dev->accelCfg.odr = BMI160_ACCEL_ODR_200HZ;
     dev->accelCfg.range = BMI160_ACCEL_RANGE_8G;
     dev->accelCfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
 
     dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
 
-    dev->gyroCfg.odr = BMI160_ACCEL_ODR_100HZ;
+    dev->gyroCfg.odr = BMI160_ACCEL_ODR_200HZ;
     dev->gyroCfg.range = BMI160_GYRO_RANGE_2000_DPS;
     dev->gyroCfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
 
@@ -1539,21 +1539,26 @@ int BMI160::I2CGetDataOpenDevice()
 
 int8_t BMI160::getAccelGyroDataFast(int file, int16_t *data)
 {
+    int size = 15;
     uint8_t idx = 0;
-    uint8_t data_array[15] = {0};
+    uint8_t data_array[size] = {0};
     uint8_t time_0 = 0;
     uint16_t time_1 = 0;
     uint32_t time_2 = 0;
     uint8_t lsb;
     uint8_t msb;
     int16_t msblsb;
-
-    if (read(file, data_array, 15) != 15)
+    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+    if (read(file, data_array, size) != size)
     {
         printf("Error : Input/Output error \n");
         exit(1);
     }
+    std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
 
+        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+    std::cout << "I2C took " << nseconds << "s"<<  std::endl;
     /* Gyro Data */
     lsb = data_array[idx++];
     msb = data_array[idx++];

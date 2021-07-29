@@ -148,7 +148,7 @@ void PositionEstimate::thrBMI160()
     {
         std::cout << "reset false" << std::endl;
     }
-    if (bmi160->I2cInit(8, 0x69) != BMI160_OK)
+    if (bmi160->I2cInit(2, 0x69) != BMI160_OK)
     {
         std::cout << "init false" << std::endl;
         return;
@@ -165,6 +165,7 @@ void PositionEstimate::thrBMI160()
     // raw AccelGyro-Data
     int16_t accelGyro[9] = {0};
     int16_t accelGyroLast[9] = {0};
+    uint32_t time, time_last;
     double nseconds;
 
     //Quaternion Calculation Variables
@@ -270,6 +271,7 @@ void PositionEstimate::thrBMI160()
     }
 
     int file = bmi160->I2CGetDataOpenDevice();
+    
     while (1)
     {
 
@@ -277,13 +279,19 @@ void PositionEstimate::thrBMI160()
         //parameter accelGyro is the pointer to store the data
         bmi160->getAccelGyroDataFast(file, accelGyro);
         // get sensor timestamp
+        time = (uint32_t)((accelGyro[6] << 16)||(accelGyro[7]));
+        // std::cout << time << std::endl;
         if (accelGyroLast[6] > accelGyro[6])
             nseconds = (double)(accelGyro[6] - accelGyroLast[6] + 65536) * SENS_TIME_RESOLUTION;
         else
             nseconds = (double)(accelGyro[6] - accelGyroLast[6]) * SENS_TIME_RESOLUTION;
-        if (GyroDataEqual(accelGyro, accelGyroLast))
+        
+        std::cout << nseconds;
+        if (GyroDataEqual(accelGyro, accelGyroLast)) {
+            std::cout << " continue" << std::endl;
             continue;
-        // std::cout << nseconds << std::endl;
+        }
+        std::cout << std::endl;
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
         //std::cout << "gyro raw values: ( ";
@@ -422,23 +430,23 @@ void PositionEstimate::thrBMI160()
         // print_quat("Delta_vector", delta_vector_xyz);
         // print_quat("Velocity",velocity_xyz);
         // print_quat("Position",position_xyz);
-        {
-            quat quat1;
-            quat quat2;
-            quat fromAngle;
-            quat result;
-            quat1[0]=0.0f;
-            quat1[1]=0.0f;
-            quat1[2]=1.0f;
-            quat1[3]=0.0f;
-            quat2[0]=2.0f;
-            quat2[1]=3.0f;
-            quat2[2]=0.0f;
-            quat2[3]=0.0f;
-            print_quat("source",quat2);
-            quat_rotate(result,quat1,quat2);
-            print_quat("Rotate q1 q2",result);
-        }
+        // {
+        //     quat quat1;
+        //     quat quat2;
+        //     quat fromAngle;
+        //     quat result;
+        //     quat1[0]=0.0f;
+        //     quat1[1]=0.0f;
+        //     quat1[2]=1.0f;
+        //     quat1[3]=0.0f;
+        //     quat2[0]=2.0f;
+        //     quat2[1]=3.0f;
+        //     quat2[2]=0.0f;
+        //     quat2[3]=0.0f;
+        //     print_quat("source",quat2);
+        //     quat_rotate(result,quat1,quat2);
+        //     print_quat("Rotate q1 q2",result);
+        // }
         {
             // update the matrix
             mtx.lock();
