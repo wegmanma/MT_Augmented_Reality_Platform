@@ -16,6 +16,7 @@ Another method for 3d mapping is, using one wide area infrared flash and measuri
 While the measurement principle in both technologies is the same, the LiDaR scanner generates a point cloud, while the ToF camera outputs a depth map image. With mathematical transformations, both outputs are equivalent. Another difference is that a ToF camera can double as a grayscale infrared camera, providing an image by itself. \\
 The sensor used for this thesis follows the principle of a ToF camera. The measured radial distance from the sensor for each pixel allows the three dimensional reconstruction of the scene. 
 \subsection{Radial information from ToF cameras}
+\label{sec:RadialCorrection}
 The used ToF camera provides the measured distance from the sensor to the filmed object for each pixel, generating a depht map. Because of the radial measurement, flat surfaces appear warped. The distortion follows a curve which can be corrected by knowing the cosine of the angle $\alpha$ for each pixel.
 \begin{figure}[H]
     \centering
@@ -318,6 +319,7 @@ By converting a rotation quaternion to a rotation matrix, the gap to Vulkan can 
 \end{equation*}
 The basic quaternion operations - like the multiplication - are included in the linmath-library. The linmath-library represents a quaternion as a four-dimensional float-vector in the ordering $(b, c, d, a)$ - the real part being the last element.\\
 \section{Camera Calibration}
+\label{sec:FundCamCalibration}
 An uncalibrated camera image often has lens distortion, warping a rectangle into a pillow or barrel shape and making areas appear closer in certain parts of the image. These distortions are named radial and tangential distortion and are induced by the camera lens.\\
 According to OpenCV \cite{openCVCamCalib}, radial distiortion can be modeled as:
 \begin{equation*}
@@ -348,13 +350,13 @@ OpenCV itself provides a script which estimates these values based on multiple p
     \begin{minipage}[b]{0.45\textwidth}
       \includegraphics[scale=0.70]{images/camcalib_source.jpg}
       \caption{Before correction}
-      \label{fig:heightmapdots} 
+      \label{fig:camCalibBefore} 
     \end{minipage} % Hier darf keine Leerzeile zwischen den beiden Minipages liegen!
     \begin{minipage}[b]{0.45\textwidth}
       \includegraphics[scale=0.70]{images/camcalib_result.png} 
       \caption{After correction}
-      \label{fig:bothobjects} 
+      \label{fig:camCalibAfter} 
     \end{minipage}
     \caption{Camera correction demonstrated at the grayscale image of the ToF camera.}
-    \label{fig.videodisplay}
+    \label{fig.camCalib}
   \end{figure}
