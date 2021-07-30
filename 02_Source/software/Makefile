@@ -5,7 +5,7 @@ VULKAN_LAY_PATH = /etc/vulkan
 INCLUDE :=include
 SRC := source
 
-CFLAGS = -Wall -std=c++17 -O2 -I$(STB_INCLUDE_PATH) 
+CFLAGS = -std=c++17 -O2 -I$(STB_INCLUDE_PATH) 
 LDFLAGS = `pkg-config --static --libs glfw3` -lvulkan -lpthread
 
 all: gyro ar_demo

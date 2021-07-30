@@ -148,7 +148,7 @@ void PositionEstimate::thrBMI160()
     {
         std::cout << "reset false" << std::endl;
     }
-    if (bmi160->I2cInit(2, 0x69) != BMI160_OK)
+    if (bmi160->I2cInit(9, 0x69) != BMI160_OK)
     {
         std::cout << "init false" << std::endl;
         return;
@@ -286,12 +286,12 @@ void PositionEstimate::thrBMI160()
         else
             nseconds = (double)(accelGyro[6] - accelGyroLast[6]) * SENS_TIME_RESOLUTION;
         
-        std::cout << nseconds;
+        // std::cout << nseconds;
         if (GyroDataEqual(accelGyro, accelGyroLast)) {
-            std::cout << " continue" << std::endl;
+            // std::cout << " continue" << std::endl;
             continue;
         }
-        std::cout << std::endl;
+        // std::cout << std::endl;
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
         //std::cout << "gyro raw values: ( ";

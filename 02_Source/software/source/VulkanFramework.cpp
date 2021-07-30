@@ -106,8 +106,11 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 }
 
 void VulkanFramework::initVulkan() {
+    std::cout << "1" << std::endl;
     positionEstimate = new PositionEstimate();
+    std::cout << "2" << std::endl;
     tcpCapture.start();
+    std::cout << "3" << std::endl;
     createInstance();
     setupDebugCallback();
     createSurface();
@@ -120,15 +123,19 @@ void VulkanFramework::initVulkan() {
     createRenderPass();
     createFramebuffers();
     createCommandPool();
-
+    std::cout << "3.5" << std::endl;
     createTextureImage();
+    std::cout << "3.6" << std::endl;
     createTextureImageView();
+    std::cout << "3.7" << std::endl;
     createTextureSampler();
     createSyncObjects();
-    
+    std::cout << "4" << std::endl;
     projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
     mainCamera.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), mainImageView, mainSampler);
+
     createCommandBuffers();
+    std::cout << "init fin" << std::endl;
 
 }
 
@@ -476,7 +483,7 @@ void VulkanFramework::recreateSwapChain() {
     std::cout << "7" << std::endl;
 
     projectedSurface.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
-    mainCamera.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
+    mainCamera.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),mainImageView,mainSampler);
     std::cout << "8" << std::endl;
     createCommandBuffers();
     std::cout << "fin" << std::endl;

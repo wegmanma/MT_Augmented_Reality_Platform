@@ -365,7 +365,6 @@ vkh::QueueFamilyIndices vkh::findQueueFamilies(VkPhysicalDevice device, VkSurfac
     {
         if ((queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
         {
-            std::cout << "Found Compute Queue index = " << i << std::endl;
             indices.computeFamily = i;
             computeQueueFound = true;
             break;

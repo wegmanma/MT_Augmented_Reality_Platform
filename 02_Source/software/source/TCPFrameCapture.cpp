@@ -94,19 +94,22 @@ int TCPFrameCapture::lockMutex()
 {
     if (write_buf_id == 0)
     {
-        mtx[1].lock();
+        std::cout << "lockMutex(): Called (buf_id = 0)" << std::endl;
+        m_lock[1].lockR();
         return 1;
     }
     else
     {
-        mtx[0].lock();
+        std::cout << "lockMutex(): Called (buf_id = 1)" << std::endl;
+        m_lock[0].lockR();
         return 0;
     }
 }
 
 void TCPFrameCapture::unlockMutex(int mtx_nr)
 {
-    mtx[mtx_nr].unlock();
+    std::cout << "unlockMutex(): Called (buf_id = " << mtx_nr << ")" << std::endl;
+    m_lock[mtx_nr].unlockR();
 }
 
 void TCPFrameCapture::run()
@@ -157,7 +160,7 @@ void TCPFrameCapture::run()
         // printf("Server reply len: = %ld\n", len);
 
         int offset_src = 0;
-        mtx[write_buf_id].lock();
+        m_lock[write_buf_id].lockW();
         memcpy(ampl, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(conf, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
@@ -200,12 +203,12 @@ void TCPFrameCapture::run()
         if (write_buf_id == 0)
         {
             write_buf_id = 1;
-            mtx[0].unlock();
+            m_lock[0].unlockW();
         }
         else
         {
             write_buf_id = 0;
-            mtx[1].unlock();
+            m_lock[1].unlockW();
         }
     }
 

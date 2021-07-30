@@ -2,11 +2,12 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include "RWLock.hpp"
 
 #define NUM_BUFFERS 2
 
 class TCPFrameCapture {
-
+mutable RWLock m_lock[2];	// mutable: can be modified even in const methods
 
 public:
     void start();
@@ -33,8 +34,6 @@ private:
     std::thread tid;
 
     bool running;
-
-    std::mutex mtx[2];
 
     void run();
 

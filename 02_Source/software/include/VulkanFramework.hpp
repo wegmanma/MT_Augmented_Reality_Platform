@@ -32,7 +32,11 @@ public:
     void run();
 
     const std::vector<const char*> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"
+    "VK_LAYER_LUNARG_standard_validation",
+    "VK_LAYER_LUNARG_core_validation",
+    "VK_LAYER_LUNARG_parameter_validation",
+    "VK_LAYER_GOOGLE_unique_objects",
+    "VK_LAYER_LUNARG_object_tracker"
     };
 
     const std::vector<const char*> deviceExtensions = {
@@ -51,6 +55,15 @@ public:
     PositionEstimate *positionEstimate = {};
 
     GLFWwindow* window{};
+
+    PFN_vkGetMemoryFdKHR  fpGetMemoryFdKHR;
+    PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;
+    PFN_vkGetPhysicalDeviceProperties2 fpGetPhysicalDeviceProperties2;
+    uint8_t  vkDeviceUUID[VK_UUID_SIZE];
+
+    int cudaUpdateVkVertexBufSemaphoreHandle;
+
+    int vkUpdateCudaVertexBufSemaphoreHandle;
 
 private:
 

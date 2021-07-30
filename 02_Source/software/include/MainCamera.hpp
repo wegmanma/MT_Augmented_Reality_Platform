@@ -29,9 +29,9 @@ public:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
 
 
-    void create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler);
+    void create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler);
 
-    void recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler);
+    void recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler);
 
     void update(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, uint32_t currentImage);
 
@@ -51,7 +51,7 @@ public:
 
     void createDescriptorPool(VkDevice device, size_t numSwapChainImages);
 
-    void createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler);
+    void createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler);
 
     void createDescriptorSetLayout(VkDevice device);
 

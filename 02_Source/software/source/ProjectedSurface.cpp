@@ -368,9 +368,6 @@ void ProjectedSurface::createDescriptorPool(VkDevice device, size_t numSwapChain
     // graphics queue needs the regular texture
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = static_cast<uint32_t>(numSwapChainImages);
-    // graphics queue needs a height map
-    // poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    // poolSizes[2].descriptorCount = static_cast<uint32_t>(numSwapChainImages);
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;

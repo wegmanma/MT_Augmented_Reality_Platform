@@ -155,13 +155,13 @@ int8_t BMI160::setSensConf()
 int8_t BMI160::setSensConf(struct bmi160Dev *dev)
 {
     int8_t rslt = BMI160_OK;
-    dev->accelCfg.odr = BMI160_ACCEL_ODR_200HZ;
+    dev->accelCfg.odr = BMI160_ACCEL_ODR_100HZ;
     dev->accelCfg.range = BMI160_ACCEL_RANGE_8G;
     dev->accelCfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
 
     dev->accelCfg.power = BMI160_ACCEL_NORMAL_MODE;
 
-    dev->gyroCfg.odr = BMI160_ACCEL_ODR_200HZ;
+    dev->gyroCfg.odr = BMI160_ACCEL_ODR_100HZ;
     dev->gyroCfg.range = BMI160_GYRO_RANGE_2000_DPS;
     dev->gyroCfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
 
@@ -919,7 +919,7 @@ int8_t BMI160::I2cGetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     uint8_t reg[1] = {reg_addr};
     ssize_t written_bytes = write(file, reg, 1);
     if (written_bytes < 0)
-        printf("problem writing.");
+        printf("I2cGetRegs(): problem writing.");
     uint8_t output[len];
 
     if (read(file, output, len) != len)
@@ -990,7 +990,7 @@ int8_t BMI160::I2cSetRegs(struct bmi160Dev *dev, uint8_t reg_addr, uint8_t *data
     }
     ssize_t written_bytes = write(file, buf, len + 1);
     if (written_bytes < 0)
-        printf("problem writing.");
+        printf("I2cSetRegs(): problem writing.");
     close(file);
 
     return BMI160_OK;
@@ -1533,7 +1533,7 @@ int BMI160::I2CGetDataOpenDevice()
     uint8_t reg[1] = {BMI160_GYRO_DATA_ADDR};
     ssize_t written_bytes = write(file, reg, 1);
     if (written_bytes < 0)
-        printf("problem writing.");
+        printf("I2CGetDataOpenDevice(): problem writing.");
     return file;
 }
 
@@ -1558,7 +1558,7 @@ int8_t BMI160::getAccelGyroDataFast(int file, int16_t *data)
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
 
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-    std::cout << "I2C took " << nseconds << "s"<<  std::endl;
+    // std::cout << "I2C took " << nseconds << "s"<<  std::endl;
     /* Gyro Data */
     lsb = data_array[idx++];
     msb = data_array[idx++];

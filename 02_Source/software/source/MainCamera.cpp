@@ -35,7 +35,7 @@ void MainCamera::cleanup(VkDevice device)
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 }
 
-void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
+void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler)
 {
     createDescriptorSetLayout(device);
     createGraphicsPipeline(device, renderPass, swapChainExtent);
@@ -43,15 +43,15 @@ void MainCamera::create(VkDevice device, VkPhysicalDevice physicalDevice, VkRend
     createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue);
     createUniformBuffers(device, physicalDevice, numSwapChainImages);
     createDescriptorPool(device, numSwapChainImages);
-    createDescriptorSets(device, numSwapChainImages, projectedImageView, projectedSampler);
+    createDescriptorSets(device, numSwapChainImages, mainImageView, mainSampler);
 }
 
-void MainCamera::recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
+void MainCamera::recreate(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkExtent2D swapChainExtent, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler)
 {
     createGraphicsPipeline(device, renderPass, swapChainExtent);
     createUniformBuffers(device, physicalDevice, numSwapChainImages);
     createDescriptorPool(device, numSwapChainImages);
-    createDescriptorSets(device, numSwapChainImages, projectedImageView, projectedSampler);
+    createDescriptorSets(device, numSwapChainImages, mainImageView, mainSampler);
 }
 
 void MainCamera::update(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D swapChainExtent, uint32_t currentImage)
@@ -306,7 +306,7 @@ void MainCamera::createDescriptorPool(VkDevice device, size_t numSwapChainImages
     }
 }
 
-void MainCamera::createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView projectedImageView, VkSampler projectedSampler)
+void MainCamera::createDescriptorSets(VkDevice device, size_t numSwapChainImages, VkImageView mainImageView, VkSampler mainSampler)
 {
     std::vector<VkDescriptorSetLayout> layouts(numSwapChainImages, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};
@@ -330,8 +330,8 @@ void MainCamera::createDescriptorSets(VkDevice device, size_t numSwapChainImages
 
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = projectedImageView;
-        imageInfo.sampler = projectedSampler;
+        imageInfo.imageView = mainImageView;
+        imageInfo.sampler = mainSampler;
 
         std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
 
