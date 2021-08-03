@@ -12,3 +12,7 @@
 *.symvers
 *.order
 *.mod.c
+*.pyc
+02_Source/python/__pycache__/functions.cpython-39.pyc
+02_Source/python/pyArrayToC/calib_xchan.txt
+02_Source/python/pyArrayToC/calib_ychan.txt

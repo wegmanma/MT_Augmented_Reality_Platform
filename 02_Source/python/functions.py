@@ -32,6 +32,26 @@ def load_n_undistort(filename):
     src = dst[y:y+h, x:x+w]
     return src
 
+def load_n_undistort_int16(filename):
+    with open(filename, newline='') as csvfile:
+        data = list(csv.reader(csvfile,  delimiter=';'))
+        
+    dataraw = np.array(data)
+    dataraw = dataraw.astype(np.uint16).reshape((286,352))
+    dataRGB = np.zeros((286*352*3),dtype=float).reshape((286,352,3))
+    dataRGB[:,:,0] = (((dataraw[:,:]-np.amin(dataraw).astype(float))/(np.amax(dataraw)-np.amin(dataraw))).astype(float)).astype(float)
+    dataRGB[:,:,1] = (((dataraw[:,:]-np.amin(dataraw).astype(float))/(np.amax(dataraw)-np.amin(dataraw))).astype(float)).astype(float)
+    dataRGB[:,:,2] = (((dataraw[:,:]-np.amin(dataraw).astype(float))/(np.amax(dataraw)-np.amin(dataraw))).astype(float)).astype(float)
+    dst = cv.undistort(dataRGB, undistort_mtx, undistort_dist, None, undistort_newcameramtx)
+    x, y, w, h = undistort_roi
+    src = dst[y:y+h, x:x+w]
+    ret = np.zeros((205,265),dtype=np.uint16)
+    for i in range(205):
+        for j in range(265):
+            ret[i,j] = (src[i,j,0]*(np.amax(dataraw)-np.amin(dataraw))+np.amin(dataraw)).astype(np.uint16)
+    
+    return ret
+
 def sobel_filter_2D(src):
     sobel_x = np.array([[-1., 0., 1.],
                         [-2., 0., 2.],
