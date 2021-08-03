@@ -8,10 +8,12 @@
 #include <sys/socket.h> //socket
 #include <arpa/inet.h>  //inet_addr
 #include <unistd.h>
+#include <fcntl.h>
 #include <any>
+#include <computation.cuh>
 
-#define MAX 11 * 352 * 286 // Bytes
-#define SAVE_IMAGES_TO_DISK
+#define FRAME_LENGTH 11 * 352 * 286 // Bytes
+// #define SAVE_IMAGES_TO_DISK
 
 #include "TCPFrameCapture.hpp"
 
@@ -39,30 +41,42 @@ void write_data(std::string filename, uint16_t *buffer, int n)
 size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int max_length)
 {
     int size_recv, total_size = 0;
-
+    int size_to_recv = 512;
     //loop
     // total_size = recv(socket_desc, client_message + total_size, 1107392, 0);
     // if (size_recv != 12) {
     //     return 0;
     // }
+    size_t bytes_sent = 0;
+    std::cout << "Sending request in TCP!" << std::endl;
+    bytes_sent = send(socket_desc, "100", 4, 0);
+    if (bytes_sent != 4) std::cout << "Problem sending request in TCP!" << std::endl;
     while (total_size < max_length)
     {
-        memset(client_message + total_size, 0, 512); //clear the variable
-        size_recv = recv(socket_desc, client_message + total_size, 512, 0);
-        if (size_recv < 0)
-        {
-            break;
+        // std::cout << "Begin: Total_size: " << total_size << " size_recv: " << size_recv << "size_to_recv" << size_to_recv << std::endl;
+        memset(client_message + total_size, 0, size_to_recv); //clear the variable
+        size_recv = recv(socket_desc, client_message + total_size, size_to_recv, 0);
+        if (size_recv <= 0) {
+            int size_recv, total_size = 0;
+            int size_to_recv = 512;
+            continue;
         }
         else
         {
             total_size += size_recv;
         }
+        // if (max_length - total_size <= size_to_recv) {
+        //     size_to_recv = max_length - total_size;
+        // }
+        // std::cout << "End: Total_size: " << total_size << " size_recv: " << size_recv << "size_to_recv" << size_to_recv << std::endl;
     }
+    std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
     return total_size;
 }
 
-void TCPFrameCapture::start()
+void TCPFrameCapture::start(Computation* computation_p)
 {
+    computation = computation_p;
     buffers[0] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
     buffers[1] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
     write_buf_id = 0;
@@ -94,13 +108,13 @@ int TCPFrameCapture::lockMutex()
 {
     if (write_buf_id == 0)
     {
-        std::cout << "lockMutex(): Called (buf_id = 0)" << std::endl;
+        // std::cout << "lockMutex(): Called (buf_id = 0)" << std::endl;
         m_lock[1].lockR();
         return 1;
     }
     else
     {
-        std::cout << "lockMutex(): Called (buf_id = 1)" << std::endl;
+        // std::cout << "lockMutex(): Called (buf_id = 1)" << std::endl;
         m_lock[0].lockR();
         return 0;
     }
@@ -108,7 +122,7 @@ int TCPFrameCapture::lockMutex()
 
 void TCPFrameCapture::unlockMutex(int mtx_nr)
 {
-    std::cout << "unlockMutex(): Called (buf_id = " << mtx_nr << ")" << std::endl;
+    // std::cout << "unlockMutex(): Called (buf_id = " << mtx_nr << ")" << std::endl;
     m_lock[mtx_nr].unlockR();
 }
 
@@ -116,7 +130,7 @@ void TCPFrameCapture::run()
 {
     int sock;
     struct sockaddr_in server;
-    char server_data[MAX];
+    char server_data[FRAME_LENGTH+4];
 
     //Create socket
     sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -145,10 +159,13 @@ void TCPFrameCapture::run()
     int cnt = 0;
     int n = 0;
 #endif
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     while (running)
     {
         //Receive a reply from the server
-        size_t len = receive_all(sock, server_data, MAX);
+        std::cout << "calling recv_all" << std::endl;
+        size_t len = receive_all(sock, server_data, FRAME_LENGTH);
         if (len < 0)
         {
             printf("recv failed");
@@ -210,6 +227,9 @@ void TCPFrameCapture::run()
             write_buf_id = 0;
             m_lock[1].unlockW();
         }
+        // while(1) {
+        //     std::this_thread::sleep_for(std::chrono::microseconds(5000));
+        // }
     }
 
     close(sock);

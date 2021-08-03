@@ -18,12 +18,14 @@
 #include <optional>
 #include <set>
 #include <chrono>   
+#include "computation.cuh"
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
 #include "ProjectedSurface.hpp"
 #include "PositionEstimate.hpp"
 #include "MainCamera.hpp"
 #include "TCPFrameCapture.hpp"
+
 
 class VulkanFramework {
 
@@ -55,6 +57,8 @@ public:
     PositionEstimate *positionEstimate = {};
 
     GLFWwindow* window{};
+
+    Computation* computation{};
 
     PFN_vkGetMemoryFdKHR  fpGetMemoryFdKHR;
     PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;

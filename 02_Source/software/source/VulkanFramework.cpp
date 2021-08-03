@@ -21,6 +21,7 @@
 
  // Project Includes
 #include "VulkanFramework.hpp"
+#include "computation.cuh"
 #include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
 #include "PositionEstimate.hpp"
@@ -106,11 +107,9 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 }
 
 void VulkanFramework::initVulkan() {
-    std::cout << "1" << std::endl;
+    computation = new Computation{};
     positionEstimate = new PositionEstimate();
-    std::cout << "2" << std::endl;
-    tcpCapture.start();
-    std::cout << "3" << std::endl;
+    tcpCapture.start(computation);
     createInstance();
     setupDebugCallback();
     createSurface();
@@ -123,19 +122,14 @@ void VulkanFramework::initVulkan() {
     createRenderPass();
     createFramebuffers();
     createCommandPool();
-    std::cout << "3.5" << std::endl;
     createTextureImage();
-    std::cout << "3.6" << std::endl;
     createTextureImageView();
-    std::cout << "3.7" << std::endl;
     createTextureSampler();
     createSyncObjects();
-    std::cout << "4" << std::endl;
     projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
     mainCamera.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), mainImageView, mainSampler);
 
     createCommandBuffers();
-    std::cout << "init fin" << std::endl;
 
 }
 
@@ -904,7 +898,7 @@ void VulkanFramework::updateTextureImage() {
     texWidth = 352;
     texHeight = 286;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
-    //int mtx = tcpCapture.lockMutex();
+    int mtx = tcpCapture.lockMutex();
     pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
 
     if (!pixels) {
@@ -914,7 +908,7 @@ void VulkanFramework::updateTextureImage() {
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
-    // tcpCapture.unlockMutex(mtx);
+    tcpCapture.unlockMutex(mtx);
     
     vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
     vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);

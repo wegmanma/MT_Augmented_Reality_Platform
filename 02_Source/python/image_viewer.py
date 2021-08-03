@@ -3,7 +3,7 @@ import csv
 import png
 from PIL import Image 
 
-with open('../software/ampl.txt', newline='') as csvfile:
+with open('/home/nvidia/MT_Augmented_Reality_Platform/02_Source/data/ToFData/ampl_movement_0.txt', newline='') as csvfile:
     data = list(csv.reader(csvfile,  delimiter=';'))
 
 arr = np.array(data)

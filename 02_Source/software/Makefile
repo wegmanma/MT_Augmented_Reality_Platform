@@ -1,7 +1,7 @@
 VULKAN_LIB_PATH = /usr/lib/aarch64-linux-gnu
 VULKAN_INC_PATH = /usr/include/vulkan
 VULKAN_LAY_PATH = /etc/vulkan
-CUDA_INCLUDE_PATH = /usr/local/cuda/targets/aarch64-linux/include
+CUDA_INCLUDE_PATH = /usr/local/cuda-10.2/targets/aarch64-linux/include/
 CUDA_PATH ?= /usr/local/cuda
 
 
@@ -20,7 +20,7 @@ build: gyro ar_demo
 
 bin/main.o: source/main.cpp include/VulkanFramework.hpp
 	@ mkdir -p bin
-	g++ -c $(CFLAGS) -c -I$(INCLUDE) -o bin/main.o source/main.cpp $(LDFLAGS)
+	nvcc -c $(NVFLAGS) -c -I$(NVINCLUDE) -I$(INCLUDE) -o bin/main.o source/main.cpp $(LDFLAGS)
 bin/gyro.o: source/gyro.cpp
 	@ mkdir -p bin
 	g++ -c $(CFLAGS) -I$(INCLUDE) -o bin/gyro.o source/gyro.cpp $(LDFLAGS)
@@ -29,7 +29,7 @@ bin/BMI160.o: source/BMI160.cpp include/BMI160.hpp
 	g++  -c $(CFLAGS) -I$(INCLUDE) -o bin/BMI160.o source/BMI160.cpp $(LDFLAGS)
 bin/VulkanFramework.o: source/VulkanFramework.cpp include/VulkanFramework.hpp
 	@ mkdir -p bin
-	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/VulkanFramework.o source/VulkanFramework.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(INCLUDE) -o bin/VulkanFramework.o source/VulkanFramework.cpp $(LDFLAGS)
 bin/VulkanHelper.o: source/VulkanHelper.cpp include/VulkanHelper.hpp
 	@ mkdir -p bin
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/VulkanHelper.o source/VulkanHelper.cpp $(LDFLAGS)
@@ -44,7 +44,7 @@ bin/FrameCapture.o: source/FrameCapture.cpp include/FrameCapture.hpp
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/FrameCapture.o source/FrameCapture.cpp $(LDFLAGS)
 bin/TCPFrameCapture.o: source/TCPFrameCapture.cpp include/TCPFrameCapture.hpp
 	@ mkdir -p bin
-	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE) -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
 bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 	@ mkdir -p bin
 	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2) -o bin/PositionEstimate.o source/PositionEstimate.cpp $(LDFLAGS)

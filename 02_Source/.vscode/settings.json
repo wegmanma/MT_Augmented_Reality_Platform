@@ -1,6 +1,7 @@
 {
     "C_Cpp.default.includePath": [
-        "${workspaceFolder}/**"
+        "${workspaceFolder}/**",
+        "/usr/local/cuda-10.2/include/"
     ],
     "files.associations": {
         "iostream": "cpp",

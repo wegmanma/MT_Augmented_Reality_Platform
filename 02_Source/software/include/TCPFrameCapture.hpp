@@ -10,7 +10,7 @@ class TCPFrameCapture {
 mutable RWLock m_lock[2];	// mutable: can be modified even in const methods
 
 public:
-    void start();
+    void start(Computation *computation_p);
 
     void cleanup();
 
@@ -26,6 +26,8 @@ private:
         void* start;
         size_t                  length;
     };
+
+    Computation* computation;
 
     uint16_t * buffers[2];
 
