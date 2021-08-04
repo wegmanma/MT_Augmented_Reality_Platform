@@ -16,3 +16,11 @@
 02_Source/python/__pycache__/functions.cpython-39.pyc
 02_Source/python/pyArrayToC/calib_xchan.txt
 02_Source/python/pyArrayToC/calib_ychan.txt
+02_Source/python/calib_ychan.txt
+02_Source/python/calib_xchan.txt
+02_Source/calib_ychan.txt
+02_Source/calib_xchan.txt
+02_Source/python/corr_calib_xchan.txt
+02_Source/python/corr_calib_ychan.txt
+02_Source/software/calib_xchan.txt
+02_Source/software/calib_ychan.txt

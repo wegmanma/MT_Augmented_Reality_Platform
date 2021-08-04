@@ -9,7 +9,7 @@ import cv2 as cv
 from functions import *
 np.set_printoptions(threshold=np.inf)
 
-# Resolution of ToF Camera: 352 x 288
+# Resolution of ToF Camera: 352 x 286
 XChan = np.zeros((286,352),dtype=np.int16)
 YChan = np.zeros((286,352),dtype=np.int16)
 for i in range(286):
@@ -40,19 +40,19 @@ y_corr = load_n_undistort_int16("calib_ychan.txt")
 print(type(x_corr[0,0]))
 print(x_corr.shape)
 
-filename = "../../data/x_corr_ToF.dat"
+filename = "../data/x_corr_ToF.dat"
 fileobj = open(filename, mode='wb')
 x_corr.tofile(fileobj)
 fileobj.close
 
-filename = "../../data/y_corr_ToF.dat"
+filename = "../data/y_corr_ToF.dat"
 fileobj = open(filename, mode='wb')
 y_corr.tofile(fileobj)
 fileobj.close
 
-# text = str(x_corr)
-# with open('corr_calib_xchan.txt', 'w') as f:
-#     f.write(text)
-# text = str(y_corr)
-# with open('corr_calib_ychan.txt', 'w') as f:
-#     f.write(text)
+text = str(x_corr)
+with open('corr_calib_xchan.txt', 'w') as f:
+    f.write(text)
+text = str(y_corr)
+with open('corr_calib_ychan.txt', 'w') as f:
+    f.write(text)
