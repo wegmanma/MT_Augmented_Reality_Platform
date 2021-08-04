@@ -809,8 +809,8 @@ void VulkanFramework::createTextureImage() {
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
  
-    texWidth = 352;
-    texHeight = 286;
+    texWidth = 265;
+    texHeight = 205;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
     pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
@@ -895,8 +895,8 @@ void VulkanFramework::updateTextureImage() {
     // vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
 
-    texWidth = 352;
-    texHeight = 286;
+    texWidth = 265;
+    texHeight = 205;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
     pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());

@@ -77,8 +77,56 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
 void TCPFrameCapture::start(Computation* computation_p)
 {
     computation = computation_p;
-    buffers[0] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
-    buffers[1] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
+    // buffers[0] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
+    // buffers[1] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
+    // image_x = (uint16_t *)malloc(205 * 265 * sizeof(uint16_t));
+    // image_y = (uint16_t *)malloc(205 * 265 * sizeof(uint16_t));
+    cudaSetDeviceFlags(cudaDeviceMapHost);
+    
+
+    buffers_h[0] = NULL; 
+    buffers_h[1] = NULL;
+    image_x_h = NULL;
+    image_y_h = NULL;
+    radial_h = NULL;
+    ampl_h = NULL;
+    conf_h = NULL;
+    cos_alpha_map_h = NULL;
+
+    cudaHostAlloc((void **)&buffers_h[0],  352 * 286 * 6 * sizeof(uint16_t),  cudaHostAllocMapped);
+    cudaHostAlloc((void **)&buffers_h[1], 352 * 286 * 6 * sizeof(uint16_t), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&image_x_h,  205 * 265 * sizeof(uint16_t),  cudaHostAllocMapped);
+    cudaHostAlloc((void **)&image_y_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&radial_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
+    cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint8_t), cudaHostAllocMapped);    
+    cudaHostAlloc((void **)&ampl_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
+    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);   
+
+    cudaHostGetDevicePointer((void **)&buffers_d[0] ,  (void *) buffers_h[0] , 0);
+    cudaHostGetDevicePointer((void **)&buffers_d[1] , (void *) buffers_h[1], 0);
+    cudaHostGetDevicePointer((void **)&image_x_d    ,  (void *) image_x_h   , 0);
+    cudaHostGetDevicePointer((void **)&image_y_d    , (void *) image_y_h   , 0);
+    cudaHostGetDevicePointer((void **)&ampl_d    , (void *) ampl_h   , 0);
+    cudaHostGetDevicePointer((void **)&radial_d    , (void *) radial_h   , 0);
+    cudaHostGetDevicePointer((void **)&conf_d    , (void *) conf_h   , 0); 
+    cudaHostGetDevicePointer((void **)&cos_alpha_map_d    , (void *) cos_alpha_map_h   , 0); 
+
+    FILE *datfile;
+    char buff[256];
+    sprintf(buff, "%s", "../data/x_corr_ToF.dat");
+    datfile = fopen(buff, "r");
+    fread(&(image_x_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
+    fclose(datfile);
+
+    sprintf(buff, "%s", "../data/y_corr_ToF.dat");
+    datfile = fopen(buff, "r");
+    fread(&(image_y_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
+    fclose(datfile);
+
+    sprintf(buff, "%s", "../data/y_corr_ToF.dat");
+    datfile = fopen(buff, "r");
+    fread(&(cos_alpha_map_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
+    fclose(datfile);
     write_buf_id = 0;
     running = true;
     tid = std::thread(&TCPFrameCapture::run, this);
@@ -88,19 +136,19 @@ void TCPFrameCapture::cleanup()
 {
     running = false;
     tid.join();
-    free(buffers[0]);
-    free(buffers[1]);
+    cudaFree(buffers_h[0]);
+    cudaFree(buffers_h[1]);
 }
 
 uint16_t *TCPFrameCapture::getToFFrame()
 {
     if (write_buf_id == 0)
     {
-        return buffers[1];
+        return buffers_h[1];
     }
     else
     {
-        return buffers[0];
+        return buffers_h[0];
     }
 }
 
@@ -149,9 +197,6 @@ void TCPFrameCapture::run()
     {
         perror("connect failed. Error");
     }
-    uint16_t ampl[352 * 286];
-    uint8_t conf[352 * 286];
-    uint16_t radial[352 * 286];
     uint16_t x[352 * 286];
     uint16_t y[352 * 286];
     uint16_t z[352 * 286];
@@ -178,11 +223,11 @@ void TCPFrameCapture::run()
 
         int offset_src = 0;
         m_lock[write_buf_id].lockW();
-        memcpy(ampl, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
+        memcpy(ampl_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
-        memcpy(conf, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
+        memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
         offset_src += 352 * 286 * sizeof(uint8_t);
-        memcpy(radial, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
+        memcpy(radial_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(x, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
@@ -211,12 +256,13 @@ void TCPFrameCapture::run()
         }
         cnt++;
 #endif
-        for (int i = 0; i < 352 * 286; i++)
-        {
-            buffers[write_buf_id][i * 4 + 0] = ampl[i];
-            buffers[write_buf_id][i * 4 + 1] = ampl[i]; //((uint16_t)conf[i]) << 8; //
-            buffers[write_buf_id][i * 4 + 2] = ampl[i]; // radial[i];
-        }
+        //for (int i = 0; i < 352 * 286; i++)
+        //{
+        //    buffers_h[write_buf_id][i * 4 + 0] = ampl_h[i];
+        //    buffers_h[write_buf_id][i * 4 + 1] = ampl_h[i]; //((uint16_t)conf[i]) << 8; //
+        //    buffers_h[write_buf_id][i * 4 + 2] = ampl_h[i]; // radial[i];
+        //}
+        computation->tof_camera_undistort(buffers_d[write_buf_id],ampl_d,image_x_d,image_y_d, cos_alpha_map_d);
         if (write_buf_id == 0)
         {
             write_buf_id = 1;

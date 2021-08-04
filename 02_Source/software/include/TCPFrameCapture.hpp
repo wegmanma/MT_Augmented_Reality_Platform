@@ -29,7 +29,23 @@ private:
 
     Computation* computation;
 
-    uint16_t * buffers[2];
+    uint16_t *image_x_h;
+    uint16_t *image_y_h;
+    uint16_t *image_x_d;
+    uint16_t *image_y_d;
+
+    uint16_t *cos_alpha_map_h;
+    uint16_t *cos_alpha_map_d;
+
+    uint16_t *ampl_h;
+    uint8_t *conf_h;
+    uint16_t *radial_h;
+    uint16_t *ampl_d;
+    uint8_t *conf_d;
+    uint16_t *radial_d;
+
+    uint16_t * buffers_h[2];
+    uint16_t * buffers_d[2];
 
     int write_buf_id;
 

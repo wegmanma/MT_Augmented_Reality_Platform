@@ -562,23 +562,35 @@ __global__ void gpuConvertYUYVtoRGBfloat_kernel(unsigned char *src, float *dst,
 }
 
 
-__global__ void gpuToFUndistort(unsigned char *src, float *dst,
-    unsigned int width, unsigned int height)
+__global__ void gpuUndistort(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= width) {
+    // printf("hoi\n");
+    if (idx >= width_dst) {
         return;
     }
-    const float cx = 184.57709806;
-    const float cy = 150.10088495;
-    const float fx = 219.46858215;
-    const float fy = 207.91963196
-
-    
-
-    for (int i = 0; i < height; ++i) {
+  
+    for (int i = 0; i < height_dst; ++i) {
         // Calculate new coordinates
+       dst[i*width_dst*4+idx*3+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst*4+idx*3+1] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst*4+idx*3+2] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+    }
+}
 
+__global__ void gpuUndistortCosAlpha(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst, uint16_t *cosAlpha)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // printf("hoi\n");
+    if (idx >= width_dst) {
+        return;
+    }
+  
+    for (int i = 0; i < height_dst; ++i) {
+        // Calculate new coordinates
+       dst[i*width_dst*4+idx*3+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst*4+idx*3+1] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst*4+idx*3+2] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
     }
 }
 
@@ -2554,12 +2566,21 @@ void Computation::sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata
   gpuSharpenImageToGrayscale<<<grid, block, 0>>>(yuvdata, greyscaleImage.d_data, 1920, 1080, amount);
 }
 
-void Computation::tof_camera_undistort(CudaImage &im_ToFCorrected, unsigned char *im_ToFRaw) {
+void Computation::tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, uint16_t *cosAlpha) {
   
-    int width = 265;
-    int height = 205;
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
-  
-    gpuToFUndistort<<<blocks, threads>>>(im_ToFRaw, im_ToFCorrected.d_data, width, height);
+    int width_dst = 265;
+    int height_dst = 205;
+    int width_src = 352;
+    int height_src = 286;
+    // printf("Wotsch mi verarsche?\n");
+    if (cosAlpha == NULL) {
+      gpuUndistort<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst);
+    } else {
+      gpuUndistortCosAlpha<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst, cosAlpha);
+    }
+
+    cudaDeviceSynchronize();
+    checkMsg("Problem with gpuUndistort:\n");
   }

@@ -192,6 +192,8 @@ void sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata, float amoun
 
 void LowPass_prepareKernel(void);
 
+void tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, uint16_t *cosAlpha = NULL);
+
 private:
 
 cudaStream_t streamToRun;

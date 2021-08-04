@@ -64,6 +64,10 @@
         "iomanip": "cpp",
         "sstream": "cpp",
         "any": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "filesystem": "cpp",
+        "__nullptr": "cpp"
     }
 }
