@@ -123,7 +123,7 @@ void TCPFrameCapture::start(Computation* computation_p)
     fread(&(image_y_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
     fclose(datfile);
 
-    sprintf(buff, "%s", "../data/y_corr_ToF.dat");
+    sprintf(buff, "%s", "../data/cos_alpha_ToF.dat");
     datfile = fopen(buff, "r");
     fread(&(cos_alpha_map_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
     fclose(datfile);

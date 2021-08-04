@@ -34,8 +34,8 @@ private:
     uint16_t *image_x_d;
     uint16_t *image_y_d;
 
-    uint16_t *cos_alpha_map_h;
-    uint16_t *cos_alpha_map_d;
+    float *cos_alpha_map_h;
+    float *cos_alpha_map_d;
 
     uint16_t *ampl_h;
     uint8_t *conf_h;

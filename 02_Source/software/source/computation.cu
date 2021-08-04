@@ -2574,13 +2574,11 @@ void Computation::tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *x
     int height_dst = 205;
     int width_src = 352;
     int height_src = 286;
-    // printf("Wotsch mi verarsche?\n");
     if (cosAlpha == NULL) {
       gpuUndistort<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst);
     } else {
       gpuUndistortCosAlpha<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst, cosAlpha);
     }
-
     cudaDeviceSynchronize();
     checkMsg("Problem with gpuUndistort:\n");
   }
