@@ -25,11 +25,16 @@ radial = np.mean(radial_arr, axis=2)
 print(type(radial[0,0]))
 print(radial.shape)
 
+cos_a = np.zeros(radial.shape,dtype=np.float32)
+for m in range(width):
+    for n in range(height):
+        cos_a[m,n] = radial[100,124]/radial[m,n]
+
 filename = "../data/cos_alpha_ToF.dat"
 fileobj = open(filename, mode='wb')
-radial.tofile(fileobj)
+cos_a.tofile(fileobj)
 fileobj.close
 
-text = str(radial)
+text = str(cos_a)
 with open('cosAlpha_calib_xchan.txt', 'w') as f:
     f.write(text)
