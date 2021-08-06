@@ -141,8 +141,6 @@ void VulkanFramework::mainLoop() {
 
         glfwPollEvents();
 
-        updateTextureImage();
-
         drawFrame();
 
         endTime = std::chrono::steady_clock::now();
@@ -637,7 +635,7 @@ void VulkanFramework::createCommandBuffers() {
        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
        vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
-       vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
+       // vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
 
 
         vkCmdEndRenderPass(commandBuffers[i]);
@@ -705,7 +703,7 @@ void VulkanFramework::drawFrame() {
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
         vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
-
+    updateTextureImage();
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
     if (!startSubmit)
     {
@@ -813,7 +811,7 @@ void VulkanFramework::createTextureImage() {
     texHeight = 205;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
-    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
+    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame(mtx));
     // memset(pixels,0,imageSize);
     // for (int i = 0; i<352*286; i++) {
     //     pixels[8*i+0] = 0;
@@ -899,12 +897,12 @@ void VulkanFramework::updateTextureImage() {
     texHeight = 205;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
-    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame());
+    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame(mtx));
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
-
+    std::cout << "buffers_h at use: "<< (int)pixels[50*265*4+50*4+0] << std::endl;
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);

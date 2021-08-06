@@ -14,7 +14,7 @@ public:
 
     void cleanup();
 
-    uint16_t* getToFFrame();
+    uint16_t* getToFFrame(int buffer);
 
     int lockMutex();
 
@@ -36,6 +36,8 @@ private:
 
     float *cos_alpha_map_h;
     float *cos_alpha_map_d;
+
+    float *temp_mem_265x205xfloat_0_d[4];
 
     uint16_t *ampl_h;
     uint8_t *conf_h;

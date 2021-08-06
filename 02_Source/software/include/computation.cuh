@@ -174,8 +174,6 @@ struct Vertex2 {
 
     void cleanup();
     
-void cudaUpdateVertexBuffer(CudaImage &heightMap, CudaImage &colorData);
-
 void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev);
 
 float *AllocSiftTempMemory(int width, int height, int numOctaves, bool scaleUp);
@@ -184,15 +182,21 @@ void ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double init
 
 void MatchSiftData(SiftData &data1, SiftData &data2);
 
-void drawHeightMap(CudaImage &heightMap, SiftData &siftData);
-
 void yuvToRGB_Convert(CudaImage &RGBImage, unsigned char *yuvdata);
 
 void sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata, float amount);
 
 void LowPass_prepareKernel(void);
 
-void tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, uint16_t *cosAlpha = NULL);
+void tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, float *cosAlpha = NULL);
+
+void tof_sobel(float *dst_mag, float *dst_phase, float *src);
+
+void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height);
+
+void buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height);
+
+void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height);
 
 private:
 
@@ -205,24 +209,6 @@ cudaExternalSemaphore_t cudaExtCudaUpdateVkVertexBufSemaphore;
 
 
 int setCudaVkDevice();
-
-
-void cudaVkImportVertexMem();
-
-
-void cudaVkSemaphoreSignal(cudaExternalSemaphore_t &extSemaphore);
-
-
-void cudaVkSemaphoreWait(cudaExternalSemaphore_t &extSemaphore);
-
-
-void cudaInitVertexMem();
-
-void cudaInitIndexMem();
-
-
-void cudaVkImportSemaphore();
-
 
 void FreeSiftTempMemory(float *memoryTmp);
 

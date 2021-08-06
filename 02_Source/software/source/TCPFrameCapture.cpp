@@ -13,6 +13,16 @@
 #include <computation.cuh>
 
 #define FRAME_LENGTH 11 * 352 * 286 // Bytes
+#define checkMsg(msg)       __checkMsg(msg, __FILE__, __LINE__)
+
+inline void __checkMsg(const char *errorMessage, const char *file, const int line)
+{
+  cudaError_t err = cudaGetLastError();
+  if (cudaSuccess != err) {
+    fprintf(stderr, "checkMsg() CUDA error: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
+    exit(-1);
+  }
+}
 // #define SAVE_IMAGES_TO_DISK
 
 #include "TCPFrameCapture.hpp"
@@ -48,7 +58,7 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
     //     return 0;
     // }
     size_t bytes_sent = 0;
-    std::cout << "Sending request in TCP!" << std::endl;
+    // std::cout << "Sending request in TCP!" << std::endl;
     bytes_sent = send(socket_desc, "100", 4, 0);
     if (bytes_sent != 4) std::cout << "Problem sending request in TCP!" << std::endl;
     while (total_size < max_length)
@@ -70,7 +80,7 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
         // }
         // std::cout << "End: Total_size: " << total_size << " size_recv: " << size_recv << "size_to_recv" << size_to_recv << std::endl;
     }
-    std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
+    // std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
     return total_size;
 }
 
@@ -93,14 +103,15 @@ void TCPFrameCapture::start(Computation* computation_p)
     conf_h = NULL;
     cos_alpha_map_h = NULL;
 
-    cudaHostAlloc((void **)&buffers_h[0],  352 * 286 * 6 * sizeof(uint16_t),  cudaHostAllocMapped);
-    cudaHostAlloc((void **)&buffers_h[1], 352 * 286 * 6 * sizeof(uint16_t), cudaHostAllocMapped);
+
+    cudaHostAlloc((void **)&buffers_h[0],  205 * 265 * 4 * sizeof(uint16_t),  cudaHostAllocMapped);
+    cudaHostAlloc((void **)&buffers_h[1], 205 * 265 * 4 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&image_x_h,  205 * 265 * sizeof(uint16_t),  cudaHostAllocMapped);
     cudaHostAlloc((void **)&image_y_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&radial_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
     cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint8_t), cudaHostAllocMapped);    
     cudaHostAlloc((void **)&ampl_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
-    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);   
+    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);   
 
     cudaHostGetDevicePointer((void **)&buffers_d[0] ,  (void *) buffers_h[0] , 0);
     cudaHostGetDevicePointer((void **)&buffers_d[1] , (void *) buffers_h[1], 0);
@@ -110,6 +121,15 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaHostGetDevicePointer((void **)&radial_d    , (void *) radial_h   , 0);
     cudaHostGetDevicePointer((void **)&conf_d    , (void *) conf_h   , 0); 
     cudaHostGetDevicePointer((void **)&cos_alpha_map_d    , (void *) cos_alpha_map_h   , 0); 
+
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[0],2*205 * 265 * sizeof(float));
+    // checkMsg("Problem with cudaMalloc [0]");
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[1],2*205 * 265 * sizeof(float));
+    // checkMsg("Problem with cudaMalloc [1]");
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[2],2*205 * 265 * sizeof(float));
+    // checkMsg("Problem with cudaMalloc [2]");
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[3],2*205 * 265 * sizeof(float));
+    // checkMsg("Problem with cudaMalloc [3]");
 
     FILE *datfile;
     char buff[256];
@@ -125,8 +145,9 @@ void TCPFrameCapture::start(Computation* computation_p)
 
     sprintf(buff, "%s", "../data/cos_alpha_ToF.dat");
     datfile = fopen(buff, "r");
-    fread(&(cos_alpha_map_h[0]), sizeof(__uint16_t), 205 * 265, datfile);
+    fread(&(cos_alpha_map_h[0]), sizeof(float), 205 * 265, datfile);
     fclose(datfile);
+    std::cout << "Float in cos_alpha[0]" << cos_alpha_map_h[0] << std::endl;
     write_buf_id = 0;
     running = true;
     tid = std::thread(&TCPFrameCapture::run, this);
@@ -140,37 +161,36 @@ void TCPFrameCapture::cleanup()
     cudaFree(buffers_h[1]);
 }
 
-uint16_t *TCPFrameCapture::getToFFrame()
+uint16_t *TCPFrameCapture::getToFFrame(int buffer)
 {
-    if (write_buf_id == 0)
-    {
-        return buffers_h[1];
-    }
-    else
-    {
-        return buffers_h[0];
-    }
+
+    return buffers_h[buffer];
+
+     
+    
 }
 
 int TCPFrameCapture::lockMutex()
 {
     if (write_buf_id == 0)
     {
-        // std::cout << "lockMutex(): Called (buf_id = 0)" << std::endl;
+        std::cout << "lockMutexR(): 1" << std::endl;
         m_lock[1].lockR();
+        std::cout << "locked R: 1" << std::endl;
         return 1;
     }
     else
     {
-        // std::cout << "lockMutex(): Called (buf_id = 1)" << std::endl;
+        std::cout << "lockMutexR(): 0" << std::endl;
         m_lock[0].lockR();
+        std::cout << "locked R: 0" << std::endl;
         return 0;
     }
 }
 
 void TCPFrameCapture::unlockMutex(int mtx_nr)
 {
-    // std::cout << "unlockMutex(): Called (buf_id = " << mtx_nr << ")" << std::endl;
+    std::cout << "unlockMutexR(): " << mtx_nr << std::endl;
     m_lock[mtx_nr].unlockR();
 }
 
@@ -209,7 +229,6 @@ void TCPFrameCapture::run()
     while (running)
     {
         //Receive a reply from the server
-        std::cout << "calling recv_all" << std::endl;
         size_t len = receive_all(sock, server_data, FRAME_LENGTH);
         if (len < 0)
         {
@@ -223,6 +242,7 @@ void TCPFrameCapture::run()
 
         int offset_src = 0;
         m_lock[write_buf_id].lockW();
+        // std::cout << "locking W" << write_buf_id << std::endl;
         memcpy(ampl_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
@@ -256,21 +276,24 @@ void TCPFrameCapture::run()
         }
         cnt++;
 #endif
-        //for (int i = 0; i < 352 * 286; i++)
-        //{
-        //    buffers_h[write_buf_id][i * 4 + 0] = ampl_h[i];
-        //    buffers_h[write_buf_id][i * 4 + 1] = ampl_h[i]; //((uint16_t)conf[i]) << 8; //
-        //    buffers_h[write_buf_id][i * 4 + 2] = ampl_h[i]; // radial[i];
-        //}
-        computation->tof_camera_undistort(buffers_d[write_buf_id],ampl_d,image_x_d,image_y_d, cos_alpha_map_d);
+
+        // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d);
+        // computation->tof_sobel(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[2],temp_mem_265x205xfloat_0_d[0]);
+
+        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],265,205);
+        cudaDeviceSynchronize();
+        // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {
             write_buf_id = 1;
+            // std::cout << "unlockingW 0" << std::endl;
             m_lock[0].unlockW();
         }
         else
         {
             write_buf_id = 0;
+            // std::cout << "unlockingW 1" << std::endl;
             m_lock[1].unlockW();
         }
         // while(1) {

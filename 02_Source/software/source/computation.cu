@@ -9,6 +9,7 @@
 #include <vector>
 #include <array>
 #include <iomanip>
+#include <limits>
 #include "computation.cuh"
 
 // 16:9 display format.
@@ -562,7 +563,7 @@ __global__ void gpuConvertYUYVtoRGBfloat_kernel(unsigned char *src, float *dst,
 }
 
 
-__global__ void gpuUndistort(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
+__global__ void gpuUndistort(float *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     // printf("hoi\n");
@@ -572,13 +573,11 @@ __global__ void gpuUndistort(uint16_t *dst, uint16_t *src, uint16_t *xCoords, ui
   
     for (int i = 0; i < height_dst; ++i) {
         // Calculate new coordinates
-       dst[i*width_dst*4+idx*3+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
-       dst[i*width_dst*4+idx*3+1] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
-       dst[i*width_dst*4+idx*3+2] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst+idx] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
     }
 }
 
-__global__ void gpuUndistortCosAlpha(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst, uint16_t *cosAlpha)
+__global__ void gpuUndistortCosAlpha(float *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst, float *cosAlpha)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     // printf("hoi\n");
@@ -586,12 +585,107 @@ __global__ void gpuUndistortCosAlpha(uint16_t *dst, uint16_t *src, uint16_t *xCo
         return;
     }
   
-    for (int i = 0; i < height_dst; ++i) {
+    for (int i = 0; i < height_dst; ++i) { 
         // Calculate new coordinates
-       dst[i*width_dst*4+idx*3+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
-       dst[i*width_dst*4+idx*3+1] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
-       dst[i*width_dst*4+idx*3+2] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst+idx] =  (float)(cosAlpha[i*width_dst+idx]*src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]]);
     }
+}
+
+__global__ void gpuNormalizeToInt16(uint16_t *dst, float *src, const int width, const int height)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= width) {
+        return;
+    }    
+    for (int i = 0; i < height; ++i) { 
+      dst[i*width*4+idx*4+0]  = (uint16_t)(src[i*width+idx]); 
+      dst[i*width*4+idx*4+1]  = (uint16_t)(src[i*width+idx]);  
+      dst[i*width*4+idx*4+2]  = (uint16_t)(src[i*width+idx]); 
+      dst[i*width*4+idx*4+3]  = 255*255;
+  }
+}
+
+__global__ void gpuNormalizeToInt16_SCALE(uint16_t *dst, float *src, const int width, const int height)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    __shared__ float min_value[1920];
+    __shared__ float max_value[1920];
+    if (idx >= width) {
+        return;
+    }    
+    min_value[idx] = 70000.0;
+    max_value[idx] = -70000.0;
+
+    for (int i = 0; i < height; ++i) { 
+      if (src[i*width+idx]<min_value[idx]) min_value[idx]=src[i*width+idx];
+      if (src[i*width+idx]>max_value[idx]) max_value[idx]=src[i*width+idx];
+    }
+    __syncthreads();
+    if (idx == 0) {
+      for (int i = 0; i < width; i++) {
+        if (min_value[0]>min_value[i]) min_value[0]=min_value[i];
+      }
+      printf("min value: %f\n",min_value[0]);
+    }
+    if (idx == 1) {
+      for (int i = 0; i < width; i++) {
+        if (max_value[0]<max_value[i]) max_value[0]=max_value[i];
+      }
+      printf("max value: %f\n",max_value[0]);
+    }
+    __syncthreads();
+    for (int i = 0; i < height; ++i) { 
+      dst[i*width*4+idx*4+0]  = (uint16_t)((src[i*width+idx]-min_value[0])/(max_value[0]-min_value[0])); 
+      dst[i*width*4+idx*4+1]  = (uint16_t)((src[i*width+idx]-min_value[0])/(max_value[0]-min_value[0]));   
+      dst[i*width*4+idx*4+2]  = (uint16_t)((src[i*width+idx]-min_value[0])/(max_value[0]-min_value[0])); 
+      dst[i*width*4+idx*4+3]  = 255*255;
+    }
+}
+
+
+__global__ void gpuNormalizeToFloat(float *dst, uint16_t *src, const int width, const int height)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= width) {
+        return;
+    }    
+    for (int i = 0; i < height; ++i) { 
+      dst[i*width+idx]  = (float)(src[i*width*4+idx*4+0]); 
+  }
+}
+
+__global__ void gpuSobelToF(float *dst_mag, float* dst_phase, float *src,
+  unsigned int width, unsigned int height)
+{
+int idx_x = blockIdx.x*blockDim.x + threadIdx.x; // image-pixel
+int idx_y = blockIdx.y*blockDim.y + threadIdx.y; 
+
+float result_x = 0;
+float result_y = 0;
+
+if ((idx_x != 0)&&(idx_x != width-1)&&(idx_y != 0)&&(idx_y != height-1)) {
+ // sobel
+  result_x +=  1 * src[(idx_x-1)+(idx_y-1)*width];
+  result_x +=  2 * src[(idx_x-1)+(idx_y)*width];
+  result_x +=  1 * src[(idx_x-1)+(idx_y+1)*width];
+  result_x += -1 * src[(idx_x+1)+(idx_y-1)*width];
+  result_x += -2 * src[(idx_x+1)+(idx_y)*width];
+  result_x += -1 * src[(idx_x+1)+(idx_y+1)*width];
+//
+  result_y +=  1 * src[(idx_x-1)+(idx_y-1)*width];
+  result_y +=  2 * src[(idx_x)+(idx_y-1)*width];
+  result_y +=  1 * src[(idx_x+1)+(idx_y-1)*width];
+  result_y += -1 * src[(idx_x-1)+(idx_y+1)*width];
+  result_y += -2 * src[(idx_x)+(idx_y+1)*width];
+  result_y += -1 * src[(idx_x+1)+(idx_y+1)*width];
+}
+//result_x = result_x/9.0f;
+float result = (sqrt(result_x*result_x+result_y*result_y));
+
+// printf("result written on x = %d, y = %d", idx_x, idx_y);
+dst_mag[idx_x+(idx_y)*width] = result; 
+if (result_x == 0.0) result_x = 0.000000001;
+dst_phase[idx_x+(idx_y)*width] = tan(result_y/result_x);
 }
 
 __global__ void gpuSharpenImageToGrayscale(unsigned char *src, float *dst,
@@ -1051,117 +1145,6 @@ __global__ void CleanMatches(SiftPoint *sift1, int numPts1)
 #define NRX    2
 #define NDIM 128
 
-__global__ void Find3DCorr(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2) {
-  unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
-  float x_limit {200.0f};
-  int x_corr {0};//{600};
-  int y_corr {0};//{-18};
-  float dx = 0.0f;
-  float dy = 0.0f;
-
-  if (idx < numPts1){
-    sift1[idx].match = -1;
-    float corr = 0.0f;
-    float best_corr = 100.0f;
-    int   best_index = -1;
-    float best_dx = x_corr+x_limit;
-    float x1 = sift1[idx].xpos;
-    float y1 = sift1[idx].ypos;
-    float sharpness = sift1[idx].sharpness;
-    float edgeness = sift1[idx].edgeness;
-    float orientation = sift1[idx].orientation;
-    int subsampling = sift1[idx].subsampling;
-    float sharp_ratio = 0.0f;
-    float edge_ratio = 0.0f;
-    float ori_ratio = 0.0f;
-    for (int i = 0; i<numPts2; i++) {
-      //if ((idx==0)&&(sift2[i].xpos+x_corr>=1060)&&(sift2[i].xpos+x_corr<=1300)&&(sift2[i].ypos+y_corr>=560)&&(sift2[i].ypos+y_corr<=890)) printf("2; %f; -%f; %f; %f; %f; %d; %d; %d\n",sift2[i].xpos+x_corr,sift2[i].ypos+y_corr,sift2[i].orientation,sift2[i].sharpness,sift2[i].edgeness,(int)sift2[i].subsampling, i, numPts2);
-      if (sift2[i].subsampling != subsampling) continue;
-      dy = y1-sift2[i].ypos;
-      if ((dy<(-3.0f+y_corr))||(dy>3.0f+y_corr)) continue; // abs(deltay) < 5, others do not pick 
-      dx = x1-sift2[i].xpos;
-      if ((dx<-1.0f+x_corr)||(dx>1.0f*x_limit+x_corr)) continue; // y1 < y2 
-      dx = abs(dx);
-      ori_ratio = (sift2[i].orientation - orientation); // best fit: near zero, 360-deg wrap around ignored for now.
-      if ((ori_ratio<-10.0f)||(ori_ratio>10.0f)) continue; // y1 < y2 
-      sharp_ratio = abs((sift2[i].sharpness / sharpness)-1.0f);
-      edge_ratio = abs((sift2[i].edgeness / edgeness)-1.0f);
-      corr = abs(sharp_ratio+edge_ratio);
-      if (best_corr < corr*0.8) continue;
-      //if ((best_dx != x_corr+x_limit)&&(best_dx > dx)) printf("dx = %f, best_dx = %f\n",dx,best_dx);
-      if (best_dx < dx) continue;
-      best_corr = corr;
-      best_index = i;
-      best_dx = dx;      
-    }
-
-  //if ((x1>=174)&&(x1<=213)&&(y1>=115)&&(y1<=187)) {
-  //  printf("1; Small; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Small; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=164)&&(x1<=230)&&(y1>=458)&&(y1<=542)) {
-  //  printf("1; Medium; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Medium; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=123)&&(x1<=212)&&(y1>=894)&&(y1<=1002)) {
-  //  printf("1; Large; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Medium; 0; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-//
-  //if ((x1>=567)&&(x1<=606)&&(y1>=115)&&(y1<=187)) {
-  //  printf("1; Small; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Small; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=523)&&(x1<=589)&&(y1>=458)&&(y1<=542)) {
-  //  printf("1; Medium; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Medium; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=540)&&(x1<=629)&&(y1>=894)&&(y1<=1002)) {
-  //  printf("1; Large; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Large; 1; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-//
-  //if ((x1>=1090)&&(x1<=1129)&&(y1>=115)&&(y1<=187)) {
-  //  printf("1; Small; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Small; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=1083)&&(x1<=1149)&&(y1>=458)&&(y1<=542)) {
-  //  printf("1; Medium; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Medium; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=1109)&&(x1<=1198)&&(y1>=894)&&(y1<=1002)) {
-  //  printf("1; Large; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Large; 2; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-//
-  //if ((x1>=1688)&&(x1<=1727)&&(y1>=115)&&(y1<=187)) {
-  //  printf("1; Small; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Small; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=1688)&&(x1<=1754)&&(y1>=458)&&(y1<=542)) {
-  //  printf("1; Medium; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Medium; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-  //if ((x1>=1617)&&(x1<=1706)&&(y1>=894)&&(y1<=1002)) {
-  //  printf("1; Large; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",x1,y1,orientation,sharpness,edgeness,subsampling,best_index, numPts1, best_dx);
-  //  if (best_index!=-1) printf("2; Large; 3; %f; -%f; %f; %f; %f; %d; %d; %d; %f\n",sift2[best_index].xpos+x_corr,sift2[best_index].ypos+y_corr,sift2[best_index].orientation,sift2[best_index].sharpness,sift2[best_index].edgeness,(int)sift2[best_index].subsampling, best_index, numPts2, best_dx);
-  //}
-        
-    
-    //printf("dx = %f, best corr = %f\nori1 = %f, sharp1 = %f, edge1 = %f\nori2 = %f, sharp2 = %f, edge2 = %f\n",best_dx,best_corr,orientation,sharpness,edgeness,sift2[best_index].orientation, sift2[best_index].sharpness, sift2[best_index].edgeness);
-    if ((best_corr < 0.5f)) {
-      
-      sift1[idx].score=1.0;
-      sift1[idx].match_error=(sqrt((x1-sift2[best_index].xpos-x_corr)*(x1-sift2[best_index].xpos-x_corr)+(y1-sift2[best_index].ypos-y_corr)*(y1-sift2[best_index].ypos-y_corr)))/(5.0f);
-      sift1[idx].match_xpos=sift2[best_index].xpos;
-      sift1[idx].match_ypos=sift2[best_index].ypos;
-      sift1[idx].match=best_index;
-      //if (((dx < -35.0)||(dx>35.0))) printf("dx = %f, dy = %f\n",dx,dy);
-    } else {
-      sift1[idx].score=0.0;
-    }
-  }
-}
 
 __global__ void FindMaxCorr10(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
 {
@@ -1698,10 +1681,6 @@ void Computation::initCuda()
     {
         
         setCudaVkDevice();
-        cudaVkImportVertexMem();
-        cudaInitVertexMem();
-        cudaInitIndexMem();
-        cudaVkImportSemaphore();
     }
 
 void Computation::cleanup()
@@ -1762,105 +1741,6 @@ int Computation::setCudaVkDevice()
 }
 
 
-void Computation::cudaVkImportVertexMem()
-{
-    cudaExternalMemoryHandleDesc cudaExtMemHandleDesc;
-    memset(&cudaExtMemHandleDesc, 0, sizeof(cudaExtMemHandleDesc));
-    cudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
-    cudaExtMemHandleDesc.handle.fd = memHandleVertex;
-    cudaExtMemHandleDesc.size = sizeof(Vertex2) * vertexBufSize;
-    checkCudaErrors(cudaImportExternalMemory(&cudaExtMemVertexBuffer, &cudaExtMemHandleDesc));
-    cudaExternalMemoryBufferDesc cudaExtBufferDesc;
-    cudaExtBufferDesc.offset = 0;
-    cudaExtBufferDesc.size = sizeof(Vertex2) * vertexBufSize;
-    cudaExtBufferDesc.flags = 0;
-    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&cudaDevVertptr, cudaExtMemVertexBuffer, &cudaExtBufferDesc));
-
-
-    cudaExtMemHandleDesc.size = (1080*1920*6)*sizeof(int);
-    cudaExtMemHandleDesc.handle.fd = memHandleIndex;
-    checkCudaErrors(cudaImportExternalMemory(&cudaExtMemIndexBuffer, &cudaExtMemHandleDesc));
-    cudaExtBufferDesc.size = (1080*1920*6)*sizeof(int);
-    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&cudaDevIndexptr, cudaExtMemIndexBuffer, &cudaExtBufferDesc));
-}
-
-
-void Computation::cudaVkSemaphoreSignal(cudaExternalSemaphore_t &extSemaphore)
-{
-    cudaExternalSemaphoreSignalParams extSemaphoreSignalParams;
-    memset(&extSemaphoreSignalParams, 0, sizeof(extSemaphoreSignalParams));
-    extSemaphoreSignalParams.params.fence.value = 0;
-    extSemaphoreSignalParams.flags              = 0;
-    checkCudaErrors(cudaSignalExternalSemaphoresAsync(&extSemaphore, &extSemaphoreSignalParams, 1, streamToRun));
-}
-
-
-void Computation::cudaVkSemaphoreWait(cudaExternalSemaphore_t &extSemaphore)
-{
-    cudaExternalSemaphoreWaitParams extSemaphoreWaitParams;
-    memset(&extSemaphoreWaitParams, 0, sizeof(extSemaphoreWaitParams));
-    extSemaphoreWaitParams.params.fence.value = 0;
-    extSemaphoreWaitParams.flags              = 0;
-    checkCudaErrors(cudaWaitExternalSemaphoresAsync(&extSemaphore, &extSemaphoreWaitParams, 1, streamToRun));
-}
-
-
-void Computation::cudaInitVertexMem()
-{
-    std::cout << "initializing VertexMemory" << std::endl;
-    checkCudaErrors(cudaStreamCreate(&streamToRun));
-    dim3 block(120, 1, 1);
-
-    dim3 grid(16, 1, 1);
-    Vertex2 *vertices = (Vertex2*) cudaDevVertptr;
-
-    init_grid_kernel<<<grid, block, 0, streamToRun>>>(vertices);
-    checkCudaErrors(cudaStreamSynchronize(streamToRun));
-}
-
-void Computation::cudaInitIndexMem()
-{
-    std::cout << "initializing IndexMemory" << std::endl;
-    checkCudaErrors(cudaStreamCreate(&streamToRun));
-    dim3 block(120, 1, 1);
-
-    dim3 grid(16, 1, 1);
-    int* indexbuffer =  (int*)cudaDevIndexptr;
-
-    init_index_kernel<<<grid, block, 0, streamToRun>>>(indexbuffer);
-    checkCudaErrors(cudaStreamSynchronize(streamToRun));
-}
-
-
-void Computation::cudaUpdateVertexBuffer(CudaImage &heightMap, CudaImage &colorData)
-{
-    cudaVkSemaphoreWait(cudaExtVkUpdateCudaVertexBufSemaphore);
-    dim3 block(16, 16, 1);
-    int mesh_width = 1920;
-    int mesh_height = 1080;
-    dim3 grid(mesh_width/block.x+1, mesh_height/block.y+1, 1);
-    Vertex2 *pos = (Vertex2*) cudaDevVertptr;
-    visualize_features_kernel<<<grid, block, 0, streamToRun>>>(pos, heightMap.d_result ,colorData.d_data,1920,1080);
-    cudaVkSemaphoreSignal(cudaExtCudaUpdateVkVertexBufSemaphore);
-}
-
-void Computation::drawHeightMap(CudaImage &heightMap, SiftData &siftData) {
-  dim3 blocks2 = dim3(1024);
-  dim3 threads2 = dim3((heightMap.width + 1024 - 1) / 1024);
-  dim3 blocks1 = dim3(256);
-  dim3 threads1 = dim3(siftData.numPts/256+1);
-
-  clear_heightmap_kernel<<<blocks2, threads2>>>(heightMap.d_data, heightMap.d_pixelFlags, heightMap.width, heightMap.height);
-  draw_heightmap_kernel<<<blocks1, threads1>>>(heightMap.d_data, heightMap.d_pixelFlags, siftData.d_data, heightMap.width, heightMap.height, siftData.numPts, siftData.maxPts);
-  dim3 block(16, 16, 1);
-  int mesh_width = 1920;
-  int mesh_height = 1080;
-  dim3 grid(mesh_width/block.x+1, mesh_height/block.y+1, 1);
-  
-  interpolate_heightmap_kernel<<<grid, block, 0>>>(heightMap.d_data, heightMap.d_pixelFlags, heightMap.d_pixHeight,  heightMap.width, heightMap.height);
-  LowPass_forSubImages(heightMap.d_result,heightMap.d_pixHeight,heightMap.width,heightMap.height);
-}
-
 void Computation::LowPass_prepareKernel(void) {
   int kernelSize{GAUSSIANSIZE};
   int range = kernelSize/2;
@@ -1906,22 +1786,6 @@ void Computation::LowPass_forSubImages(float *res, float *src, int width, int he
   return; 
 }
 
-
-void Computation::cudaVkImportSemaphore()
-{
-    cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc;
-    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
-    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
-    externalSemaphoreHandleDesc.handle.fd = cudaUpdateVkVertexBufSemaphoreHandle;
-    externalSemaphoreHandleDesc.flags = 0;
-    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtCudaUpdateVkVertexBufSemaphore, &externalSemaphoreHandleDesc));
-    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
-    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
-    externalSemaphoreHandleDesc.handle.fd = vkUpdateCudaVertexBufSemaphoreHandle;
-    externalSemaphoreHandleDesc.flags = 0;
-    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtVkUpdateCudaVertexBufSemaphore, &externalSemaphoreHandleDesc));
-    printf("CUDA Imported Vulkan semaphore\n");
-}
 
 void Computation::InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev)
 {
@@ -2508,7 +2372,7 @@ void Computation::MatchSiftData(SiftData &data1, SiftData &data2)
   dim3 blocksMax3(iDivUp(numPts1, 16), iDivUp(numPts2, 512));
   dim3 threadsMax3(16, 16);
   CleanMatches<<<iDivUp(numPts1, 64), 64>>>(sift1, numPts1);
-  int mode = 11;
+  int mode = 10;
   if (mode==5)// K40c 5.0ms, 1080 Ti 1.2ms, 2080 Ti 0.83ms
     FindMaxCorr5<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
   else if (mode==6) {                    // 2080 Ti 0.89ms
@@ -2528,12 +2392,7 @@ void Computation::MatchSiftData(SiftData &data1, SiftData &data2)
     blocksMax3 = dim3(iDivUp(numPts1, M7W));
     threadsMax3 = dim3(M7W, M7H/M7R);
     FindMaxCorr10<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  } else if (mode==11) {                 // 2080 Ti 0.24ms
-    dim3 blocksMax3 = dim3(256);
-    dim3 threadsMax3 = dim3(numPts1/256+1);
-    Find3DCorr<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
- 
-  }
+  } 
   cudaDeviceSynchronize();
   checkMsg("FindMaxCorr5() execution failed\n");
 #endif
@@ -2566,7 +2425,7 @@ void Computation::sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata
   gpuSharpenImageToGrayscale<<<grid, block, 0>>>(yuvdata, greyscaleImage.d_data, 1920, 1080, amount);
 }
 
-void Computation::tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, uint16_t *cosAlpha) {
+void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, float *cosAlpha) {
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
@@ -2579,6 +2438,44 @@ void Computation::tof_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *x
     } else {
       gpuUndistortCosAlpha<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst, cosAlpha);
     }
-    cudaDeviceSynchronize();
     checkMsg("Problem with gpuUndistort:\n");
+  }
+
+  void Computation::buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height) {
+  
+    dim3 blocks =   dim3(512);
+    dim3 threads =  dim3(1);
+     gpuNormalizeToInt16<<<blocks, threads>>>(dst, src, width, height);
+     checkMsg("Problem with gpuNormalizeToInt16:\n");    
+  }
+
+  void Computation::buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height) {
+  
+    dim3 blocks =   dim3(512);
+    dim3 threads =  dim3(1);
+     gpuNormalizeToInt16_SCALE<<<blocks, threads>>>(dst, src, width, height);
+     checkMsg("Problem with gpuNormalizeToInt16:\n");    
+  }
+
+
+  void Computation::buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height) {
+  
+    dim3 blocks =   dim3(512);
+    dim3 threads =  dim3(1);
+     gpuNormalizeToFloat<<<blocks, threads>>>(dst, src, width, height);
+     checkMsg("Problem with gpuNormalizeToInt16:\n");    
+  }
+
+  void Computation::tof_sobel(float *dst_mag, float *dst_phase, float *src) {
+  
+
+    int width = 265;
+    int height = 205;
+    
+    dim3 block(16, 16, 1);
+    dim3 grid(265/block.x+1, 205/block.y+1, 1);
+    gpuSobelToF<<<grid, block, 0>>>(dst_mag, dst_phase, src,  width, height);
+    checkMsg("Problem with gpuSobelToF:\n"); 
+  
+    
   }

@@ -12,7 +12,7 @@ NVINCLUDE2 +=include/cuda
 
 CFLAGS = -std=c++17 -O2 -I$(STB_INCLUDE_PATH) -I$(CUDA_INCLUDE_PATH) -I$(NVINCLUDE2) 
 LDFLAGS = -L/usr/lib/aarch64-linux-gnu -L"$(CUDA_PATH)/lib64" -L"/usr/lib/aarch64-linux-gnu/tegra" `pkg-config --static --libs glfw3` -lvulkan -lpthread
-NVFLAGS = -ccbin g++ -Xcudafe="--diag_suppress=2886" -I$(CUDA_INCLUDE_PATH) -I$(NVINCLUDE2) -I../../common/inc `pkg-config --static --cflags glfw3` -I/usr/include  -m64    --std=c++11 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_32,code=sm_32 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_72,code=sm_72 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_75,code=compute_75
+NVFLAGS = -ccbin g++ -Xcudafe="--diag_suppress=2886" -I$(CUDA_INCLUDE_PATH) -I$(NVINCLUDE2) -I../../common/inc `pkg-config --static --cflags glfw3` -I/usr/include  -m64    --std=c++11  -gencode arch=compute_72,code=sm_72
 
 all: gyro ar_demo
 
