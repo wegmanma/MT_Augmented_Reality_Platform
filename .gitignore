@@ -24,3 +24,4 @@
 02_Source/python/corr_calib_ychan.txt
 02_Source/software/calib_xchan.txt
 02_Source/software/calib_ychan.txt
+*.zip

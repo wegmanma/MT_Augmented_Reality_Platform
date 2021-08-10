@@ -279,21 +279,22 @@ void TCPFrameCapture::run()
 
         // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d);
-        // computation->tof_sobel(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[2],temp_mem_265x205xfloat_0_d[0]);
-
+        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0]);
+        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1]);
+        //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0]);
+        //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2]);
+        //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0);
         computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],265,205);
         cudaDeviceSynchronize();
         // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {
             write_buf_id = 1;
-            // std::cout << "unlockingW 0" << std::endl;
             m_lock[0].unlockW();
         }
         else
         {
             write_buf_id = 0;
-            // std::cout << "unlockingW 1" << std::endl;
             m_lock[1].unlockW();
         }
         // while(1) {

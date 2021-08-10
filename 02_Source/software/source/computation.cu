@@ -684,10 +684,102 @@ float result = (sqrt(result_x*result_x+result_y*result_y));
 
 // printf("result written on x = %d, y = %d", idx_x, idx_y);
 dst_mag[idx_x+(idx_y)*width] = result; 
+if (dst_phase == NULL) return;
 if (result_x == 0.0) result_x = 0.000000001;
 dst_phase[idx_x+(idx_y)*width] = tan(result_y/result_x);
 }
 
+__global__ void gpuMaxfilterToF(float *dst, float *src,
+  unsigned int width, unsigned int height)
+{
+int idx_x = blockIdx.x*blockDim.x + threadIdx.x; // image-pixel
+int idx_y = blockIdx.y*blockDim.y + threadIdx.y; 
+
+float result = -65000.0;
+
+if ((idx_x != 0)&&(idx_x != width-1)&&(idx_y != 0)&&(idx_y != height-1)) {
+ // sobel
+  if (result  <  src[(idx_x-1)+(idx_y-1)*width]) result = src[(idx_x-1)+(idx_y-1)*width];
+  if (result  <  src[(idx_x-1)+(idx_y+0)*width]) result = src[(idx_x-1)+(idx_y+0)*width];
+  if (result  <  src[(idx_x-1)+(idx_y+1)*width]) result = src[(idx_x-1)+(idx_y+1)*width];
+  if (result  <  src[(idx_x+0)+(idx_y-1)*width]) result = src[(idx_x+0)+(idx_y-1)*width];
+  if (result  <  src[(idx_x+0)+(idx_y+0)*width]) result = src[(idx_x+0)+(idx_y+0)*width];
+  if (result  <  src[(idx_x+0)+(idx_y+1)*width]) result = src[(idx_x+0)+(idx_y+1)*width];  
+  if (result  <  src[(idx_x+1)+(idx_y-1)*width]) result = src[(idx_x+1)+(idx_y-1)*width];
+  if (result  <  src[(idx_x+1)+(idx_y+0)*width]) result = src[(idx_x+1)+(idx_y+0)*width];
+  if (result  <  src[(idx_x+1)+(idx_y+1)*width]) result = src[(idx_x+1)+(idx_y+1)*width];
+}
+
+dst[idx_x+(idx_y)*width] = result; 
+
+}
+
+
+__global__ void gpuMinfilterToF(float *dst, float *src,
+  unsigned int width, unsigned int height)
+{
+int idx_x = blockIdx.x*blockDim.x + threadIdx.x; // image-pixel
+int idx_y = blockIdx.y*blockDim.y + threadIdx.y; 
+
+float result = 65000.0;
+
+if ((idx_x != 0)&&(idx_x != width-1)&&(idx_y != 0)&&(idx_y != height-1)) {
+ // sobel
+  if (result  >  src[(idx_x-1)+(idx_y-1)*width]) result = src[(idx_x-1)+(idx_y-1)*width];
+  if (result  >  src[(idx_x-1)+(idx_y+0)*width]) result = src[(idx_x-1)+(idx_y+0)*width];
+  if (result  >  src[(idx_x-1)+(idx_y+1)*width]) result = src[(idx_x-1)+(idx_y+1)*width];
+  if (result  >  src[(idx_x+0)+(idx_y-1)*width]) result = src[(idx_x+0)+(idx_y-1)*width];
+  if (result  >  src[(idx_x+0)+(idx_y+0)*width]) result = src[(idx_x+0)+(idx_y+0)*width];
+  if (result  >  src[(idx_x+0)+(idx_y+1)*width]) result = src[(idx_x+0)+(idx_y+1)*width];  
+  if (result  >  src[(idx_x+1)+(idx_y-1)*width]) result = src[(idx_x+1)+(idx_y-1)*width];
+  if (result  >  src[(idx_x+1)+(idx_y+0)*width]) result = src[(idx_x+1)+(idx_y+0)*width];
+  if (result  >  src[(idx_x+1)+(idx_y+1)*width]) result = src[(idx_x+1)+(idx_y+1)*width];
+}
+
+dst[idx_x+(idx_y)*width] = result; 
+
+}
+
+__global__ void gpuMeanfilterToF(float *dst_mag, float *src,
+  unsigned int width, unsigned int height)
+{
+int idx_x = blockIdx.x*blockDim.x + threadIdx.x; // image-pixel
+int idx_y = blockIdx.y*blockDim.y + threadIdx.y; 
+
+float result = 0;
+
+
+if ((idx_x != 0)&&(idx_x != width-1)&&(idx_y != 0)&&(idx_y != height-1)) {
+ // sobel
+  result += src[(idx_x-1)+(idx_y-1)*width];
+  result += src[(idx_x-1)+(idx_y)*width];
+  result += src[(idx_x-1)+(idx_y+1)*width];
+  result += src[(idx_x-0)+(idx_y-1)*width];
+  result += src[(idx_x-0)+(idx_y)*width];
+  result += src[(idx_x-0)+(idx_y+1)*width];  
+  result += src[(idx_x+1)+(idx_y-1)*width];
+  result += src[(idx_x+1)+(idx_y)*width];
+  result += src[(idx_x+1)+(idx_y+1)*width];
+}
+dst_mag[idx_x+(idx_y)*width] = result/9.0; 
+
+}
+
+__global__ void gpuFillAreaToF(float *mask, float *src,
+  unsigned int width, unsigned int height, int seed_x, int seed_y, float thresh)
+{
+int idx_x = blockIdx.x*blockDim.x + threadIdx.x; // image-pixel
+int idx_y = blockIdx.y*blockDim.y + threadIdx.y; 
+
+float seed_value = src[(seed_x)+(seed_y)*width];
+
+if ((src[(idx_x)+(idx_y)*width]>=seed_value-thresh)&&((src[(idx_x)+(idx_y)*width]<=seed_value+thresh))) {
+  mask[(idx_x)+(idx_y)*width] = 256.0*256.0-1;
+}
+else {
+  mask[(idx_x)+(idx_y)*width] = 0.0;
+}
+}
 __global__ void gpuSharpenImageToGrayscale(unsigned char *src, float *dst,
 		unsigned int width, unsigned int height, float amount)
 {
@@ -2478,4 +2570,52 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
     checkMsg("Problem with gpuSobelToF:\n"); 
   
     
+  }
+
+  void Computation::tof_maxfilter_3x3(float *dst_mag, float *src) { 
+
+    int width = 265;
+    int height = 205;
+    
+    dim3 block(16, 16, 1);
+    dim3 grid(265/block.x+1, 205/block.y+1, 1);
+    gpuMaxfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    checkMsg("Problem with gpuMaxFilter:\n"); 
+  
+  }
+
+  void Computation::tof_minfilter_3x3(float *dst_mag, float *src) { 
+
+    int width = 265;
+    int height = 205;
+    
+    dim3 block(16, 16, 1);
+    dim3 grid(265/block.x+1, 205/block.y+1, 1);
+    gpuMinfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    checkMsg("Problem with gpuMaxFilter:\n"); 
+  
+  }
+
+  void Computation::tof_meanfilter_3x3(float *dst_mag, float *src) { 
+
+    int width = 265;
+    int height = 205;
+    
+    dim3 block(16, 16, 1);
+    dim3 grid(265/block.x+1, 205/block.y+1, 1);
+    gpuMeanfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    checkMsg("Problem with gpuMaxFilter:\n"); 
+  
+  }
+
+  void Computation::tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh) { 
+
+    int width = 265;
+    int height = 205;
+    
+    dim3 block(16, 16, 1);
+    dim3 grid(265/block.x+1, 205/block.y+1, 1);
+    gpuFillAreaToF<<<grid, block, 0>>>(mask, src,  width, height, seed_x, seed_y, thresh);
+    checkMsg("Problem with gpuMaxFilter:\n"); 
+  
   }

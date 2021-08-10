@@ -192,6 +192,14 @@ void tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, 
 
 void tof_sobel(float *dst_mag, float *dst_phase, float *src);
 
+void tof_maxfilter_3x3(float *dst_mag, float *src);
+
+void tof_minfilter_3x3(float *dst_mag, float *src);
+
+void tof_meanfilter_3x3(float *dst_mag, float *src);
+
+void tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh);
+
 void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height);
 
 void buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height);
