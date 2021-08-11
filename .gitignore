@@ -25,3 +25,4 @@
 02_Source/software/calib_xchan.txt
 02_Source/software/calib_ychan.txt
 *.zip
+02_Source/data/RaspiData/img_*.jpg
