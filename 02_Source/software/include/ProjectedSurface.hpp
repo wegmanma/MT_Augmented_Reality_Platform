@@ -3,7 +3,6 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
-#include "FrameCapture.hpp"
 #include "PositionEstimate.hpp"
 
 class ProjectedSurface  {

@@ -19,8 +19,8 @@
 #include <set>
 #include <chrono>   
 #include "computation.cuh"
-#include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
+#include "CudaCapture.hpp"
 #include "ProjectedSurface.hpp"
 #include "PositionEstimate.hpp"
 #include "MainCamera.hpp"
@@ -53,6 +53,8 @@ public:
     ProjectedSurface projectedSurface{};
 
     TCPFrameCapture tcpCapture{};
+
+    CudaCapture cudaCapture{};
 
     PositionEstimate *positionEstimate = {};
 

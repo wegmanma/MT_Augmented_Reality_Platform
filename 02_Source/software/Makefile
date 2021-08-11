@@ -39,9 +39,9 @@ bin/ProjectedSurface.o: source/ProjectedSurface.cpp include/ProjectedSurface.hpp
 bin/MainCamera.o: source/MainCamera.cpp include/MainCamera.hpp
 	@ mkdir -p bin
 	g++ -c -I../../common/inc $(CFLAGS) -c -I$(INCLUDE) -o bin/MainCamera.o source/MainCamera.cpp $(LDFLAGS)
-bin/FrameCapture.o: source/FrameCapture.cpp include/FrameCapture.hpp
+bin/CudaCapture.o: source/CudaCapture.cpp include/CudaCapture.hpp
 	@ mkdir -p bin
-	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/FrameCapture.o source/FrameCapture.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE) -I$(INCLUDE) -o bin/CudaCapture.o source/CudaCapture.cpp $(LDFLAGS)
 bin/TCPFrameCapture.o: source/TCPFrameCapture.cpp include/TCPFrameCapture.hpp
 	@ mkdir -p bin
 	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE) -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
@@ -56,7 +56,7 @@ bin/computation.o: source/computation.cu include/computation.cuh
 gyro: bin/BMI160.o bin/gyro.o 
 	nvcc $(NVFLAGS) $^ -o $@ $(LDFLAGS)
 
-ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/FrameCapture.o bin/TCPFrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o bin/computation.o
+ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/CudaCapture.o bin/TCPFrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o bin/computation.o
 	nvcc $(NVFLAGS) $^ -o $@ $(LDFLAGS) -lnvbuf_utils
 	
 .PHONY: directories test clean 

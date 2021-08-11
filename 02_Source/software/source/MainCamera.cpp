@@ -242,14 +242,14 @@ void MainCamera::createIndexBuffer(VkDevice device, VkPhysicalDevice physicalDev
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
     vkh::createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-    std::cout << "IndexBuffer 1: createBuffer worked " << std::endl;
+    // std::cout << "IndexBuffer 1: createBuffer worked " << std::endl;
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, indices.data(), (size_t)bufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     vkh::createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-    std::cout << "IndexBuffer 2: createBuffer worked " << std::endl;
+    // std::cout << "IndexBuffer 2: createBuffer worked " << std::endl;
     vkh::copyBuffer(device, commandPool, stagingBuffer, indexBuffer, bufferSize, graphicsQueue);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
@@ -267,7 +267,7 @@ void MainCamera::createUniformBuffers(VkDevice device, VkPhysicalDevice physical
     {
         vkh::createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
     }
-    std::cout << "Uniformbuffers: createBuffer worked " << std::endl;
+    // std::cout << "Uniformbuffers: createBuffer worked " << std::endl;
 }
 
 void MainCamera::updateUniformBuffer(VkDevice device, VkExtent2D swapChainExtent, uint32_t currentImage)

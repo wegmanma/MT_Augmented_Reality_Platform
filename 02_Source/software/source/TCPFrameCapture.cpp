@@ -174,23 +174,23 @@ int TCPFrameCapture::lockMutex()
 {
     if (write_buf_id == 0)
     {
-        std::cout << "lockMutexR(): 1" << std::endl;
+        // std::cout << "lockMutexR(): 1" << std::endl;
         m_lock[1].lockR();
-        std::cout << "locked R: 1" << std::endl;
+        // std::cout << "locked R: 1" << std::endl;
         return 1;
     }
     else
     {
-        std::cout << "lockMutexR(): 0" << std::endl;
+        // std::cout << "lockMutexR(): 0" << std::endl;
         m_lock[0].lockR();
-        std::cout << "locked R: 0" << std::endl;
+        // std::cout << "locked R: 0" << std::endl;
         return 0;
     }
 }
 
 void TCPFrameCapture::unlockMutex(int mtx_nr)
 {
-    std::cout << "unlockMutexR(): " << mtx_nr << std::endl;
+    // std::cout << "unlockMutexR(): " << mtx_nr << std::endl;
     m_lock[mtx_nr].unlockR();
 }
 
@@ -206,7 +206,7 @@ void TCPFrameCapture::run()
     {
         printf("Could not create socket");
     }
-    puts("Socket created");
+    // puts("Socket created");
 
     server.sin_addr.s_addr = inet_addr("10.42.0.58");
     server.sin_family = AF_INET;

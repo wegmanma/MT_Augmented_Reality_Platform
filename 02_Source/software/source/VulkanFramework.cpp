@@ -22,11 +22,11 @@
  // Project Includes
 #include "VulkanFramework.hpp"
 #include "computation.cuh"
-#include "FrameCapture.hpp"
 #include "VulkanHelper.hpp"
 #include "PositionEstimate.hpp"
 #include "MainCamera.hpp"
 #include "TCPFrameCapture.hpp"
+#include "CudaCapture.hpp"
 
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -110,6 +110,7 @@ void VulkanFramework::initVulkan() {
     computation = new Computation{};
     positionEstimate = new PositionEstimate();
     tcpCapture.start(computation);
+    cudaCapture.CudaCaptureInit(0);
     createInstance();
     setupDebugCallback();
     createSurface();
@@ -459,26 +460,17 @@ void VulkanFramework::recreateSwapChain() {
         glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
     }
-    std::cout << "1" << std::endl;
 
     vkDeviceWaitIdle(device);
-    std::cout << "2" << std::endl;
     cleanupSwapChain();
-    std::cout << "3" << std::endl;
     createSwapChain();
-    std::cout << "4" << std::endl;
     createImageViews();
-    std::cout << "5" << std::endl;
     createRenderPass();  
-    std::cout << "6" << std::endl;
     createFramebuffers();
-    std::cout << "7" << std::endl;
 
     projectedSurface.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),projectedImageView,projectedSampler);
     mainCamera.recreate(device, physicalDevice, renderPass, swapChainExtent, swapChainImages.size(),mainImageView,mainSampler);
-    std::cout << "8" << std::endl;
     createCommandBuffers();
-    std::cout << "fin" << std::endl;
 }
 
 void VulkanFramework::createImageViews() {
@@ -772,7 +764,6 @@ void VulkanFramework::drawFrame() {
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
         framebufferResized = false;
-        std::cout << "recreate Swap Chain 2" << std::endl;
         recreateSwapChain();
         return;
     }
@@ -902,7 +893,7 @@ void VulkanFramework::updateTextureImage() {
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
-    std::cout << "buffers_h at use: "<< (int)pixels[50*265*4+50*4+0] << std::endl;
+    // std::cout << "buffers_h at use: "<< (int)pixels[50*265*4+50*4+0] << std::endl;
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
