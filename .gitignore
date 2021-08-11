@@ -25,3 +25,6 @@
 02_Source/software/calib_xchan.txt
 02_Source/software/calib_ychan.txt
 *.zip
+02_Source/python/corr_calib_xchan_raspi.txt
+.gitignore
+02_Source/python/corr_calib_ychan_raspi.txt
