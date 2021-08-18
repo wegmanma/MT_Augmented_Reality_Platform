@@ -318,6 +318,15 @@ By converting a rotation quaternion to a rotation matrix, the gap to Vulkan can 
     \end{bmatrix}
 \end{equation*}
 The basic quaternion operations - like the multiplication - are included in the linmath-library. The linmath-library represents a quaternion as a four-dimensional float-vector in the ordering $(b, c, d, a)$ - the real part being the last element.\\
+\section{Motion detection by camera and depth information}
+Turning or moving the camera head influences the image of an object differently, based on its distance to the camera. The position of a single point within the image depends on the coordinates of the point in the real space, as shown in image \ref{im:opticalAxis}. The optical axis matches with the $x$ axis while the sensor plane lies in the $YZ$ plane.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/dummy_optical_axis.png}
+    \caption{Projection of a point in space to the image sensor.}
+    \label{im:opticalAxis}
+\end{figure}
+
 \section{Camera Calibration}
 \label{sec:FundCamCalibration}
 An uncalibrated camera image often has lens distortion, warping a rectangle into a pillow or barrel shape and making areas appear closer in certain parts of the image. These distortions are named radial and tangential distortion and are induced by the camera lens.\\
@@ -360,3 +369,10 @@ OpenCV itself provides a script which estimates these values based on multiple p
     \caption{Camera correction demonstrated at the grayscale image of the ToF camera.}
     \label{fig.camCalib}
   \end{figure}
+The implementation in CUDA is done by storing the pixel coordinates of the uncorrected image for each pixel in the corrected image. This data is loaded into a CUDA allocated memory area and allows mapping the coordinates for the correction without complex caluclations as visualized in image \ref{im:CudaCamCalib}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \caption{Storing the final calibration values into an array keeps the CUDA-Kernel simple.}
+    \label{im:CudaCamCalib}
+\end{figure}
