@@ -11,6 +11,7 @@
 #include <vector>
 #include <array>
 #include "linmath.h"
+#include <libavutil/pixfmt.h>
 
 #define NUM_SLICES 1
 
@@ -205,6 +206,8 @@ void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height);
 void buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height);
 
 void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height);
+
+int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp);
 
 private:
 

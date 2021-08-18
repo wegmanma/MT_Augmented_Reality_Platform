@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <limits>
 #include "computation.cuh"
+#include "common.h"
 
 // 16:9 display format.
 #define GRIDSIZEX 1920
@@ -88,6 +89,133 @@ __global__ void CopyCharToImage(unsigned char *src, float *dst,
 	}
 }
 
+
+
+
+#define MAP_HOST_DEVICE_POINTER 1
+
+#define SHIFT_XAVIER 5
+#define SHIFT_RESULT 0
+
+#define LEFT(x, y, imgw)	((x) - 1 + (y) * (imgw))
+#define RIGHT(x, y, imgw)	((x) + 1 + (y) * (imgw))
+#define TOP(x, y, imgw)		((x) + ((y) - 1) * (imgw))
+#define BOT(x, y, imgw)		((x) + ((y) + 1) * (imgw))
+#define TL(x, y, imgw)		((x) - 1 + ((y) - 1) * (imgw))
+#define BL(x, y, imgw)		((x) - 1 + ((y) + 1) * (imgw))
+#define TR(x, y, imgw)		((x) + 1 + ((y) - 1) * (imgw))
+#define BR(x, y, imgw)		((x) + 1 + ((y) + 1) * (imgw))
+
+#define PIX(in, x, y, imgw) 		(in[((x) + (y) * (imgw))] >> SHIFT_XAVIER)
+
+#define INTERPOLATE_H(in, x, y, w)	((in[LEFT(x, y, w)] >> SHIFT_XAVIER) / 2 + (in[RIGHT(x, y, w)] >> SHIFT_XAVIER) / 2)
+
+#define INTERPOLATE_V(in, x, y, w)	((in[TOP(x, y, w)] >> SHIFT_XAVIER) / 2 + (in[BOT(x, y, w)] >> SHIFT_XAVIER) / 2)
+
+#define INTERPOLATE_HV(in, x, y, w)	((in[LEFT(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[RIGHT(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[TOP(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[BOT(x, y, w)] >> SHIFT_XAVIER) / 4)
+
+#define INTERPOLATE_X(in, x, y, w)	((in[TL(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[BL(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[TR(x, y, w)] >> SHIFT_XAVIER) / 4 + (in[BR(x, y, w)] >> SHIFT_XAVIER) / 4)
+
+#define RED 0
+#define GREEN 1
+#define BLUE 2
+
+// ## WHITE BALANCE GAIN FACTORS (use with the White Patch method)
+#define GAIN_RED 3
+#define OFFSET_RED 55
+#define GAIN_GREEN 2.8
+#define OFFSET_GREEN 55
+#define GAIN_BLUE 4.7
+#define OFFSET_BLUE 55
+
+// ## COLOR SATURATION FACTOR
+/*
+K is the saturation factor
+K=1 means no change
+K > 1 increases saturation
+0<K<1 decreases saturation,  K=0 produces B&W ,  K<0 inverts color
+*/
+#define K 1
+
+#define SATURATION_RED(R,G,B)   ((0.299 + 0.701*K)*R + (0.587 * (1-K))*G + (0.114 * (1-K))*B)
+#define SATURATION_GREEN(R,G,B) ((0.299 * (1-K))*R + (0.587 + 0.413*K)*G + (0.114 * (1-K))*B)
+#define SATURATION_BLUE(R,G,B)  ((0.299 * (1-K))*R + (0.587 * (1-K))*G + (0.114 + 0.886*K)*B)
+
+
+__global__ void bayer_to_rgb(uint16_t *in , uint16_t * out, const int imgw, const int imgh, const uint8_t bpp,
+	const int2 r, const int2 gr, const int2 gb, const int2 b) {
+    int x = 2 * ((blockDim.x * blockIdx.x) + threadIdx.x) + 1;
+    int y = 2 * ((blockDim.y * blockIdx.y) + threadIdx.y) + 1;
+    int elemCols = imgw * bpp;
+
+	uint32_t r_color, g_color, b_color;
+
+    if ((x + 2) < imgw && (x - 1) >= 0 && (y + 2) < imgh && (y - 1) >= 0) {
+        /* Red */
+		r_color = (PIX( in , x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
+		g_color = (INTERPOLATE_HV( in , x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
+		b_color = (INTERPOLATE_X( in , x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
+		//r_color = SATURATION_RED(r_color, g_color, b_color);
+		//g_color = SATURATION_GREEN(r_color, g_color, b_color);
+		//b_color = SATURATION_BLUE(r_color, g_color, b_color);
+		r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) 		- OFFSET_RED) * GAIN_RED);
+		g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) 	- OFFSET_GREEN) * GAIN_GREEN);
+		b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) 	- OFFSET_BLUE) * GAIN_BLUE);
+        out[(y + r.y) * elemCols + (x + r.x) * bpp + RED] 	= 	(uint16_t)((r_color > 255) ? 255 : r_color)*255;
+        out[(y + r.y) * elemCols + (x + r.x) * bpp + GREEN]	= 	(uint16_t)((g_color > 255) ? 255 : g_color)*255;
+        out[(y + r.y) * elemCols + (x + r.x) * bpp + BLUE] 	= 	(uint16_t)((b_color > 255) ? 255 : b_color)*255;
+
+        /* Green on a red line */
+		r_color = (INTERPOLATE_H( in , x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
+		g_color = (PIX( in , x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
+		b_color = (INTERPOLATE_V( in , x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
+		//r_color = SATURATION_RED(r_color, g_color, b_color);
+		//g_color = SATURATION_GREEN(r_color, g_color, b_color);
+		//b_color = SATURATION_BLUE(r_color, g_color, b_color);
+		r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) 		- OFFSET_RED) * GAIN_RED);
+		g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) 	- OFFSET_GREEN) * GAIN_GREEN);
+		b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) 	- OFFSET_BLUE) * GAIN_BLUE);
+        out[(y + gr.y) * elemCols + (x + gr.x) * bpp + RED] 	=	(uint16_t)((r_color > 255) ? 255 : r_color)*255;
+        out[(y + gr.y) * elemCols + (x + gr.x) * bpp + GREEN]	=	(uint16_t)((g_color > 255) ? 255 : g_color)*255;
+        out[(y + gr.y) * elemCols + (x + gr.x) * bpp + BLUE]	=	(uint16_t)((b_color > 255) ? 255 : b_color)*255;
+
+        /* Green on a blue line */
+		r_color = (INTERPOLATE_V( in , x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
+		g_color = (PIX( in , x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
+		b_color = (INTERPOLATE_H( in , x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
+		//r_color = SATURATION_RED(r_color, g_color, b_color);
+		//g_color = SATURATION_GREEN(r_color, g_color, b_color);
+		//b_color = SATURATION_BLUE(r_color, g_color, b_color);
+		r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) 		- OFFSET_RED) * GAIN_RED);
+		g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) 	- OFFSET_GREEN) * GAIN_GREEN);
+		b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) 	- OFFSET_BLUE) * GAIN_BLUE);
+        out[(y + gb.y) * elemCols + (x + gb.x) * bpp + RED] 	=	(uint16_t)((r_color > 255) ? 255 : r_color)*255;
+        out[(y + gb.y) * elemCols + (x + gb.x) * bpp + GREEN]	=	(uint16_t)((g_color > 255) ? 255 : g_color)*255;
+        out[(y + gb.y) * elemCols + (x + gb.x) * bpp + BLUE] 	=	(uint16_t)((b_color > 255) ? 255 : b_color)*255;
+
+        /* Blue */
+		r_color = (INTERPOLATE_X( in , x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
+		g_color = (INTERPOLATE_HV( in , x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
+		b_color = (PIX( in , x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
+		//r_color = SATURATION_RED(r_color, g_color, b_color)	;
+		//g_color = SATURATION_GREEN(r_color, g_color, b_color);
+		//b_color = SATURATION_BLUE(r_color, g_color, b_color);
+		r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) 		- OFFSET_RED) * GAIN_RED);
+		g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) 	- OFFSET_GREEN) * GAIN_GREEN);
+		b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) 	- OFFSET_BLUE) * GAIN_BLUE);
+        out[(y + b.y) * elemCols + (x + b.x) * bpp + RED]	=	(uint16_t)((r_color > 255) ? 255 : r_color)*255;
+        out[(y + b.y) * elemCols + (x + b.x) * bpp + GREEN] =	(uint16_t)((g_color > 255) ? 255 : g_color)*255;
+        out[(y + b.y) * elemCols + (x + b.x) * bpp + BLUE] 	=	(uint16_t)((b_color > 255) ? 255 : b_color)*255;
+
+        if (bpp == 4) {
+            out[y * elemCols + x * bpp + 3] = 0xFF;
+            out[y * elemCols + (x + 1) * bpp + 3] = 0xFF;
+            out[(y + 1) * elemCols + x * bpp + 3] = 0xFF;
+            out[(y + 1) * elemCols + (x + 1) * bpp + 3] = 0xFF;
+        }
+
+    }
+}
 
 
 __global__ void ScaleDownKernel(float *d_Result, float *d_Data, int width, int pitch, int height, int newpitch)
@@ -2619,3 +2747,100 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
     checkMsg("Problem with gpuMaxFilter:\n"); 
   
   }
+
+  int8_t Computation::gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp)
+{
+	dim3 threads_p_block;
+	dim3 blocks_p_grid;
+
+	int2 pos_r;
+	int2 pos_gr;
+	int2 pos_gb;
+	int2 pos_b;
+
+
+	uint16_t *d_src = NULL;
+	uint16_t *d_dst = NULL;
+
+	unsigned int flags;
+
+	size_t planeSize = width * height * sizeof(unsigned char);
+
+	bool srcIsMapped = (cudaHostGetFlags(&flags, src) == cudaSuccess) && (flags & cudaHostAllocMapped);
+
+
+	#if MAP_HOST_DEVICE_POINTER
+	if (!srcIsMapped) {
+		cudaHostRegister(src, planeSize * 2, cudaHostRegisterMapped);
+	}
+	cudaHostGetDevicePointer(&d_src, src, 0);
+	#else
+	if (srcIsMapped) {
+		d_src = src;
+		cudaStreamAttachMemAsync(NULL, src, 0, cudaMemAttachGlobal);
+	} else {
+		cudaMalloc(&d_src, planeSize * 2);
+		cudaMemcpy(d_src, src, planeSize * 2, cudaMemcpyHostToDevice);
+	}
+	#endif
+
+	d_dst = dst;
+	cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachGlobal);
+	
+
+	threads_p_block = dim3(32, 32);
+	blocks_p_grid.x = (width / 2 +
+			threads_p_block.x - 1) /
+			threads_p_block.x;
+	blocks_p_grid.y = (height / 2 +
+			threads_p_block.y - 1) /
+			threads_p_block.y;
+
+	
+	switch (format) {
+		case AV_PIX_FMT_BAYER_BGGR10:
+			pos_r = make_int2(0, 0);
+			pos_gr = make_int2(1, 0);
+			pos_gb = make_int2(0, 1);
+			pos_b = make_int2(1, 1);
+			break;
+		case AV_PIX_FMT_BAYER_GBRG10:
+			pos_r = make_int2(1, 0);
+			pos_gr = make_int2(0, 0);
+			pos_gb = make_int2(1, 1);
+			pos_b = make_int2(0, 1);
+			break;
+		case AV_PIX_FMT_BAYER_GRBG10:
+			pos_r = make_int2(0, 1);
+			pos_gr = make_int2(1, 1);
+			pos_gb = make_int2(0, 0);
+			pos_b = make_int2(1, 0);
+			break;
+		case AV_PIX_FMT_BAYER_RGGB10:
+			pos_r = make_int2(1, 1);
+			pos_gr = make_int2(0, 1);
+			pos_gb = make_int2(1, 0);
+			pos_b = make_int2(0, 0);
+			break;
+		default:
+			return RTN_ERROR;
+			break;
+	}
+
+	bayer_to_rgb<<<blocks_p_grid, threads_p_block, 0, 0>>>(d_src, d_dst, width, height, bpp, pos_r, pos_gr, pos_gb, pos_b);
+	cudaDeviceSynchronize();
+
+	cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachHost);
+
+	#if !MAP_HOST_DEVICE_POINTER
+	if (!srcIsMapped) {
+		cudaFree(d_src);
+	}else{
+		cudaStreamAttachMemAsync(NULL, src, 0, cudaMemAttachHost);
+	 }
+	#endif
+
+	cudaStreamSynchronize(NULL);
+
+	return RTN_SUCCESS;
+}
