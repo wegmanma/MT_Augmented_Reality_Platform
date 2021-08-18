@@ -23,7 +23,7 @@ public:
 	}
 
 	void unlockR() {
-		std::unique_lock<std::mutex> monitor(m_mutex);
+		// std::unique_lock<std::mutex> monitor(m_mutex);
 		// std::cout << "thread " << std::this_thread::get_id() << " unlocks reading " << std::endl;
 		m_readLocked--;
 	}

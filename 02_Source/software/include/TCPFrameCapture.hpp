@@ -4,6 +4,8 @@
 #include <mutex>
 #include "RWLock.hpp"
 
+#include "computation.cuh"
+
 #define NUM_BUFFERS 2
 
 class TCPFrameCapture {

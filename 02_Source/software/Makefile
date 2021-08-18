@@ -14,6 +14,24 @@ CFLAGS = -std=c++17 -O2 -I$(STB_INCLUDE_PATH) -I$(CUDA_INCLUDE_PATH) -I$(NVINCLU
 LDFLAGS = -L/usr/lib/aarch64-linux-gnu -L"$(CUDA_PATH)/lib64" -L"/usr/lib/aarch64-linux-gnu/tegra" `pkg-config --static --libs glfw3` -lvulkan -lpthread
 NVFLAGS = -ccbin g++ -Xcudafe="--diag_suppress=2886" -I$(CUDA_INCLUDE_PATH) -I$(NVINCLUDE2) -I../../common/inc `pkg-config --static --cflags glfw3` -I/usr/include  -m64    --std=c++11  -gencode arch=compute_72,code=sm_72
 
+# Flags for FFMPEG Framework
+ifeq ($(VERBOSE), 1)
+AT =
+else
+AT = @
+endif
+CC             = $(AT) gcc
+CCFLAGS :=
+CCFLAGS += -std=c99 -Wall -ggdb 
+COMMONFLAGS :=
+
+COMMONFLAGS += \
+	-g -O0 \
+	-I/usr/local/include \
+	-I"/usr/include/libdrm" \
+	-I"/$(CUDA_PATH)/include"
+
+
 all: gyro ar_demo
 
 build: gyro ar_demo
@@ -51,13 +69,21 @@ bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 bin/computation.o: source/computation.cu include/computation.cuh
 	@ mkdir -p bin
 	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2)  -o bin/computation.o source/computation.cu
+bin/scaler.o: source/scaler.c
+	$(CC) $(CCFLAGS) -c $(COMMONFLAGS) -I$(INCLUDE) -o $@ $<
+bin/framebuffer.o: source/framebuffer.c
+	$(CC) $(CCFLAGS) -c $(COMMONFLAGS) -I$(INCLUDE) -o $@ $<	
+bin/setup_camera.o: source/setup_camera.c
+	@echo "Compiling: $<"
+	$(CC) -I/usr/local/include -I"/usr/include/aarch64-linux-gnu" -I"/usr/src/linux-headers-4.9.140-tegra-ubuntu18.04_aarch64/nvidia/include/" -c -I$(INCLUDE) -o $@ $<
+
 
 
 gyro: bin/BMI160.o bin/gyro.o 
-	nvcc $(NVFLAGS) $^ -o $@ $(LDFLAGS)
+	g++ $(CFLAGS) -I$(INCLUDE) $^ -o $@ $(LDFLAGS)
 
-ar_demo: bin/main.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/CudaCapture.o bin/TCPFrameCapture.o bin/VulkanFramework.o  bin/PositionEstimate.o bin/computation.o
-	nvcc $(NVFLAGS) $^ -o $@ $(LDFLAGS) -lnvbuf_utils
+ar_demo: bin/main.o bin/framebuffer.o bin/BMI160.o  bin/VulkanHelper.o bin/ProjectedSurface.o bin/MainCamera.o bin/CudaCapture.o bin/TCPFrameCapture.o bin/VulkanFramework.o bin/PositionEstimate.o bin/computation.o bin/setup_camera.o bin/scaler.o
+	nvcc  $(NVFLAGS) -I$(INCLUDE) $^ -o $@ $(LDFLAGS) -lXext -lxcb -lX11 -lnvbuf_utils  -lavdevice -lavformat -lavfilter -lavcodec -lswresample -lswscale -lavutil
 	
 .PHONY: directories test clean 
 
