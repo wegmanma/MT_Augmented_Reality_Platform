@@ -7,20 +7,19 @@ import matplotlib as mpl
 mpl.rcParams['figure.figsize'] = [27, 14]
 mpl.rcParams['figure.dpi'] = 72
 
-undistort_mtx = np.array([[2.70698401e+03,   0.00000000e+00,   9.71379742e+02],
-                          [0.00000000e+00,  2.69656522e+03,   5.21649973e+02],
-                          [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
+undistort_mtx = np.array([[1.30269281e+03, 0.00000000e+00, 6.29842386e+02],
+ [0.00000000e+00, 1.29407977e+03, 3.59106501e+02],
+ [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
 
 
-undistort_newcameramtx = np.array([[2.76536255e+03, 0.00000000e+00,  9.74480810e+02],
-                                   [0.00000000e+00, 2.72011548e+03,  5.22169397e+02],
-                                   [0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+undistort_newcameramtx = np.array([[1.32807019e+03, 0.00000000e+00 ,6.26613794e+02],
+ [0.00000000e+00, 1.30680530e+03, 3.59702855e+02],
+ [0.00000000e+00, 0.00000000e+00 ,1.00000000e+00]])
 
 undistort_dist = np.array(
-    [[2.45000445e-01, -6.42516377e-01,   7.64725607e-04,  3.61062798e-03,
-        8.36154477e-01]])
+    [[ 0.16106655 ,-0.11948599,  0.00374535, -0.00232904 ,-0.54201863]])
 
-undistort_roi = (4, 10, 1911, 1060)
+undistort_roi = (3, 4, 1273, 709)
 
 
 def load_n_undistort_int16(dataraw):
@@ -29,8 +28,8 @@ def load_n_undistort_int16(dataraw):
     maximum = np.amax(dataraw)
     print("maximum: " +str(maximum))
     print("minimum: " +str(minimum))
-    dataraw = dataraw.astype(np.uint16).reshape((1080, 1920))
-    dataRGB = np.zeros((1920*1080*3), dtype=float).reshape((1080, 1920, 3))
+    dataraw = dataraw.astype(np.uint16).reshape((720, 1280))
+    dataRGB = np.zeros((720*1280*3), dtype=float).reshape((720, 1280, 3))
     dataRGB[:, :, 0] = (((dataraw[:, :].astype(float)) /
                         maximum).astype(float)).astype(float)
     dataRGB[:, :, 1] = (((dataraw[:, :].astype(float)) /
@@ -42,11 +41,11 @@ def load_n_undistort_int16(dataraw):
     print("dataRGB Value: "+str(dataRGB[0,0,0]))
     x, y, w, h = undistort_roi
     src = dst[y:y+h, x:x+w]
-    ret = np.zeros((1060, 1911), dtype=np.uint16)
+    ret = np.zeros((709, 1273), dtype=np.uint16)
     print("Starting for loop")
     print("src Value: "+str(src[0,0]))
-    for i in range(1060):
-        for j in range(1911):
+    for i in range(709):
+        for j in range(1273):
             ret[i, j] = (src[i, j, 0]*(maximum)).astype(np.uint16)
     print("ret Value: "+str(ret[0,0]))
     return ret
@@ -54,15 +53,15 @@ def load_n_undistort_int16(dataraw):
 
 np.set_printoptions(threshold=np.inf)
 
-XChan = np.zeros((1080, 1920), dtype=np.int16)
-YChan = np.zeros((1080, 1920), dtype=np.int16)
-for i in range(1080):
-    for j in range(1920):
+XChan = np.zeros((720, 1280), dtype=np.int16)
+YChan = np.zeros((720, 1280), dtype=np.int16)
+for i in range(720):
+    for j in range(1280):
         XChan[i, j] = j
         YChan[i, j] = i
 
-XChan = XChan.reshape((1920*1080, 1))
-YChan = YChan.reshape((1920*1080, 1))
+XChan = XChan.reshape((1280*720, 1))
+YChan = YChan.reshape((1280*720, 1))
 
 print(XChan.shape)
 

@@ -1,4 +1,12 @@
 %!TEX root = ../doc.tex
 \chapter{Concept}
 \label{sec:Concept}
+A minimal working prototype of an AR system consists of two key components: Awareness regarding the environment and awareness regarding the motion of the camera.\\
+Scanning the environment is required for a system to know what parts of the image could be enhanced by a virtual object. This prototype will be limited to finding flat surfaces that are suitable for projecting a virtual image or video. \\
+Tracking the exact motion of the camera allows adjusting the position of the projected display accordingly. The virtual projection then appears to be fixed to the wall, no matter how the camera head is moved.\\ 
+The prototype is developed on a Nvidia Jetson Xavier AGX 8GB system, to which an accelerometer- and gyroscope-sensor, a time of flight (ToF) camera, and two Raspberry Pi Cameras are attached.\\
+The ToF camera provides three dimensional information that can be used for both finding flat walls and giving motion information on a frame by frame basis. The accelerometer complements the motion information given by the camera, especially helping whenever the motion is too fast for a sharp image. One Raspberry Pi camera acts as a viewfinder, in which the virtual projection is visible.\\
+
+
+
 

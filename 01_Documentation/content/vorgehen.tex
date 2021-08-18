@@ -31,6 +31,7 @@ Pixel by pixel multiplication of any other image $I_{Any}$ with $I_{cos}$ will c
     \caption{Left, the uncorrected ToF image $I_{Any}$, in the middle the corrected image $I_{Corr}$ and on the right, the infrared grayscale image of the scene. To make the effect more apparent, the brightness accross the red lines have been plotted.}
     \label{im:ToFCorrected}
 \end{figure}
+To apply this calibration in CUDA, a file has been generated which holds the $I_{Cos}$ values for each pixel. The application reads the file at initialization and keeps it stored in a Cuda allocated memory area. 
 
 
 TODO: Distance measurement calibration!
