@@ -15,7 +15,7 @@ extern "C" {
 #define NUM_BUFFERS 2
 
 class CudaCapture {
-mutable RWLock m_lock[2];	// mutable: can be modified even in const methods
+std::mutex m_lock[2];
 
 public:
     void start(Computation *computation_p);
@@ -43,11 +43,20 @@ private:
     AVPacket *pOutputPacket;
     AVFrame *pInputFrame;
     AVFrame *pOutputFrame;
+    uint16_t *pInputFrameBuffer_d;
 
     Computation* computation;
 
+    uint16_t *image_x_h;
+    uint16_t *image_y_h;
+    uint16_t *image_x_d;
+    uint16_t *image_y_d;
+
     uint16_t * buffers_h[2];
     uint16_t * buffers_d[2];
+
+    uint16_t * temp_mem_1280x720x4uint16_0_d;
+    uint16_t * temp_mem_1280x720x4uint16_1_d;
 
     int write_buf_id;
 

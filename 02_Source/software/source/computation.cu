@@ -19,6 +19,7 @@
 #define GAUSSIANSIZE 25
 
 #define checkMsg(msg)       __checkMsg(msg, __FILE__, __LINE__)
+#define checkMsgNoFail(msg)       __checkMsgNoFail(msg, __FILE__, __LINE__)
 
 cudaExternalMemory_t cudaExtMemVertexBuffer;
 cudaExternalMemory_t cudaExtMemIndexBuffer;
@@ -701,7 +702,8 @@ __global__ void gpuUndistort(float *dst, uint16_t *src, uint16_t *xCoords, uint1
   
     for (int i = 0; i < height_dst; ++i) {
         // Calculate new coordinates
-       dst[i*width_dst+idx] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]];
+       dst[i*width_dst+idx+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]+0];
+
     }
 }
 
@@ -716,6 +718,24 @@ __global__ void gpuUndistortCosAlpha(float *dst, uint16_t *src, uint16_t *xCoord
     for (int i = 0; i < height_dst; ++i) { 
         // Calculate new coordinates
        dst[i*width_dst+idx] =  (float)(cosAlpha[i*width_dst+idx]*src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]]);
+    }
+}
+
+__global__ void gpuUndistort_uint16(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // printf("hoi\n");
+    if (idx >= width_dst) {
+        return;
+    }
+  
+    for (int i = 0; i < height_dst; ++i) {
+        // Calculate new coordinates
+        // dst[i*width_dst*4+idx+0] = 255; // src[i*width_dst*4+idx+0];
+       dst[i*width_dst*4+idx*4] =  src[yCoords[i*width_dst+idx]*width_src*4+xCoords[i*width_dst+idx]*4+0];
+       dst[i*width_dst*4+idx*4+1] =  src[yCoords[i*width_dst+idx]*width_src*4+xCoords[i*width_dst+idx]*4+1];
+       dst[i*width_dst*4+idx*4+2] =  src[yCoords[i*width_dst+idx]*width_src*4+xCoords[i*width_dst+idx]*4+2];
+       dst[i*width_dst*4+idx*4+3] =  1;
     }
 }
 
@@ -1897,10 +1917,18 @@ inline void __checkMsg(const char *errorMessage, const char *file, const int lin
   }
 }
 
+
+inline void __checkMsgNoFail(const char *errorMessage, const char *file, const int line)
+{
+  cudaError_t err = cudaGetLastError();
+  if (cudaSuccess != err) {
+    fprintf(stderr, "checkMsg() CUDA warning: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
+  }
+}
+
 void Computation::initCuda()
-    {
-        
-        setCudaVkDevice();
+    {        
+        cudaSetDeviceFlags(cudaDeviceMapHost);
     }
 
 void Computation::cleanup()
@@ -2645,7 +2673,20 @@ void Computation::sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata
   gpuSharpenImageToGrayscale<<<grid, block, 0>>>(yuvdata, greyscaleImage.d_data, 1920, 1080, amount);
 }
 
-void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, float *cosAlpha) {
+
+void Computation::rpi_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream) {
+    dim3 blocks =   dim3(2048);
+    dim3 threads =  dim3(1);
+    int width_dst = 1273;
+    int height_dst = 709;
+    int width_src = 1280;
+    int height_src = 720;
+    gpuUndistort_uint16<<<blocks, threads,0,stream>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst);
+    checkMsg("Problem with RPI gpuUndistort:\n");
+}
+
+
+void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream, float *cosAlpha) {
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
@@ -2656,37 +2697,37 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
     if (cosAlpha == NULL) {
       gpuUndistort<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst);
     } else {
-      gpuUndistortCosAlpha<<<blocks, threads>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst, cosAlpha);
+      gpuUndistortCosAlpha<<<blocks, threads,0,stream>>>(dst, src, xCoordsPerPixel, yCoordsPerPixel, width_src, height_src, width_dst, height_dst, cosAlpha);
     }
-    checkMsg("Problem with gpuUndistort:\n");
+    checkMsg("Problem with TOF gpuUndistort:\n");
   }
 
-  void Computation::buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height) {
+  void Computation::buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height, cudaStream_t stream) {
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
-     gpuNormalizeToInt16<<<blocks, threads>>>(dst, src, width, height);
+     gpuNormalizeToInt16<<<blocks, threads,0,stream>>>(dst, src, width, height);
      checkMsg("Problem with gpuNormalizeToInt16:\n");    
   }
 
-  void Computation::buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height) {
+  void Computation::buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height, cudaStream_t stream) {
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
-     gpuNormalizeToInt16_SCALE<<<blocks, threads>>>(dst, src, width, height);
+     gpuNormalizeToInt16_SCALE<<<blocks, threads,0,stream>>>(dst, src, width, height);
      checkMsg("Problem with gpuNormalizeToInt16:\n");    
   }
 
 
-  void Computation::buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height) {
+  void Computation::buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height, cudaStream_t stream) {
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
-     gpuNormalizeToFloat<<<blocks, threads>>>(dst, src, width, height);
+     gpuNormalizeToFloat<<<blocks, threads,0,stream>>>(dst, src, width, height);
      checkMsg("Problem with gpuNormalizeToInt16:\n");    
   }
 
-  void Computation::tof_sobel(float *dst_mag, float *dst_phase, float *src) {
+  void Computation::tof_sobel(float *dst_mag, float *dst_phase, float *src, cudaStream_t stream) {
   
 
     int width = 265;
@@ -2694,61 +2735,61 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
     
     dim3 block(16, 16, 1);
     dim3 grid(265/block.x+1, 205/block.y+1, 1);
-    gpuSobelToF<<<grid, block, 0>>>(dst_mag, dst_phase, src,  width, height);
+    gpuSobelToF<<<grid, block,0,stream>>>(dst_mag, dst_phase, src,  width, height);
     checkMsg("Problem with gpuSobelToF:\n"); 
   
     
   }
 
-  void Computation::tof_maxfilter_3x3(float *dst_mag, float *src) { 
+  void Computation::tof_maxfilter_3x3(float *dst_mag, float *src, cudaStream_t stream) { 
 
     int width = 265;
     int height = 205;
     
     dim3 block(16, 16, 1);
     dim3 grid(265/block.x+1, 205/block.y+1, 1);
-    gpuMaxfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    gpuMaxfilterToF<<<grid, block,0,stream>>>(dst_mag, src,  width, height);
     checkMsg("Problem with gpuMaxFilter:\n"); 
   
   }
 
-  void Computation::tof_minfilter_3x3(float *dst_mag, float *src) { 
+  void Computation::tof_minfilter_3x3(float *dst_mag, float *src, cudaStream_t stream) { 
 
     int width = 265;
     int height = 205;
     
     dim3 block(16, 16, 1);
     dim3 grid(265/block.x+1, 205/block.y+1, 1);
-    gpuMinfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    gpuMinfilterToF<<<grid, block,0,stream>>>(dst_mag, src,  width, height);
     checkMsg("Problem with gpuMaxFilter:\n"); 
   
   }
 
-  void Computation::tof_meanfilter_3x3(float *dst_mag, float *src) { 
+  void Computation::tof_meanfilter_3x3(float *dst_mag, float *src, cudaStream_t stream) { 
 
     int width = 265;
     int height = 205;
     
     dim3 block(16, 16, 1);
     dim3 grid(265/block.x+1, 205/block.y+1, 1);
-    gpuMeanfilterToF<<<grid, block, 0>>>(dst_mag, src,  width, height);
+    gpuMeanfilterToF<<<grid, block,0,stream>>>(dst_mag, src,  width, height);
     checkMsg("Problem with gpuMaxFilter:\n"); 
   
   }
 
-  void Computation::tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh) { 
+  void Computation::tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh, cudaStream_t stream) { 
 
     int width = 265;
     int height = 205;
     
     dim3 block(16, 16, 1);
     dim3 grid(265/block.x+1, 205/block.y+1, 1);
-    gpuFillAreaToF<<<grid, block, 0>>>(mask, src,  width, height, seed_x, seed_y, thresh);
+    gpuFillAreaToF<<<grid, block,0,stream>>>(mask, src,  width, height, seed_x, seed_y, thresh);
     checkMsg("Problem with gpuMaxFilter:\n"); 
   
   }
 
-  int8_t Computation::gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp)
+  int8_t Computation::gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp, cudaStream_t stream)
 {
 	dim3 threads_p_block;
 	dim3 blocks_p_grid;
@@ -2765,14 +2806,15 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
 	unsigned int flags;
 
 	size_t planeSize = width * height * sizeof(unsigned char);
+  checkMsg("Problem before cudaHostGetFlags:\n");
+	bool srcIsMapped = (cudaHostGetFlags(&flags, (void*)src) == cudaSuccess) && (flags & cudaHostAllocMapped);
 
-	bool srcIsMapped = (cudaHostGetFlags(&flags, src) == cudaSuccess) && (flags & cudaHostAllocMapped);
-
-
+checkMsgNoFail("Problem with cudaHostGetFlags:\n");
 	#if MAP_HOST_DEVICE_POINTER
 	if (!srcIsMapped) {
 		cudaHostRegister(src, planeSize * 2, cudaHostRegisterMapped);
 	}
+  
 	cudaHostGetDevicePointer(&d_src, src, 0);
 	#else
 	if (srcIsMapped) {
@@ -2785,7 +2827,7 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
 	#endif
 
 	d_dst = dst;
-	cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachGlobal);
+	// cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachGlobal);
 	
 
 	threads_p_block = dim3(32, 32);
@@ -2826,11 +2868,12 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
 			return RTN_ERROR;
 			break;
 	}
+  
+	bayer_to_rgb<<<blocks_p_grid, threads_p_block,0,stream>>>(d_src, d_dst, width, height, bpp, pos_r, pos_gr, pos_gb, pos_b);
+  checkMsg("Problem with bayer_to_rgb:\n");
+	cudaStreamSynchronize(stream);
 
-	bayer_to_rgb<<<blocks_p_grid, threads_p_block, 0, 0>>>(d_src, d_dst, width, height, bpp, pos_r, pos_gr, pos_gb, pos_b);
-	cudaDeviceSynchronize();
-
-	cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachHost);
+	// cudaStreamAttachMemAsync(NULL, dst, 0, cudaMemAttachHost);
 
 	#if !MAP_HOST_DEVICE_POINTER
 	if (!srcIsMapped) {
@@ -2840,7 +2883,7 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
 	 }
 	#endif
 
-	cudaStreamSynchronize(NULL);
+	// cudaStreamSynchronize(NULL);
 
 	return RTN_SUCCESS;
 }

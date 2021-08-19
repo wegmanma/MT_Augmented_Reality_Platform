@@ -189,25 +189,27 @@ void sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata, float amoun
 
 void LowPass_prepareKernel(void);
 
-void tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, float *cosAlpha = NULL);
+void tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream, float *cosAlpha = NULL);
 
-void tof_sobel(float *dst_mag, float *dst_phase, float *src);
+void rpi_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream);
 
-void tof_maxfilter_3x3(float *dst_mag, float *src);
+void tof_sobel(float *dst_mag, float *dst_phase, float *src, cudaStream_t stream);
 
-void tof_minfilter_3x3(float *dst_mag, float *src);
+void tof_maxfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
 
-void tof_meanfilter_3x3(float *dst_mag, float *src);
+void tof_minfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
 
-void tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh);
+void tof_meanfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
 
-void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height);
+void tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh, cudaStream_t stream);
 
-void buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height);
+void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height, cudaStream_t stream);
 
-void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height);
+void buffer_Float_to_uInt16x4_SCALE(uint16_t *dst, float *src, int width, int height, cudaStream_t stream);
 
-int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp);
+void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height, cudaStream_t stream);
+
+int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp, cudaStream_t stream);
 
 private:
 

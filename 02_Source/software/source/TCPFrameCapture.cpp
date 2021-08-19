@@ -196,6 +196,8 @@ void TCPFrameCapture::unlockMutex(int mtx_nr)
 
 void TCPFrameCapture::run()
 {
+    cudaStream_t tcpCaptureStream;
+    cudaStreamCreate(&tcpCaptureStream);
     int sock;
     struct sockaddr_in server;
     char server_data[FRAME_LENGTH+4];
@@ -277,15 +279,15 @@ void TCPFrameCapture::run()
         cnt++;
 #endif
 
-        // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d);
-        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d);
-        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0]);
-        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1]);
-        //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0]);
-        //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2]);
-        //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0);
-        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],265,205);
-        cudaDeviceSynchronize();
+        // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d, tcpCaptureStream);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d, tcpCaptureStream);
+        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
+        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
+        //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
+        //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2], tcpCaptureStream);
+        //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0, tcpCaptureStream);
+        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],265,205, tcpCaptureStream);
+        cudaStreamSynchronize(tcpCaptureStream);
         // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {
@@ -303,4 +305,5 @@ void TCPFrameCapture::run()
     }
 
     close(sock);
+    cudaStreamDestroy(tcpCaptureStream);
 }

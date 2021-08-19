@@ -108,6 +108,7 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 
 void VulkanFramework::initVulkan() {
     computation = new Computation{};
+    computation->initCuda();
     positionEstimate = new PositionEstimate();
     tcpCapture.start(computation);
     cudaCapture.start(computation);
@@ -211,7 +212,7 @@ void VulkanFramework::cleanup() {
     if (enableValidationLayers) {
         DestroyDebugReportCallbackEXT(instance, callback, nullptr);
     }
-    tcpCapture.cleanup();
+    // tcpCapture.cleanup();
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
 
@@ -798,8 +799,8 @@ void VulkanFramework::createTextureImage() {
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
  
-    texWidth = 1280;
-    texHeight = 720;
+    texWidth = 1273;
+    texHeight = 709;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = cudaCapture.lockMutex();
     pixels = (unsigned char*)((void*)cudaCapture.getRPiFrame(mtx));
@@ -884,8 +885,8 @@ void VulkanFramework::updateTextureImage() {
     // vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
 
-    texWidth = 1280;
-    texHeight = 720;
+    texWidth = 1273;
+    texHeight = 709;
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = cudaCapture.lockMutex();
     pixels = (unsigned char*)((void*)cudaCapture.getRPiFrame(mtx));
