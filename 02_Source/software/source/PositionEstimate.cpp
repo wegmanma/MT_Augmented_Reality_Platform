@@ -2,7 +2,9 @@
 #include <fstream>
 #include <thread>
 #include <mutex>
+#include <cstring>
 #include <iomanip>
+#include <pthread.h>
 #include <PositionEstimate.hpp>
 
 #define CONST_G 9.81
@@ -46,7 +48,8 @@ void print_quat(std::string name, quat e)
     std::cout << std::defaultfloat << std::setprecision(6);
 }
 
-void quat_rotate(quat result, quat rotation, quat vector) {
+void quat_rotate(quat result, quat rotation, quat vector)
+{
     quat conj_rot;
     quat temp;
     quat_conj(conj_rot, rotation);
@@ -127,6 +130,14 @@ PositionEstimate::PositionEstimate()
     bmi160 = new BMI160(2, 0x69);
 
     tid = std::thread(&PositionEstimate::thrBMI160, this);
+    sched_param sch;
+    int policy;
+    pthread_getschedparam(tid.native_handle(), &policy, &sch);
+    sch.sched_priority = 20;
+    if (pthread_setschedparam(tid.native_handle(), SCHED_FIFO, &sch))
+    {
+        std::cout << "Failed to setschedparam: " << std::strerror(errno) << '\n';
+    }
     tid.detach();
 }
 
@@ -221,6 +232,17 @@ void PositionEstimate::thrBMI160()
     //  }
     // return;
 
+    std::ofstream myfile;
+    myfile.open("data.csv");
+    myfile << "time_passed"
+           << ";";
+    for (int i = 0; i < 3; i++)
+        myfile << "accel_m_per_sq_s[" << i << "];";
+    for (int i = 0; i < 3; i++)
+        myfile << "gyro_rad_per_s[" << i << "];";
+    myfile << "nseconds" << std::endl;
+    myfile.close();
+
     zero_rotation_abc[0] = CAL_GYRO_X;
     zero_rotation_abc[1] = CAL_GYRO_Y;
     zero_rotation_abc[2] = CAL_GYRO_Z;
@@ -271,7 +293,26 @@ void PositionEstimate::thrBMI160()
     }
 
     int file = bmi160->I2CGetDataOpenDevice();
-    
+    double time_passed = 0.0;
+
+    double KG = 0.0;
+    double Eest = 1.0;
+    double Emeat = 1.0;
+    double Emeap = 1.0;
+    double ESTt = 0.0;
+    double ESTp = 0.0;
+
+    vec4 x = {0, 0, 0, 0};
+    mat4x4 P = {{0.04, 0, 0, 0}, {0, 0.04, 0, 0}, {0, 0, 0.04, 0}, {0, 0, 0, 0.04}};
+    vec4 H = {1, 0, 0, 0};
+    mat4x4 R = {{0.04, 0, 0, 0}, {0, 0.04, 0, 0}, {0, 0, 0.04, 0}, {0, 0, 0, 0.04}};
+    mat4x4 F = {{1, nseconds, 1 / 2 * nseconds * nseconds, 1 / 6 * nseconds * nseconds * nseconds}, {0, 1, nseconds, 1 / 2 * nseconds * nseconds}, {0, 0, 1, nseconds}, {0, 0, 0, 1}};
+
+    double velocity_raw = 0.0;
+    double velocity_corrected = 0.0;
+
+    double position_raw = 0.0;
+    double position_corrected = 0.0;
     while (1)
     {
 
@@ -279,19 +320,21 @@ void PositionEstimate::thrBMI160()
         //parameter accelGyro is the pointer to store the data
         bmi160->getAccelGyroDataFast(file, accelGyro);
         // get sensor timestamp
-        time = (uint32_t)((accelGyro[6] << 16)||(accelGyro[7]));
-        // std::cout << time << std::endl;
+        time = (uint32_t)((accelGyro[6] << 16) || (accelGyro[7]));
+
         if (accelGyroLast[6] > accelGyro[6])
             nseconds = (double)(accelGyro[6] - accelGyroLast[6] + 65536) * SENS_TIME_RESOLUTION;
         else
             nseconds = (double)(accelGyro[6] - accelGyroLast[6]) * SENS_TIME_RESOLUTION;
-        
-        // std::cout << nseconds;
-        if (GyroDataEqual(accelGyro, accelGyroLast)) {
-            // std::cout << " continue" << std::endl;
+
+        std::cout << nseconds;
+        if (GyroDataEqual(accelGyro, accelGyroLast))
+        {
+            std::cout << " continue" << std::endl;
             continue;
         }
-        // std::cout << std::endl;
+        time_passed += nseconds;
+        std::cout << std::endl;
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
         //std::cout << "gyro raw values: ( ";
@@ -318,6 +361,31 @@ void PositionEstimate::thrBMI160()
             accel_m_per_sq_s[2] *= FACE_DOWN_CORR; // z_neg
         else
             accel_m_per_sq_s[2] *= FACE_UP_CORR; // z_pos
+        // calibrated and noisy measurement ready
+        Emeat = 0.04;
+        Emeap = 0.04;
+        KG = Eest / (Eest + Emeat);
+        ESTt = ESTp + KG * (accel_m_per_sq_s[0] - ESTp);
+        Eest = (Emeat * Emeap) / (Emeat + Emeap);
+        ESTp = ESTt;
+        velocity_raw += accel_m_per_sq_s[0] * nseconds;
+        velocity_corrected += ESTt * nseconds;
+        position_raw += velocity_raw * nseconds;
+        position_corrected += velocity_corrected * nseconds;
+
+
+        std::ofstream myfile;
+        myfile.open("data.csv", std::ios_base::app);
+        myfile << time_passed << ";";
+        for (int i = 0; i < 3; i++)
+            myfile << accel_m_per_sq_s[i] << ";";
+        for (int i = 0; i < 3; i++)
+            myfile << gyro_rad_per_s[i] << ";";
+        myfile << ESTt << ";";
+        myfile << position_raw << ";";
+        myfile << position_corrected << ";";
+        myfile << std::endl;
+        myfile.close();
         // Calculate vector length
         for (int i = 0; i < 3; i++)
         {
@@ -384,8 +452,9 @@ void PositionEstimate::thrBMI160()
         if ((vec_len >= 9.77) && (vec_len <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH))
         {
             // std::cout << "Stable: \U00002705 (no motion)" << std::endl;
-            for (int i = 0; i<3;i++){
-                delta_vector_xyz_moving[i] = (1-ACC_FILTER_DEPTH)*delta_vector_xyz_moving[i]+ACC_FILTER_DEPTH*delta_vector_xyz[i];
+            for (int i = 0; i < 3; i++)
+            {
+                delta_vector_xyz_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_vector_xyz_moving[i] + ACC_FILTER_DEPTH * delta_vector_xyz[i];
             }
             // correct rotation quaternion
             {
@@ -395,18 +464,20 @@ void PositionEstimate::thrBMI160()
                 quat_integrated[1] = temp[1];
                 quat_integrated[2] = temp[2];
                 quat_integrated[3] = temp[3];
-            }            
+            }
         }
         else
         {
             // std::cout << "Stable: \U0000274C (motion detected)" << std::endl;
-            for (int i = 0; i<3;i++){
-               // delta_vector_xyz_moving[i] = (1-ACC_FILTER_DEPTH)*delta_vector_xyz_moving[i]+0.0;
-            }            
+            for (int i = 0; i < 3; i++)
+            {
+                // delta_vector_xyz_moving[i] = (1-ACC_FILTER_DEPTH)*delta_vector_xyz_moving[i]+0.0;
+            }
         }
-        for (int i = 0; i<3;i++){
+        for (int i = 0; i < 3; i++)
+        {
             delta_vector_xyz[i] = delta_vector_xyz[i] - delta_vector_xyz_moving[i];
-        }        
+        }
         // calculate velocity from acceleration
         for (int i = 0; i < 3; i++)
         {
