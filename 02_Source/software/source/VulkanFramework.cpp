@@ -110,7 +110,7 @@ void VulkanFramework::initVulkan() {
     computation = new Computation{};
     computation->initCuda();
     positionEstimate = new PositionEstimate();
-    tcpCapture.start(computation);
+    // tcpCapture.start(computation);
     cudaCapture.start(computation);
     createInstance();
     setupDebugCallback();

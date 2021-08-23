@@ -5,7 +5,7 @@
 #include "CudaCapture.hpp"
 
 #define INPUT_DRIVER "video4linux2,v4l2"
-#define INPUT_STREAM_URL "/dev/video0"
+#define INPUT_STREAM_URL "/dev/video1"
 #define WIDTH 1280
 #define HEIGHT 720
 
@@ -80,16 +80,16 @@ int CudaCapture::lockMutex()
 {
     if (write_buf_id == 0)
     {
-        std::cout << "read-locking 1" << std::flush;
+        // std::cout << "read-locking 1" << std::flush;
         m_lock[1].lock();
-        std::cout << " locked!" << std::endl;
+        // std::cout << " locked!" << std::endl;
         return 1;
     }
     else
     {
-        std::cout << "read-locking 0" << std::flush;
+        // std::cout << "read-locking 0" << std::flush;
         m_lock[0].lock();
-        std::cout << " locked!" << std::endl;
+        // std::cout << " locked!" << std::endl;
         return 0;
     }
 }
@@ -97,7 +97,7 @@ int CudaCapture::lockMutex()
 void CudaCapture::unlockMutex(int mtx_nr)
 {
     m_lock[mtx_nr].unlock();
-    std::cout << "read unlocked!" << mtx_nr << std::endl;
+    // std::cout << "read unlocked!" << mtx_nr << std::endl;
 }
 
 void CudaCapture::run()
@@ -121,7 +121,7 @@ void CudaCapture::run()
     errors = allocate_frame_flow((void **)&pInputFrame);
 
     av_dump_format(f_context.avInputFormatContext, 0, INPUT_STREAM_URL, 0); // get stream info
-    std::cout << "Entering while loop " << std::endl;
+    // std::cout << "Entering while loop " << std::endl;
     while (running)
     {
         
@@ -133,7 +133,7 @@ void CudaCapture::run()
 
         computation->rpi_camera_undistort(buffers_d[write_buf_id],temp_mem_1280x720x4uint16_0_d,image_x_d,image_y_d, cudaCaptureStream);      
         cudaStreamSynchronize(cudaCaptureStream);
-        std::cout << "RPi: buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << " lost_frames: " << lost_frames << std::endl;
+        // std::cout << "RPi: buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << " lost_frames: " << lost_frames << std::endl;
 
         if (write_buf_id == 0)
         {
