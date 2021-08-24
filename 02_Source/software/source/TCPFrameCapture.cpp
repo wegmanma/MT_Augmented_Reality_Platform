@@ -130,6 +130,9 @@ void TCPFrameCapture::start(Computation* computation_p)
     // checkMsg("Problem with cudaMalloc [2]");
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[3],2*205 * 265 * sizeof(float));
     // checkMsg("Problem with cudaMalloc [3]");
+    computation->InitSiftData(siftData, 100000,1, false, true);
+    siftImage.Allocate(256,205,256,false,NULL,NULL);
+    memoryTmp = computation->AllocSiftTempMemory(256, 205, 5, true);
 
     FILE *datfile;
     char buff[256];
@@ -279,15 +282,20 @@ void TCPFrameCapture::run()
         cnt++;
 #endif
 
-        // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d, tcpCaptureStream);
-        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],ampl_d,image_x_d,image_y_d, tcpCaptureStream);
+        float initBlur = 0.0f;
+        float thresh = 4.0f;
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
+        computation->tof_camera_undistort(siftImage.d_data,ampl_d,image_x_d,image_y_d, tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2], tcpCaptureStream);
         //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0, tcpCaptureStream);
-        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],265,205, tcpCaptureStream);
+        computation->ExtractSift(siftData, siftImage, 1, initBlur, thresh, 1.0f, false, memoryTmp, NULL);
+        computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData, 256, 205, tcpCaptureStream);
+        // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],siftImage.d_data,265,205, tcpCaptureStream);
         cudaStreamSynchronize(tcpCaptureStream);
+        std::cout << "number of extracted features: " << siftData.numPts << std::endl; 
         // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {

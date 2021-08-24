@@ -51,6 +51,10 @@ private:
     uint16_t * buffers_h[2];
     uint16_t * buffers_d[2];
 
+    CudaImage siftImage;
+    SiftData siftData;
+    float *memoryTmp;
+
     int write_buf_id;
 
     std::thread tid;

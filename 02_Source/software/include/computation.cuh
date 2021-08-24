@@ -211,6 +211,8 @@ void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height, 
 
 int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp, cudaStream_t stream);
 
+void drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream);
+
 private:
 
 cudaStream_t streamToRun;

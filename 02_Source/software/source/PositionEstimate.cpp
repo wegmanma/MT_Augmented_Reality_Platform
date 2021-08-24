@@ -347,7 +347,7 @@ void PositionEstimate::thrBMI160()
             continue;
         }
         time_passed += nseconds;
-        std::cout << std::endl;
+        // std::cout << std::endl;
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
         //std::cout << "gyro raw values: ( ";
@@ -525,10 +525,10 @@ void PositionEstimate::thrBMI160()
         // std::cout << velocity_xyz[0] << ";" << velocity_xyz[1] << ";" << velocity_xyz[2] << ";";
         // std::cout << position_xyz[0] << ";" << position_xyz[1] << ";" << position_xyz[2] << std::endl;
         // print_quat("Delta_vector_moving", delta_vector_xyz_moving);
-        print_quat("accel_raw", accel_m_per_sq_s);
-        print_quat("Delta_vector", delta_vector_xyz);
-        print_quat("Velocity",velocity_xyz);
-        print_quat("Position",position_xyz);
+        // print_quat("accel_raw", accel_m_per_sq_s);
+        // print_quat("Delta_vector", delta_vector_xyz);
+        // print_quat("Velocity",velocity_xyz);
+        // print_quat("Position",position_xyz);
         // {
         //     quat quat1;
         //     quat quat2;

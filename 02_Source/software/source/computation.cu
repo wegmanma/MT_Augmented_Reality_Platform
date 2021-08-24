@@ -27,7 +27,7 @@ cudaExternalSemaphore_t cudaExtCudaUpdateVkVertexBufSemaphore;
 cudaExternalSemaphore_t cudaExtVkUpdateCudaVertexBufSemaphore;
 
 __constant__ int d_MaxNumPoints;
-__device__ unsigned int d_PointCounter[8*2+1];
+__device__ unsigned int d_PointCounter[2*8*2+1];
 __constant__ float d_ScaleDownKernel[5]; 
 __constant__ float d_LowPassKernel[2*LOWPASS_R+1];
 __constant__ float d_GaussKernel[GAUSSIANSIZE*GAUSSIANSIZE]; 
@@ -699,11 +699,55 @@ __global__ void gpuUndistort(float *dst, uint16_t *src, uint16_t *xCoords, uint1
     if (idx >= width_dst) {
         return;
     }
-  
+    //int x = 50;
+    //int y = 50;
     for (int i = 0; i < height_dst; ++i) {
         // Calculate new coordinates
-       dst[i*width_dst+idx+0] =  src[yCoords[i*width_dst+idx]*width_src+xCoords[i*width_dst+idx]+0];
-
+       dst[i*width_dst+idx+0] =  src[yCoords[i*265+idx]*width_src+xCoords[i*265+idx]+0];
+       //x = 50;
+       //y = 50;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-1)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-2)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+4)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+5)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+6)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+10)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+11)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+12)) dst[i*width_dst+idx+0] = 255*255;
+       //x = 70;
+       //y = 50;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-1)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-2)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+4)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+5)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+6)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+10)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+11)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+12)) dst[i*width_dst+idx+0] = 255*255;
+       //x = 50;
+       //y = 70;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-1)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-2)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+4)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+5)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+6)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+10)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+11)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+12)) dst[i*width_dst+idx+0] = 255*255;
+       //x = 70;
+       //y = 70;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-1)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y-2)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+4)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+5)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((idx >= y )&&(idx <= y+10)&&(i==x+6)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+10)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+11)) dst[i*width_dst+idx+0] = 255*255;
+       //if ((i >= x )&&(i <= x+10)&&(idx==y+12)) dst[i*width_dst+idx+0] = 255*255;
     }
 }
 
@@ -751,6 +795,27 @@ __global__ void gpuNormalizeToInt16(uint16_t *dst, float *src, const int width, 
       dst[i*width*4+idx*4+2]  = (uint16_t)(src[i*width+idx]); 
       dst[i*width*4+idx*4+3]  = 255*255;
   }
+}
+
+
+__global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, int nPoints, const int width, const int height)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < width) { 
+        for (int i = 0; i < height; ++i) { 
+          dst[i*width*4+idx*4+0]  = (uint16_t)(src[i*width+idx]); 
+          dst[i*width*4+idx*4+1]  = (uint16_t)(src[i*width+idx]);  
+          dst[i*width*4+idx*4+2]  = (uint16_t)(src[i*width+idx]); 
+          dst[i*width*4+idx*4+3]  = 255*255;
+      }
+    }
+  __syncthreads();
+    if (idx < nPoints) { 
+        dst[((int)(d_sift[idx].ypos))*width*4+((int)(d_sift[idx].xpos))*4+0] = 255*255;
+        if (d_sift[idx].xpos > 205.0) dst[((int)(d_sift[idx].ypos))*width*4+((int)(d_sift[idx].xpos))*4+1] = 255*255;
+        // printf("Coordinates for point %d: x: %f y: %f\n",idx,d_sift[idx].xpos,d_sift[idx].ypos);
+    }
+  
 }
 
 __global__ void gpuNormalizeToInt16_SCALE(uint16_t *dst, float *src, const int width, const int height)
@@ -2122,17 +2187,28 @@ void Computation::ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves
     LowPass(lowImg, img, max(initBlur, 0.001f), chardata);
     ExtractSiftLoop(siftData, lowImg, numOctaves, 0.0f, thresh, lowestScale, 1.0f, memoryTmp, memorySub + height*iAlignUp(width, 128));
     cudaMemcpy(&siftData.numPts, &d_PointCounterAddr[2*numOctaves], sizeof(int), cudaMemcpyDeviceToHost); 
+    checkMsg("Error at cudaMemcpy\n");
     siftData.numPts = (siftData.numPts<siftData.maxPts ? siftData.numPts : siftData.maxPts);
   } else {
     CudaImage upImg;
     upImg.Allocate(width, height, iAlignUp(width, 128), false, memoryTmp);
     ScaleUp(upImg, img, chardata);
+    checkMsg("Error at ScaleUp\n");
     LowPass(lowImg, upImg, max(initBlur, 0.001f),NULL);
+    checkMsg("Error at LowPass\n");
     float kernel[8*12*16];
     PrepareLaplaceKernels(numOctaves, 0.0f, kernel);
+    checkMsg("Error at PrepareLaplace\n");
     cudaMemcpyToSymbolAsync(d_LaplaceKernel, kernel, 8*12*16*sizeof(float));
-    ExtractSiftLoop(siftData, lowImg, numOctaves, 0.0f, thresh, lowestScale*2.0f, 1.0f, memoryTmp, memorySub + height*iAlignUp(width, 128));
+    checkMsg("Error at cudaMemcpyToSymbolAsync\n");
+    ExtractSiftLoop(siftData, lowImg, numOctaves, 1.0f, thresh, lowestScale*2.0f, 1.0f, memoryTmp, memorySub + height*iAlignUp(width, 128));
+    checkMsg("Error at ExtractSiftLoop\n");
+    cudaDeviceSynchronize();
+    checkMsg("Error at cudaDeviceSynchronize\n");
     cudaMemcpy(&siftData.numPts, &d_PointCounterAddr[2*numOctaves], sizeof(int), cudaMemcpyDeviceToHost); 
+    printf("numpts: %d\n",siftData.numPts);
+    siftData.numPts = 10;
+    checkMsg("Error at cudaMemcpy\n");
     siftData.numPts = (siftData.numPts<siftData.maxPts ? siftData.numPts : siftData.maxPts);
     RescalePositions(siftData, 0.5f);
   } 
@@ -2674,6 +2750,13 @@ void Computation::sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata
 }
 
 
+void Computation::drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream) {
+    dim3 blocks =   dim3(2048);
+    dim3 threads =  dim3(1);
+    gpuDrawSiftData<<<blocks, threads,0,stream>>>(rgbImage, greyscaleImage.d_data, siftData.d_data, siftData.numPts, width, height);
+    checkMsg("Problem with RPI gpuUndistort:\n");
+}
+
 void Computation::rpi_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream) {
     dim3 blocks =   dim3(2048);
     dim3 threads =  dim3(1);
@@ -2690,7 +2773,7 @@ void Computation::tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoo
   
     dim3 blocks =   dim3(512);
     dim3 threads =  dim3(1);
-    int width_dst = 265;
+    int width_dst = 256;
     int height_dst = 205;
     int width_src = 352;
     int height_src = 286;

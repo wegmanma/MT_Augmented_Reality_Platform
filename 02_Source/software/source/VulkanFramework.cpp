@@ -623,12 +623,12 @@ void VulkanFramework::createCommandBuffers() {
        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mainCamera.indices.size()), 1, 0, 0, 0);   
 
 
-       VkBuffer vertexBufferProjected[] = { projectedSurface.vertexBuffer };
-       vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
-       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
-       vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-       vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
-       vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
+       // VkBuffer vertexBufferProjected[] = { projectedSurface.vertexBuffer };
+       // vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
+       // vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
+       // vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+       // vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
+       // vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
 
 
         vkCmdEndRenderPass(commandBuffers[i]);
@@ -801,7 +801,7 @@ void VulkanFramework::createTextureImage() {
  
     texWidth = 1273;
     texHeight = 709;
-    texWidth = 265;
+    texWidth = 256;
     texHeight = 205;    
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
@@ -889,7 +889,7 @@ void VulkanFramework::updateTextureImage() {
 
     texWidth = 1273;
     texHeight = 709;
-    texWidth = 265;
+    texWidth = 256;
     texHeight = 205;    
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
     int mtx = tcpCapture.lockMutex();
