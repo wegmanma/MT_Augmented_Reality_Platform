@@ -5,7 +5,7 @@
 #include "CudaCapture.hpp"
 
 #define INPUT_DRIVER "video4linux2,v4l2"
-#define INPUT_STREAM_URL "/dev/video1"
+#define INPUT_STREAM_URL "/dev/video0"
 #define WIDTH 1280
 #define HEIGHT 720
 

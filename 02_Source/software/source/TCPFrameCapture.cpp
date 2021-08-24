@@ -32,7 +32,7 @@ void write_data(std::string filename, uint16_t *buffer, int n)
     std::cout << "WRITING IMAGE DATA! " << n << std::endl;
     std::ofstream fileData;
     std::string num = std::to_string(n);
-    filename = "../data/ToFData/" + filename + "_movement_" + num + ".txt";
+    filename = "../data/ToFData/" + filename + "_chess_placement_" + num + ".txt";
     fileData.open(filename);
     for (int i = 0; i < 352 * 286; i++)
     {
@@ -259,10 +259,10 @@ void TCPFrameCapture::run()
 #ifdef SAVE_IMAGES_TO_DISK
         if (cnt >= 40)
         {
-            if (ampl[0] != 0)
+            if (ampl_h[0] != 0)
             {
-                write_data("ampl", ampl, n);
-                write_data("radial", radial, n);
+                write_data("ampl", ampl_h, n);
+                write_data("radial", radial_h, n);
                 n++;
             }
         }
@@ -280,7 +280,7 @@ void TCPFrameCapture::run()
 #endif
 
         // computation->tof_camera_undistort(buffers_d[write_buf_id],radial_d,image_x_d,image_y_d, cos_alpha_map_d, tcpCaptureStream);
-        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d, tcpCaptureStream);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],ampl_d,image_x_d,image_y_d, tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
