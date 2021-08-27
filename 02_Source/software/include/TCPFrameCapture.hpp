@@ -47,12 +47,17 @@ private:
     uint16_t *ampl_d;
     uint8_t *conf_d;
     uint16_t *radial_d;
-
+    uint16_t *x_d;
+    uint16_t *y_d;
+    uint16_t *z_d;
+    uint16_t *x_h;
+    uint16_t *y_h;
+    uint16_t *z_h;
     uint16_t * buffers_h[2];
     uint16_t * buffers_d[2];
 
     CudaImage siftImage;
-    SiftData siftData;
+    SiftData siftData[2];
     float *memoryTmp;
 
     int write_buf_id;

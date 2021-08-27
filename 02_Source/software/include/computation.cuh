@@ -93,6 +93,14 @@ typedef struct {
   float match_ypos;
   float match_error;
   float subsampling;
+  uint16_t x_3d;
+  uint16_t y_3d;
+  uint16_t z_3d;
+  float distance;
+  uint16_t match_x_3d;
+  uint16_t match_y_3d;
+  uint16_t match_z_3d;
+  float match_distance;
   float empty[3];
   float data[128];
 } SiftPoint;
@@ -212,6 +220,12 @@ void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height, 
 int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp, cudaStream_t stream);
 
 void drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream);
+
+void FindHomography(SiftData &data, float *homography, int *numMatches, int numLoops, float minScore, float maxAmbiguity, float thresh);
+
+void addDepthInfoToSift(SiftData &data, float* depthData, cudaStream_t stream, uint16_t *x, uint16_t *y, uint16_t *z);
+
+void findRotationTranslation(SiftData &data_new, SiftData &data_old, vec4 translation, quat rotation, cudaStream_t stream);
 
 private:
 
