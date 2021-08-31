@@ -294,7 +294,8 @@ void TCPFrameCapture::run()
         }
         cnt++;
 #endif
-
+        vec4 translation;
+        quat rotation;
         float initBlur = 0.0f;
         float thresh = 5.5f;
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
@@ -317,7 +318,8 @@ void TCPFrameCapture::run()
         else
         {
             computation->MatchSiftData(siftData[1],siftData[0]);
-        }  
+        }
+        computation->findRotationTranslation(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[2], translation, rotation, tcpCaptureStream);  
         computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
         // Processing finished, change buffer index.      
         if (write_buf_id == 0)
