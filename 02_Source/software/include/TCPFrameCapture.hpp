@@ -39,13 +39,13 @@ private:
     float *cos_alpha_map_h;
     float *cos_alpha_map_d;
 
-    float *temp_mem_265x205xfloat_0_d[4];
+    float *temp_mem_265x205xfloat_0_d[6];
 
     uint16_t *ampl_h;
-    uint8_t *conf_h;
+    uint16_t *conf_h;
     uint16_t *radial_h;
     uint16_t *ampl_d;
-    uint8_t *conf_d;
+    uint16_t *conf_d;
     uint16_t *radial_d;
     uint16_t *x_d;
     uint16_t *y_d;

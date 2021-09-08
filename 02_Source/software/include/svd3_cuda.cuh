@@ -1027,13 +1027,13 @@ void svd(
 	Su32.f = __fadd_rn(Su32.f, Stmp2.f);					
 	Su33.f = __fsub_rn(Su33.f, Stmp1.f);					
 
-	v11 = Sv11.f; v12 = Sv12.f; v13 = Sv13.f;
-	v21 = Sv21.f; v22 = Sv22.f; v23 = Sv23.f;
-	v31 = Sv31.f; v32 = Sv32.f; v33 = Sv33.f;
+	v11 = -Sv11.f; v12 = -Sv12.f; v13 = -Sv13.f;
+	v21 = -Sv21.f; v22 = -Sv22.f; v23 = -Sv23.f;
+	v31 = -Sv31.f; v32 = -Sv32.f; v33 = -Sv33.f;
 
-	u11 = Su11.f; u12 = Su12.f; u13 = Su13.f;
-	u21 = Su21.f; u22 = Su22.f; u23 = Su23.f;
-	u31 = Su31.f; u32 = Su32.f; u33 = Su33.f;
+	u11 = -Su11.f; u12 = -Su12.f; u13 = Su13.f;
+	u21 = -Su21.f; u22 = -Su22.f; u23 = Su23.f;
+	u31 = -Su31.f; u32 = -Su32.f; u33 = Su33.f;
 
 	s11 = Sa11.f; 
 	//s12 = Sa12.f; s13 = Sa13.f; s21 = Sa21.f; 

@@ -110,16 +110,18 @@ void VulkanFramework::initVulkan() {
     computation = new Computation{};
     computation->initCuda();
     positionEstimate = new PositionEstimate();
+    
     tcpCapture.start(computation);
+    
     // cudaCapture.start(computation);
     createInstance();
+    
     setupDebugCallback();
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
     getKhrExtensionsFn();
     createSwapChain();
-    
     createImageViews();
     createRenderPass();
     createFramebuffers();
@@ -130,7 +132,6 @@ void VulkanFramework::initVulkan() {
     createSyncObjects();
     projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
     mainCamera.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), mainImageView, mainSampler);
-
     createCommandBuffers();
 
 }

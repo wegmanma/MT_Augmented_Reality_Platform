@@ -96,6 +96,8 @@ typedef struct {
   float x_3d;
   float y_3d;
   float z_3d;
+  float conf;
+  bool draw;
   float distance;
   float match_x_3d;
   float match_y_3d;
@@ -189,7 +191,7 @@ float *AllocSiftTempMemory(int width, int height, int numOctaves, bool scaleUp);
 
 void ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh, float lowestScale, bool scaleUp, float *tempMemory, unsigned char * chardata);
 
-void MatchSiftData(SiftData &data1, SiftData &data2);
+void MatchSiftData(SiftData &data1, SiftData &data2, cudaStream_t stream);
 
 void yuvToRGB_Convert(CudaImage &RGBImage, unsigned char *yuvdata);
 
@@ -223,9 +225,9 @@ void drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftD
 
 void FindHomography(SiftData &data, float *homography, int *numMatches, int numLoops, float minScore, float maxAmbiguity, float thresh);
 
-void addDepthInfoToSift(SiftData &data, float* depthData, cudaStream_t stream, uint16_t *x, uint16_t *y, uint16_t *z);
+void addDepthInfoToSift(SiftData &data, float* depthData, cudaStream_t stream, float *x, float *y, float *z, float *conf);
 
-void findRotationTranslation(SiftData &data, float *tempMemory, vec4 translation, quat rotation, cudaStream_t stream);
+void findRotationTranslation(SiftData &data, SiftData &data_old, float *tempMemory, vec4 translation, quat rotation, cudaStream_t stream);
 
 private:
 

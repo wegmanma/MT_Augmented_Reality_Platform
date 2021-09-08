@@ -61,6 +61,7 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int m
     // }
     size_t bytes_sent = 0;
     // std::cout << "Sending request in TCP!" << std::endl;
+
     bytes_sent = send(socket_desc, "100", 4, 0);
     if (bytes_sent != 4) std::cout << "Problem sending request in TCP!" << std::endl;
     while (total_size < max_length)
@@ -114,9 +115,9 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaHostAlloc((void **)&x_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped); 
     cudaHostAlloc((void **)&y_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped); 
     cudaHostAlloc((void **)&z_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped); 
-    cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint8_t), cudaHostAllocMapped);    
+    cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
     cudaHostAlloc((void **)&ampl_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
-    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);   
+    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);     
 
     cudaHostGetDevicePointer((void **)&buffers_d[0] ,  (void *) buffers_h[0] , 0);
     cudaHostGetDevicePointer((void **)&buffers_d[1] , (void *) buffers_h[1], 0);
@@ -137,6 +138,8 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[2],2*205 * 265 * sizeof(float));
     // checkMsg("Problem with cudaMalloc [2]");
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[3],2*205 * 265 * sizeof(float));
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[4],2*205 * 265 * sizeof(float));
+    cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[5],2*205 * 265 * sizeof(float));
     // checkMsg("Problem with cudaMalloc [3]");
     computation->InitSiftData(siftData[0], 100000,1, false, true);
     computation->InitSiftData(siftData[1], 100000,1, false, true);
@@ -242,7 +245,7 @@ void TCPFrameCapture::run()
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::duration timeSpan;
 
-        
+    std::cout << "Start loop" << std::endl;    
     while (running)
     {
         startTime = std::chrono::steady_clock::now();
@@ -263,7 +266,11 @@ void TCPFrameCapture::run()
         // std::cout << "locking W" << write_buf_id << std::endl;
         memcpy(ampl_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
-        memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
+        //memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
+        for (int i = 0; i<352 * 286;i++) {
+            uint16_t *ptr = conf_h+i;
+            *ptr = server_data[offset_src+i]*255;
+        }
         offset_src += 352 * 286 * sizeof(uint8_t);
         memcpy(radial_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
@@ -297,30 +304,38 @@ void TCPFrameCapture::run()
         vec4 translation;
         quat rotation;
         float initBlur = 0.0f;
-        float thresh = 5.5f;
-        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
+        float thresh = 2.5f;
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[4],conf_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
         computation->tof_camera_undistort(siftImage.d_data,ampl_d,image_x_d,image_y_d, tcpCaptureStream);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],x_d,image_x_d,image_y_d, tcpCaptureStream);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[2],y_d,image_x_d,image_y_d, tcpCaptureStream);
+        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[3],z_d,image_x_d,image_y_d, tcpCaptureStream);
+        cudaStreamSynchronize(tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2], tcpCaptureStream);
         //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0, tcpCaptureStream);
-        computation->ExtractSift(siftData[write_buf_id], siftImage, 1, initBlur, thresh, 1.0f, false, memoryTmp, NULL);
-        computation->addDepthInfoToSift(siftData[write_buf_id],temp_mem_265x205xfloat_0_d[1],tcpCaptureStream, x_d, y_d, z_d);
+        computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 1.0f, false, memoryTmp, NULL);
+        // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
+        computation->addDepthInfoToSift(siftData[write_buf_id],temp_mem_265x205xfloat_0_d[0],tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
-        cudaStreamSynchronize(tcpCaptureStream);
-        std::cout << "number of extracted features: " << siftData[write_buf_id].numPts << std::endl; 
+        // std::cout << "number of extracted features: " << siftData[write_buf_id].numPts << std::endl; 
         // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {
-            computation->MatchSiftData(siftData[0],siftData[1]);
+            computation->MatchSiftData(siftData[0],siftData[1], tcpCaptureStream);
+            computation->findRotationTranslation(siftData[0],siftData[1], temp_mem_265x205xfloat_0_d[5], translation, rotation, tcpCaptureStream);  
         }
         else
         {
-            computation->MatchSiftData(siftData[1],siftData[0]);
+            computation->MatchSiftData(siftData[1],siftData[0],tcpCaptureStream);
+            computation->findRotationTranslation(siftData[1],siftData[0], temp_mem_265x205xfloat_0_d[5], translation, rotation, tcpCaptureStream);  
         }
-        computation->findRotationTranslation(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[2], translation, rotation, tcpCaptureStream);  
+        
         computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
+        //computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
         // Processing finished, change buffer index.      
         if (write_buf_id == 0)
         {
@@ -335,7 +350,7 @@ void TCPFrameCapture::run()
         endTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        std::cout << "ToF Frame by frame time: " << nseconds << "s"<<  std::endl;
+        // std::cout << "ToF Frame by frame time: " << nseconds << "s"<<  std::endl;
         // while(1) {
         //     std::this_thread::sleep_for(std::chrono::microseconds(5000));
         // }
