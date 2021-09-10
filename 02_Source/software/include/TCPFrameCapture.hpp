@@ -40,6 +40,18 @@ private:
     float *cos_alpha_map_d;
 
     float *temp_mem_265x205xfloat_0_d[6];
+    float *temp_mem_265x205xfloat_nocache_h;
+    float *temp_mem_265x205xfloat_nocache_d;
+
+    mat4x4 *best_rotation_d;
+    mat4x4 *best_rotation_h;
+    mat4x4 *opt_rotation_d;
+    mat4x4 *opt_rotation_h;
+
+    vec4 *best_translation_d;
+    vec4 *best_translation_h;
+    vec4 *opt_translation_d;
+    vec4 *opt_translation_h;    
 
     uint16_t *ampl_h;
     uint16_t *conf_h;

@@ -14,14 +14,17 @@
 #include "common.h"
 #include "svd3_cuda.cuh"
 
-#define HEIGHT_ANGLE 0.87 / 2 //rad
-#define WIDTH_ANGLE 1.04 / 2  //rad
+#include <curand.h>
+#include <curand_kernel.h>
+
+#define HEIGHT_ANGLE 0.87 / 8 //rad
+#define WIDTH_ANGLE 1.04 / 8  //rad
 
 // 16:9 display format.
 #define GRIDSIZEX 1920
 #define GRIDSIZEY 1080
 #define GAUSSIANSIZE 25
-#define MIN_SCORE 0.97
+#define MIN_SCORE 0.9
 
 #define checkMsg(msg) __checkMsg(msg, __FILE__, __LINE__)
 #define checkMsgNoFail(msg) __checkMsgNoFail(msg, __FILE__, __LINE__)
@@ -781,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-__global__ void gpuFindRotationTranslation(SiftPoint *point, SiftPoint *point_old, float *tempMemory, vec4 translation, quat rotation, int numPts, int numPts_old)
+__global__ void gpuFindRotationTranslation(SiftPoint *point, float *tempMemory, mat4x4 *rotation, vec4 *translation, int numPts)
 {
   int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
   int idx1 = numPts + 1;
@@ -790,7 +793,8 @@ __global__ void gpuFindRotationTranslation(SiftPoint *point, SiftPoint *point_ol
   TempCoords corr0;
   TempCoords corr1;
   TempCoords corr2;
-  if (idx0 < numPts)
+  mat4x4 rot;
+  if ((idx0 < numPts) && (point[idx0].score > 0.9))
   {
     tempMemory[idx0 * 16 + 0] = 0.0f;
     tempMemory[idx0 * 16 + 1] = 0.0f;
@@ -810,348 +814,383 @@ __global__ void gpuFindRotationTranslation(SiftPoint *point, SiftPoint *point_ol
     tempMemory[idx0 * 16 + 15] = 0.0f;
 
     point[idx0].draw = false;
-    if (point[idx0].score > MIN_SCORE)
+    curandState_t state;
+    curand_init(idx0, /* the seed controls the sequence of random values that are produced */
+                0,    /* the sequence number is only important with multiple cores */
+                idx0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
+                &state);
+    int rng;
+
+    while (idx1 > numPts)
     {
-      for (int i = 1; i < numPts; i++)
+      rng = curand(&state) % numPts;
+      if ((point[rng].score > 0.9) && (rng != idx0))
       {
-        if (idx2 < numPts)
-        {
-          break;
-        }
-        if (i + idx0 >= numPts)
-        {
-          if ((point[i + idx0 - numPts].score >= MIN_SCORE) && (point[i + idx0 - numPts].match != point[idx0].match) && ((point[i + idx0 - numPts].match != point[idx1].match) || (idx1 > numPts)))
-          {
-            if (idx1 > numPts)
-            {
-              idx1 = i + idx0 - numPts;
-            }
-            else
-            {
-              idx2 = i + idx0 - numPts;
-            }
-          }
-        }
-        else
-        {
-          if (point[i + idx0].score >= MIN_SCORE)
-          {
-            if (idx1 > numPts)
-              idx1 = i + idx0;
-            else
-              idx2 = i + idx0;
-          }
-        }
+        idx1 = rng;
       }
-      __syncthreads();
-      if ((idx2 <= numPts) && (idx1 <= numPts))
+    }
+
+    while (idx2 > numPts)
+    {
+      rng = curand(&state) % numPts;
+      if ((point[rng].score > 0.9) && (rng != idx0) && (rng != idx1))
       {
-
-        centroids.x_3d = (point[idx0].x_3d + point[idx1].x_3d + point[idx2].x_3d) / 3.0f;
-        centroids.y_3d = (point[idx0].y_3d + point[idx1].y_3d + point[idx2].y_3d) / 3.0f;
-        centroids.z_3d = (point[idx0].z_3d + point[idx1].z_3d + point[idx2].z_3d) / 3.0f;
-        centroids.match_x_3d = (point[idx0].match_x_3d + point[idx1].match_x_3d + point[idx2].match_x_3d) / 3.0f;
-        centroids.match_y_3d = (point[idx0].match_y_3d + point[idx1].match_y_3d + point[idx2].match_y_3d) / 3.0f;
-        centroids.match_z_3d = (point[idx0].match_z_3d + point[idx1].match_z_3d + point[idx2].match_z_3d) / 3.0f;
-        corr0.x_3d = point[idx0].x_3d - centroids.x_3d;
-        corr0.y_3d = point[idx0].y_3d - centroids.y_3d;
-        corr0.z_3d = point[idx0].z_3d - centroids.z_3d;
-        corr0.match_x_3d = point[idx0].match_x_3d - centroids.match_x_3d;
-        corr0.match_y_3d = point[idx0].match_y_3d - centroids.match_y_3d;
-        corr0.match_z_3d = point[idx0].match_z_3d - centroids.match_z_3d;
-        corr1.x_3d = point[idx1].x_3d - centroids.x_3d;
-        corr1.y_3d = point[idx1].y_3d - centroids.y_3d;
-        corr1.z_3d = point[idx1].z_3d - centroids.z_3d;
-        corr1.match_x_3d = point[idx1].match_x_3d - centroids.match_x_3d;
-        corr1.match_y_3d = point[idx1].match_y_3d - centroids.match_y_3d;
-        corr1.match_z_3d = point[idx1].match_z_3d - centroids.match_z_3d;
-        corr2.x_3d = point[idx2].x_3d - centroids.x_3d;
-        corr2.y_3d = point[idx2].y_3d - centroids.y_3d;
-        corr2.z_3d = point[idx2].z_3d - centroids.z_3d;
-        corr2.match_x_3d = point[idx2].match_x_3d - centroids.match_x_3d;
-        corr2.match_y_3d = point[idx2].match_y_3d - centroids.match_y_3d;
-        corr2.match_z_3d = point[idx2].match_z_3d - centroids.match_z_3d;
-        centroids.xpos = (point[idx0].xpos + point[idx1].xpos + point[idx2].xpos) / 3.0f;
-        centroids.ypos = (point[idx0].ypos + point[idx1].ypos + point[idx2].ypos) / 3.0f;
-        centroids.distance = (point[idx0].distance + point[idx1].distance + point[idx2].distance) / 3.0f;
-        centroids.match_xpos = (point[idx0].match_xpos + point[idx1].match_xpos + point[idx2].match_xpos) / 3.0f;
-        centroids.match_ypos = (point[idx0].match_ypos + point[idx1].match_ypos + point[idx2].match_ypos) / 3.0f;
-        centroids.match_distance = (point[idx0].match_distance + point[idx1].match_distance + point[idx2].match_distance) / 3.0f;
-        corr0.xpos = point[idx0].xpos - centroids.xpos;
-        corr0.ypos = point[idx0].ypos - centroids.ypos;
-        corr0.distance = (point[idx0].distance - centroids.distance);
-        corr0.match_xpos = point[idx0].match_xpos - centroids.match_xpos;
-        corr0.match_ypos = point[idx0].match_ypos - centroids.match_ypos;
-        corr0.match_distance = (point[idx0].match_distance - centroids.match_distance);
-        corr1.xpos = point[idx1].xpos - centroids.xpos;
-        corr1.ypos = point[idx1].ypos - centroids.ypos;
-        corr1.distance = (point[idx1].distance - centroids.distance);
-        corr1.match_xpos = point[idx1].match_xpos - centroids.match_xpos;
-        corr1.match_ypos = point[idx1].match_ypos - centroids.match_ypos;
-        corr1.match_distance = (point[idx1].match_distance - centroids.match_distance);
-        corr2.xpos = point[idx2].xpos - centroids.xpos;
-        corr2.ypos = point[idx2].ypos - centroids.ypos;
-        corr2.distance = (point[idx2].distance - centroids.distance);
-        corr2.match_xpos = point[idx2].match_xpos - centroids.match_xpos;
-        corr2.match_ypos = point[idx2].match_ypos - centroids.match_ypos;
-        corr2.match_distance = (point[idx2].match_distance - centroids.match_distance);
-
-        mat4x4 pos_new = {{corr0.x_3d, corr0.y_3d, corr0.z_3d, 0},
-                          {corr1.x_3d, corr1.y_3d, corr1.z_3d, 0},
-                          {corr2.x_3d, corr2.y_3d, corr2.z_3d, 0},
-                          {0, 0, 0, 1}};
-        mat4x4 pos_old = {{corr0.match_x_3d, corr0.match_y_3d, corr0.match_z_3d, 0},
-                          {corr1.match_x_3d, corr1.match_y_3d, corr1.match_z_3d, 0},
-                          {corr2.match_x_3d, corr2.match_y_3d, corr2.match_z_3d, 0},
-                          {0, 0, 0, 1}};
-        mat4x4 pos_old_trans;
-        // Transpose
-        int i, j;
-        for (j = 0; j < 4; ++j)
-          for (i = 0; i < 4; ++i)
-            pos_old_trans[i][j] = pos_old[j][i];
-        mat4x4 h; // covariance matrix
-        // Matrix Multiplication
-        int k, r, c;
-        for (c = 0; c < 4; ++c)
-          for (r = 0; r < 4; ++r)
-          {
-            h[c][r] = 0.f;
-            for (k = 0; k < 4; ++k)
-              h[c][r] += pos_new[k][r] * pos_old_trans[c][k];
-          }
-        mat4x4 u;
-        mat4x4 s;
-        mat4x4 s_det;
-        mat4x4 v;
-        for (i = 0; i < 4; ++i)
-          for (j = 0; j < 4; ++j)
-          {
-            u[i][j] = i == j ? 1.f : 0.f;
-            s[i][j] = i == j ? 1.f : 0.f;
-            s_det[i][j] = i == j ? 1.f : 0.f;
-            v[i][j] = i == j ? 1.f : 0.f;
-          }
-
-        svd(h[0][0], h[1][0], h[2][0],
-            h[0][1], h[1][1], h[2][1],
-            h[0][2], h[1][2], h[2][2],
-            u[0][0], u[1][0], u[2][0],
-            u[0][1], u[1][1], u[2][1],
-            u[0][2], u[1][2], u[2][2],
-            s[0][0], s[1][1], s[2][2],
-            v[0][0], v[1][0], v[2][0],
-            v[0][1], v[1][1], v[2][1],
-            v[0][2], v[1][2], v[2][2]);
-        mat4x4 u_t;
-        for (j = 0; j < 4; ++j)
-          for (i = 0; i < 4; ++i)
-            u_t[i][j] = u[j][i];
-        mat4x4 vu_t;
-        for (c = 0; c < 4; ++c)
-          for (r = 0; r < 4; ++r)
-          {
-            vu_t[c][r] = 0.f;
-            for (k = 0; k < 4; ++k)
-              vu_t[c][r] += v[k][r] * u_t[c][k];
-          }
-
-        float s1[6];
-        float c1[6];
-        s1[0] = vu_t[0][0] * vu_t[1][1] - vu_t[1][0] * vu_t[0][1];
-        s1[1] = vu_t[0][0] * vu_t[1][2] - vu_t[1][0] * vu_t[0][2];
-        s1[2] = vu_t[0][0] * vu_t[1][3] - vu_t[1][0] * vu_t[0][3];
-        s1[3] = vu_t[0][1] * vu_t[1][2] - vu_t[1][1] * vu_t[0][2];
-        s1[4] = vu_t[0][1] * vu_t[1][3] - vu_t[1][1] * vu_t[0][3];
-        s1[5] = vu_t[0][2] * vu_t[1][3] - vu_t[1][2] * vu_t[0][3];
-
-        c1[0] = vu_t[2][0] * vu_t[3][1] - vu_t[3][0] * vu_t[2][1];
-        c1[1] = vu_t[2][0] * vu_t[3][2] - vu_t[3][0] * vu_t[2][2];
-        c1[2] = vu_t[2][0] * vu_t[3][3] - vu_t[3][0] * vu_t[2][3];
-        c1[3] = vu_t[2][1] * vu_t[3][2] - vu_t[3][1] * vu_t[2][2];
-        c1[4] = vu_t[2][1] * vu_t[3][3] - vu_t[3][1] * vu_t[2][3];
-        c1[5] = vu_t[2][2] * vu_t[3][3] - vu_t[3][2] * vu_t[2][3];
-
-        float idet = 1.0f / (s1[0] * c1[5] - s1[1] * c1[4] + s1[2] * c1[3] + s1[3] * c1[2] - s1[4] * c1[1] + s1[5] * c1[0]);
-        s_det[2][2] = idet;
-        mat4x4 vs_det;
-        for (c = 0; c < 4; ++c)
-          for (r = 0; r < 4; ++r)
-          {
-            vs_det[c][r] = 0.f;
-            for (k = 0; k < 4; ++k)
-              vs_det[c][r] += v[k][r] * s_det[c][k];
-          }
-        mat4x4 rot_t;
-        for (c = 0; c < 4; ++c)
-          for (r = 0; r < 4; ++r)
-          {
-            rot_t[c][r] = 0.f;
-            for (k = 0; k < 4; ++k)
-              rot_t[c][r] += vs_det[k][r] * u_t[c][k];
-          }
-        mat4x4 rot;
-        for (j = 0; j < 4; ++j)
-          for (i = 0; i < 4; ++i)
-            rot[i][j] = rot_t[j][i];
-        vec4 p_dash = {centroids.match_x_3d, centroids.match_y_3d, centroids.match_z_3d, 1.0};
-        vec4 rp_dash;
-        for (j = 0; j < 4; ++j)
-        {
-          rp_dash[j] = 0.f;
-          for (i = 0; i < 4; ++i)
-            rp_dash[j] += rot[i][j] * p_dash[i];
-        }
-        vec4 t = {centroids.x_3d - rp_dash[0], centroids.y_3d - rp_dash[1], centroids.z_3d - rp_dash[2], 1.0};
-        mat4x4 check_res;
-        for (c = 0; c < 4; ++c)
-          for (r = 0; r < 4; ++r)
-          {
-            check_res[c][r] = 0.f;
-            for (k = 0; k < 4; ++k)
-              check_res[c][r] += rot[k][r] * pos_old[c][k];
-          }
-        mat4x4 delta_vectors;
-        delta_vectors[0][3] = 0.0;
-        delta_vectors[1][3] = 0.0;
-        delta_vectors[2][3] = 0.0;
-        delta_vectors[3][3] = 0.0;
-        delta_vectors[2][3] = 0.0;
-        delta_vectors[1][3] = 0.0;
-        delta_vectors[0][3] = 0.0;
-        delta_vectors[3][0] = 0.0;
-        delta_vectors[3][1] = 0.0;
-        delta_vectors[3][2] = 0.0;
-        for (c = 0; c < 3; ++c)
-        {
-          for (r = 0; r < 3; ++r)
-          {
-            delta_vectors[c][r] = pos_new[c][r] - check_res[c][r];
-            delta_vectors[c][3] += (pos_new[c][r] - check_res[c][r]) * (pos_new[c][r] - check_res[c][r]);
-          }
-          delta_vectors[c][3] = sqrt(delta_vectors[c][3]);
-          delta_vectors[3][3] += delta_vectors[c][3];
-        }
-        delta_vectors[3][3] /= 3;
-        float det = rot[0][0] * rot[1][1] * rot[2][2] + rot[1][0] * rot[2][1] * rot[0][2] + rot[2][0] * rot[0][1] * rot[1][2] - rot[2][0] * rot[1][1] * rot[0][2] - rot[1][0] * rot[0][1] * rot[2][2] - rot[0][0] * rot[2][1] * rot[1][2];
-
-        if ((det > 0.9) && (det < 1.1) && (rot[0][0] >= 0.50) && (delta_vectors[0][3] < 300) && (delta_vectors[1][3] < 300) && (delta_vectors[2][3] < 300) && (delta_vectors[3][3] < 500.0) && (point[idx0].conf < 100.0) && (point[idx1].conf < 100.0) && (point[idx2].conf < 100.0))
-        {
-          tempMemory[idx0 * 16 + 0] = rot[0][0];
-          tempMemory[idx0 * 16 + 1] = rot[0][1];
-          tempMemory[idx0 * 16 + 2] = rot[0][2];
-          tempMemory[idx0 * 16 + 3] = rot[1][0];
-          tempMemory[idx0 * 16 + 4] = rot[1][1];
-          tempMemory[idx0 * 16 + 5] = rot[1][2];
-          tempMemory[idx0 * 16 + 6] = rot[2][0];
-          tempMemory[idx0 * 16 + 7] = rot[2][1];
-          tempMemory[idx0 * 16 + 8] = rot[2][2];
-          tempMemory[idx0 * 16 + 9] = t[0];
-          tempMemory[idx0 * 16 + 10] = t[1];
-          tempMemory[idx0 * 16 + 11] = t[2];
-          tempMemory[idx0 * 16 + 12] = (float)idx0;
-          tempMemory[idx0 * 16 + 13] = (float)idx1;
-          tempMemory[idx0 * 16 + 14] = (float)idx2;
-        }
+        idx2 = rng;
       }
     }
     __syncthreads();
-    int num_neigh = 0;
-    if (tempMemory[idx0 * 16 + 0] >= 0.50)
+    if ((idx2 <= numPts) && (idx1 <= numPts))
     {
-      float trace = tempMemory[idx0 * 16 + 0] + tempMemory[idx0 * 16 + 4] + tempMemory[idx0 * 16 + 8];
-      float u_0 = tempMemory[idx0 * 16 + 7] - tempMemory[idx0 * 16 + 5];
-      float u_1 = tempMemory[idx0 * 16 + 2] - tempMemory[idx0 * 16 + 6];
-      float u_2 = tempMemory[idx0 * 16 + 3] - tempMemory[idx0 * 16 + 1];
-      float u_ang = asin(sqrt(u_0 * u_0 + u_1 * u_1 + u_2 * u_2) / 2);
-      if (trace > 0.2) {
-        for (int i = 0; i < numPts; i++)
+
+      centroids.x_3d = (point[idx0].x_3d + point[idx1].x_3d + point[idx2].x_3d) / 3.0f;
+      centroids.y_3d = (point[idx0].y_3d + point[idx1].y_3d + point[idx2].y_3d) / 3.0f;
+      centroids.z_3d = (point[idx0].z_3d + point[idx1].z_3d + point[idx2].z_3d) / 3.0f;
+      centroids.match_x_3d = (point[idx0].match_x_3d + point[idx1].match_x_3d + point[idx2].match_x_3d) / 3.0f;
+      centroids.match_y_3d = (point[idx0].match_y_3d + point[idx1].match_y_3d + point[idx2].match_y_3d) / 3.0f;
+      centroids.match_z_3d = (point[idx0].match_z_3d + point[idx1].match_z_3d + point[idx2].match_z_3d) / 3.0f;
+      corr0.x_3d = point[idx0].x_3d - centroids.x_3d;
+      corr0.y_3d = point[idx0].y_3d - centroids.y_3d;
+      corr0.z_3d = point[idx0].z_3d - centroids.z_3d;
+      corr0.match_x_3d = point[idx0].match_x_3d - centroids.match_x_3d;
+      corr0.match_y_3d = point[idx0].match_y_3d - centroids.match_y_3d;
+      corr0.match_z_3d = point[idx0].match_z_3d - centroids.match_z_3d;
+      corr1.x_3d = point[idx1].x_3d - centroids.x_3d;
+      corr1.y_3d = point[idx1].y_3d - centroids.y_3d;
+      corr1.z_3d = point[idx1].z_3d - centroids.z_3d;
+      corr1.match_x_3d = point[idx1].match_x_3d - centroids.match_x_3d;
+      corr1.match_y_3d = point[idx1].match_y_3d - centroids.match_y_3d;
+      corr1.match_z_3d = point[idx1].match_z_3d - centroids.match_z_3d;
+      corr2.x_3d = point[idx2].x_3d - centroids.x_3d;
+      corr2.y_3d = point[idx2].y_3d - centroids.y_3d;
+      corr2.z_3d = point[idx2].z_3d - centroids.z_3d;
+      corr2.match_x_3d = point[idx2].match_x_3d - centroids.match_x_3d;
+      corr2.match_y_3d = point[idx2].match_y_3d - centroids.match_y_3d;
+      corr2.match_z_3d = point[idx2].match_z_3d - centroids.match_z_3d;
+      centroids.xpos = (point[idx0].xpos + point[idx1].xpos + point[idx2].xpos) / 3.0f;
+      centroids.ypos = (point[idx0].ypos + point[idx1].ypos + point[idx2].ypos) / 3.0f;
+      centroids.distance = (point[idx0].distance + point[idx1].distance + point[idx2].distance) / 3.0f;
+      centroids.match_xpos = (point[idx0].match_xpos + point[idx1].match_xpos + point[idx2].match_xpos) / 3.0f;
+      centroids.match_ypos = (point[idx0].match_ypos + point[idx1].match_ypos + point[idx2].match_ypos) / 3.0f;
+      centroids.match_distance = (point[idx0].match_distance + point[idx1].match_distance + point[idx2].match_distance) / 3.0f;
+      corr0.xpos = point[idx0].xpos - centroids.xpos;
+      corr0.ypos = point[idx0].ypos - centroids.ypos;
+      corr0.distance = (point[idx0].distance - centroids.distance);
+      corr0.match_xpos = point[idx0].match_xpos - centroids.match_xpos;
+      corr0.match_ypos = point[idx0].match_ypos - centroids.match_ypos;
+      corr0.match_distance = (point[idx0].match_distance - centroids.match_distance);
+      corr1.xpos = point[idx1].xpos - centroids.xpos;
+      corr1.ypos = point[idx1].ypos - centroids.ypos;
+      corr1.distance = (point[idx1].distance - centroids.distance);
+      corr1.match_xpos = point[idx1].match_xpos - centroids.match_xpos;
+      corr1.match_ypos = point[idx1].match_ypos - centroids.match_ypos;
+      corr1.match_distance = (point[idx1].match_distance - centroids.match_distance);
+      corr2.xpos = point[idx2].xpos - centroids.xpos;
+      corr2.ypos = point[idx2].ypos - centroids.ypos;
+      corr2.distance = (point[idx2].distance - centroids.distance);
+      corr2.match_xpos = point[idx2].match_xpos - centroids.match_xpos;
+      corr2.match_ypos = point[idx2].match_ypos - centroids.match_ypos;
+      corr2.match_distance = (point[idx2].match_distance - centroids.match_distance);
+
+      mat4x4 pos_new = {{corr0.x_3d, corr0.y_3d, corr0.z_3d, 0},
+                        {corr1.x_3d, corr1.y_3d, corr1.z_3d, 0},
+                        {corr2.x_3d, corr2.y_3d, corr2.z_3d, 0},
+                        {0, 0, 0, 1}};
+      mat4x4 pos_old = {{corr0.match_x_3d, corr0.match_y_3d, corr0.match_z_3d, 0},
+                        {corr1.match_x_3d, corr1.match_y_3d, corr1.match_z_3d, 0},
+                        {corr2.match_x_3d, corr2.match_y_3d, corr2.match_z_3d, 0},
+                        {0, 0, 0, 1}};
+      mat4x4 pos_old_trans;
+      // Transpose
+      int i, j;
+      for (j = 0; j < 4; ++j)
+        for (i = 0; i < 4; ++i)
+          pos_old_trans[i][j] = pos_old[j][i];
+      mat4x4 h; // covariance matrix
+      // Matrix Multiplication
+      int k, r, c;
+      for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
         {
-          if (tempMemory[i * 16 + 0] >= 0.50)
-          {
-            float d_trace = tempMemory[i * 16 + 0] + tempMemory[i * 16 + 4] + tempMemory[i * 16 + 8] - trace;
-            float d_u_0 = tempMemory[i * 16 + 7] - tempMemory[i * 16 + 5] - u_0;
-            float d_u_1 = tempMemory[i * 16 + 2] - tempMemory[i * 16 + 6] - u_1;
-            float d_u_2 = tempMemory[i * 16 + 3] - tempMemory[i * 16 + 1] - u_2;
-            float d_u_ang = asin(sqrt(d_u_0 * d_u_0 + d_u_1 * d_u_1 + d_u_2 * d_u_2) / 2) - u_ang;
-            if ((trace>0.2)&&(d_trace < 0.1) && (d_u_ang < 0.3)) //((dx_sq + dy_sq + dz_sq) < 8000000) &&
-            {
-              num_neigh++;
-            }
-          }
+          h[c][r] = 0.f;
+          for (k = 0; k < 4; ++k)
+            h[c][r] += pos_new[k][r] * pos_old_trans[c][k];
         }
-      }
-      tempMemory[idx0 * 16 + 15] = (float)num_neigh;
-    }
-  }
-  __syncthreads();
-  int tmp_neigh;
-  int max_neigh = 0;
-  float max_neigh_index = 0;
-  if (idx0 == 0)
-  {
-    for (int i = 0; i < numPts; i++)
-    {
-      if (tempMemory[i * 16 + 0] >= 0.50)
+      mat4x4 u;
+      mat4x4 s;
+      mat4x4 s_det;
+      mat4x4 v;
+      for (i = 0; i < 4; ++i)
+        for (j = 0; j < 4; ++j)
+        {
+          u[i][j] = i == j ? 1.f : 0.f;
+          s[i][j] = i == j ? 1.f : 0.f;
+          s_det[i][j] = i == j ? 1.f : 0.f;
+          v[i][j] = i == j ? 1.f : 0.f;
+        }
+
+      svd(h[0][0], h[1][0], h[2][0],
+          h[0][1], h[1][1], h[2][1],
+          h[0][2], h[1][2], h[2][2],
+          u[0][0], u[1][0], u[2][0],
+          u[0][1], u[1][1], u[2][1],
+          u[0][2], u[1][2], u[2][2],
+          s[0][0], s[1][1], s[2][2],
+          v[0][0], v[1][0], v[2][0],
+          v[0][1], v[1][1], v[2][1],
+          v[0][2], v[1][2], v[2][2]);
+      mat4x4 u_t;
+      for (j = 0; j < 4; ++j)
+        for (i = 0; i < 4; ++i)
+          u_t[i][j] = u[j][i];
+      mat4x4 vu_t;
+      for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
+        {
+          vu_t[c][r] = 0.f;
+          for (k = 0; k < 4; ++k)
+            vu_t[c][r] += v[k][r] * u_t[c][k];
+        }
+
+      float s1[6];
+      float c1[6];
+      s1[0] = vu_t[0][0] * vu_t[1][1] - vu_t[1][0] * vu_t[0][1];
+      s1[1] = vu_t[0][0] * vu_t[1][2] - vu_t[1][0] * vu_t[0][2];
+      s1[2] = vu_t[0][0] * vu_t[1][3] - vu_t[1][0] * vu_t[0][3];
+      s1[3] = vu_t[0][1] * vu_t[1][2] - vu_t[1][1] * vu_t[0][2];
+      s1[4] = vu_t[0][1] * vu_t[1][3] - vu_t[1][1] * vu_t[0][3];
+      s1[5] = vu_t[0][2] * vu_t[1][3] - vu_t[1][2] * vu_t[0][3];
+
+      c1[0] = vu_t[2][0] * vu_t[3][1] - vu_t[3][0] * vu_t[2][1];
+      c1[1] = vu_t[2][0] * vu_t[3][2] - vu_t[3][0] * vu_t[2][2];
+      c1[2] = vu_t[2][0] * vu_t[3][3] - vu_t[3][0] * vu_t[2][3];
+      c1[3] = vu_t[2][1] * vu_t[3][2] - vu_t[3][1] * vu_t[2][2];
+      c1[4] = vu_t[2][1] * vu_t[3][3] - vu_t[3][1] * vu_t[2][3];
+      c1[5] = vu_t[2][2] * vu_t[3][3] - vu_t[3][2] * vu_t[2][3];
+
+      float idet = 1.0f / (s1[0] * c1[5] - s1[1] * c1[4] + s1[2] * c1[3] + s1[3] * c1[2] - s1[4] * c1[1] + s1[5] * c1[0]);
+      s_det[2][2] = idet;
+      mat4x4 vs_det;
+      for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
+        {
+          vs_det[c][r] = 0.f;
+          for (k = 0; k < 4; ++k)
+            vs_det[c][r] += v[k][r] * s_det[c][k];
+        }
+      mat4x4 rot_t;
+      for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
+        {
+          rot_t[c][r] = 0.f;
+          for (k = 0; k < 4; ++k)
+            rot_t[c][r] += vs_det[k][r] * u_t[c][k];
+        }
+
+      for (j = 0; j < 4; ++j)
+        for (i = 0; i < 4; ++i)
+          rot[i][j] = rot_t[j][i];
+      vec4 p_dash = {centroids.match_x_3d, centroids.match_y_3d, centroids.match_z_3d, 1.0};
+      vec4 rp_dash;
+      for (j = 0; j < 4; ++j)
       {
-        tmp_neigh = (int)ld_gbl_cg(&(tempMemory[i * 16 + 15]));
-        // printf("i: %d idx: %d num_neigh: %d\n", i, idx0, tmp_neigh);
-        if (tmp_neigh > max_neigh)
+        rp_dash[j] = 0.f;
+        for (i = 0; i < 4; ++i)
+          rp_dash[j] += rot[i][j] * p_dash[i];
+      }
+      vec4 t = {centroids.x_3d - rp_dash[0], centroids.y_3d - rp_dash[1], centroids.z_3d - rp_dash[2], 1.0};
+      mat4x4 check_res;
+      for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
         {
-          max_neigh = tmp_neigh;
-          max_neigh_index = (float)i;
+          check_res[c][r] = 0.f;
+          for (k = 0; k < 4; ++k)
+            check_res[c][r] += rot[k][r] * pos_old[c][k];
         }
+      mat4x4 delta_vectors;
+      delta_vectors[0][3] = 0.0;
+      delta_vectors[1][3] = 0.0;
+      delta_vectors[2][3] = 0.0;
+      delta_vectors[3][3] = 0.0;
+      delta_vectors[2][3] = 0.0;
+      delta_vectors[1][3] = 0.0;
+      delta_vectors[0][3] = 0.0;
+      delta_vectors[3][0] = 0.0;
+      delta_vectors[3][1] = 0.0;
+      delta_vectors[3][2] = 0.0;
+      for (c = 0; c < 3; ++c)
+      {
+        for (r = 0; r < 3; ++r)
+        {
+          delta_vectors[c][r] = pos_new[c][r] - check_res[c][r];
+          delta_vectors[c][3] += (pos_new[c][r] - check_res[c][r]) * (pos_new[c][r] - check_res[c][r]);
+        }
+        delta_vectors[c][3] = sqrt(delta_vectors[c][3]);
+        delta_vectors[3][3] += delta_vectors[c][3];
+      }
+      delta_vectors[3][3] /= 3;
+      float det = rot[0][0] * rot[1][1] * rot[2][2] + rot[1][0] * rot[2][1] * rot[0][2] + rot[2][0] * rot[0][1] * rot[1][2] - rot[2][0] * rot[1][1] * rot[0][2] - rot[1][0] * rot[0][1] * rot[2][2] - rot[0][0] * rot[2][1] * rot[1][2];
+
+      if ((det > 0.9) && (det < 1.1) && (rot[0][0] >= 0.50) && (delta_vectors[0][3] < 300) && (delta_vectors[1][3] < 300) && (delta_vectors[2][3] < 300) && (delta_vectors[3][3] < 500.0) && (point[idx0].conf < 100.0) && (point[idx1].conf < 100.0) && (point[idx2].conf < 100.0))
+      {
+        tempMemory[idx0 * 16 + 0] = rot[0][0];
+        tempMemory[idx0 * 16 + 1] = rot[0][1];
+        tempMemory[idx0 * 16 + 2] = rot[0][2];
+        tempMemory[idx0 * 16 + 3] = rot[1][0];
+        tempMemory[idx0 * 16 + 4] = rot[1][1];
+        tempMemory[idx0 * 16 + 5] = rot[1][2];
+        tempMemory[idx0 * 16 + 6] = rot[2][0];
+        tempMemory[idx0 * 16 + 7] = rot[2][1];
+        tempMemory[idx0 * 16 + 8] = rot[2][2];
+        tempMemory[idx0 * 16 + 9] = t[0];
+        tempMemory[idx0 * 16 + 10] = t[1];
+        tempMemory[idx0 * 16 + 11] = t[2];
+        tempMemory[idx0 * 16 + 12] = (float)idx0;
+        tempMemory[idx0 * 16 + 13] = (float)idx1;
+        tempMemory[idx0 * 16 + 14] = (float)idx2;
       }
     }
-    tempMemory[265 * 205 - 10] = max_neigh_index;
-  }
   __syncthreads();
-  int idx = (int)(int)ld_gbl_cg(&(tempMemory[265 * 205 - 10]));
-  if (idx0 == idx)
+  int num_neigh = 0;
+  if (ld_gbl_cg(&(tempMemory[idx0 * 16 + 0])) >= 0.50)
   {
+    float trace = ld_gbl_cg(&(tempMemory[idx0 * 16 + 0])) + ld_gbl_cg(&(tempMemory[idx0 * 16 + 4])) + ld_gbl_cg(&(tempMemory[idx0 * 16 + 8]));
+    float u_0 = ld_gbl_cg(&(tempMemory[idx0 * 16 + 7])) - ld_gbl_cg(&(tempMemory[idx0 * 16 + 5]));
+    float u_1 = ld_gbl_cg(&(tempMemory[idx0 * 16 + 2])) - ld_gbl_cg(&(tempMemory[idx0 * 16 + 6]));
+    float u_2 = ld_gbl_cg(&(tempMemory[idx0 * 16 + 3])) - ld_gbl_cg(&(tempMemory[idx0 * 16 + 1]));
+    float u_len = sqrt(u_0 * u_0 + u_1 * u_1 + u_2 * u_2);
+    float u_ang = asin(u_len / 2);
 
-    printf("DING DING DING!!! We have a winner! %d\n", idx0);
-    printf("Winner: \n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
-           tempMemory[idx0 * 16 + 0], tempMemory[idx0 * 16 + 1], tempMemory[idx0 * 16 + 2],  // matrix 1st row
-           tempMemory[idx0 * 16 + 3], tempMemory[idx0 * 16 + 4], tempMemory[idx0 * 16 + 5],  // matrix 2nd row
-           tempMemory[idx0 * 16 + 6], tempMemory[idx0 * 16 + 7], tempMemory[idx0 * 16 + 8]); // matrix 3rd row)
-    point[idx0].draw = true;
-    point[idx1].draw = true;
-    point[idx2].draw = true;
-  }
-  else if (tempMemory[idx0 * 16 + 0] != 0.0)
-  {
-    float trace = tempMemory[idx0 * 16 + 0] + tempMemory[idx0 * 16 + 4] + tempMemory[idx0 * 16 + 8];
-    float u_0 = tempMemory[idx0 * 16 + 7] - tempMemory[idx0 * 16 + 5];
-    float u_1 = tempMemory[idx0 * 16 + 2] - tempMemory[idx0 * 16 + 6];
-    float u_2 = tempMemory[idx0 * 16 + 3] - tempMemory[idx0 * 16 + 1];
-
-    float d_trace = tempMemory[idx * 16 + 0] + tempMemory[idx * 16 + 4] + tempMemory[idx * 16 + 8] - trace;
-    float d_u_0 = tempMemory[idx * 16 + 7] - tempMemory[idx * 16 + 5] - u_0;
-    float d_u_1 = tempMemory[idx * 16 + 2] - tempMemory[idx * 16 + 6] - u_1;
-    float d_u_2 = tempMemory[idx * 16 + 3] - tempMemory[idx * 16 + 1] - u_2;
-    if ((trace>0.2)&&(d_trace < 0.1) && (d_u_0 < 0.3) && (d_u_1 < 0.3) && (d_u_2 < 0.3)) //((dx_sq + dy_sq + dz_sq) < 8000000) &&
+    if ((trace > 2.0) && (trace < 3.0))
     {
-      printf("Drawing: %d: %f,%f,%f,%f,%f,%f,%f,%f,%f\n", idx0,
-             tempMemory[idx0 * 16 + 0], tempMemory[idx0 * 16 + 1], tempMemory[idx0 * 16 + 2],  // matrix 1st row
-             tempMemory[idx0 * 16 + 3], tempMemory[idx0 * 16 + 4], tempMemory[idx0 * 16 + 5],  // matrix 2nd row
-             tempMemory[idx0 * 16 + 6], tempMemory[idx0 * 16 + 7], tempMemory[idx0 * 16 + 8]); // matrix 3rd row
       point[idx0].draw = true;
       point[idx1].draw = true;
       point[idx2].draw = true;
-    } else {
-      printf("Not Drawing: %d: %f,%f,%f,%f,%f,%f,%f,%f,%f\n", idx0,
-             tempMemory[idx0 * 16 + 0], tempMemory[idx0 * 16 + 1], tempMemory[idx0 * 16 + 2],  // matrix 1st row
-             tempMemory[idx0 * 16 + 3], tempMemory[idx0 * 16 + 4], tempMemory[idx0 * 16 + 5],  // matrix 2nd row
-             tempMemory[idx0 * 16 + 6], tempMemory[idx0 * 16 + 7], tempMemory[idx0 * 16 + 8]); // matrix 3rd row      
+      printf("%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", trace, u_0, u_1, u_2, u_len, u_ang, point[idx0].distance, point[idx0].match_distance, point[idx1].distance, point[idx1].match_distance, point[idx2].distance, point[idx2].match_distance);
+      for (int i = 0; i < numPts; i++)
+      {
+        if (ld_gbl_cg(&(tempMemory[i * 16 + 0])) >= 0.50)
+        {
+          float pair_trace = ld_gbl_cg(&(tempMemory[i * 16 + 0])) + ld_gbl_cg(&(tempMemory[i * 16 + 4])) + ld_gbl_cg(&(tempMemory[i * 16 + 8]));
+          float pair_u_0 = ld_gbl_cg(&(tempMemory[i * 16 + 7])) - ld_gbl_cg(&(tempMemory[i * 16 + 5]));
+          float pair_u_1 = ld_gbl_cg(&(tempMemory[i * 16 + 2])) - ld_gbl_cg(&(tempMemory[i * 16 + 6]));
+          float pair_u_2 = ld_gbl_cg(&(tempMemory[i * 16 + 3])) - ld_gbl_cg(&(tempMemory[i * 16 + 1]));
+          float pair_u_len = sqrt(pair_u_0 * pair_u_0 + pair_u_1 * pair_u_1 + pair_u_2 * pair_u_2);
+          float pair_u_ang = asin(pair_u_len / 2);
+          if ((trace > 2.0) && (trace < 3.0) && (pair_trace - trace < 0.01) && (pair_trace - trace > -0.01) && (pair_u_ang - u_ang < 0.5) && (pair_u_ang - u_ang > -0.5) &&
+              (pair_u_0 - u_0 < 0.02) && (pair_u_0 - u_0 > -0.02) && (pair_u_1 - u_1 < 0.02) &&
+              (pair_u_1 - u_1 > -0.02) && (pair_u_2 - u_2 < 0.02) && (pair_u_2 - u_2 > -0.02)) //((dx_sq + dy_sq + dz_sq) < 8000000) &&
+          {
+            num_neigh++;
+          }
+        }
+      }
+    }
+    tempMemory[idx0 * 16 + 15] = (float)num_neigh;
+  }
+}
+__syncthreads();
+int tmp_neigh;
+int max_neigh = 0;
+int max_neigh_index = 0;
+if (idx0 == 0)
+{
+  for (int i = 0; i < numPts; i++)
+  {
+    if (tempMemory[i * 16 + 0] >= 0.50)
+    {
+      tmp_neigh = (int)ld_gbl_cg(&(tempMemory[i * 16 + 15]));
+      // printf("i: %d idx: %d num_neigh: %d, first element: %f\n", i, idx0, tmp_neigh, ld_gbl_cg(&(tempMemory[i * 16 + 0])));
+      if ((tmp_neigh > max_neigh))
+      {
+        max_neigh = tmp_neigh;
+        max_neigh_index = i;
+      }
     }
   }
+  point[(int)ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 12]))].draw = true;
+  point[(int)ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 13]))].draw = true;
+  point[(int)ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 14]))].draw = true;
+  tempMemory[265 * 205 - 10] = (float)max_neigh_index;
+  *rotation[0][0] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 0]));
+  *rotation[0][1] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 1]));
+  *rotation[0][2] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 2]));
+  *rotation[1][0] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 3]));
+  *rotation[1][1] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 4]));
+  *rotation[1][2] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 5]));
+  *rotation[2][0] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 6]));
+  *rotation[2][1] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 7]));
+  *rotation[2][2] = ld_gbl_cg(&(tempMemory[max_neigh_index * 16 + 8]));
+}
+//__syncthreads();
+//int idx = (int)(int)ld_gbl_cg(&(tempMemory[265 * 205 - 10]));
+//if (idx0 == idx)
+//{
+//
+//  printf("DING DING DING!!! We have a winner! %d\n", idx0);
+//  printf("Winner: \n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
+//         tempMemory[idx0 * 16 + 0], tempMemory[idx0 * 16 + 1], tempMemory[idx0 * 16 + 2],  // matrix 1st row
+//         tempMemory[idx0 * 16 + 3], tempMemory[idx0 * 16 + 4], tempMemory[idx0 * 16 + 5],  // matrix 2nd row
+//         tempMemory[idx0 * 16 + 6], tempMemory[idx0 * 16 + 7], tempMemory[idx0 * 16 + 8]); // matrix 3rd row)
+//  point[idx0].draw = true;
+//  point[idx1].draw = true;
+//  point[idx2].draw = true;
+//
+//
+//}
+}
 
-  __syncthreads();
+#define GAUSS_VARIANCE 100
+__global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old, mat4x4 *rotation, vec4 *translation, int numPts_new, int numPts_old)
+{
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= numPts_new)
+    return;
+  point_new[idx].score = 1.0f;
+  point_new[idx].match = -1;
+  point_new[idx].draw = false;
+  vec4 coords_new;
+  coords_new[0] = point_new[idx].x_3d;
+  coords_new[1] = point_new[idx].y_3d;
+  coords_new[2] = point_new[idx].z_3d;
+  coords_new[3] = 1.0f;
+  vec4 coords_est;
+  mat4x4 rot_trans;
+  int i, j;
+  for (j = 0; j < 4; ++j)
+    for (i = 0; i < 4; ++i)
+      rot_trans[i][j] = *(rotation[j][i]);
+  for (j = 0; j < 4; ++j)
+  {
+    coords_est[j] = 0.f;
+    for (i = 0; i < 4; ++i)
+      coords_est[j] += rot_trans[i][j] * coords_new[i];
+  }
+  point_new[idx].match_x_3d = coords_est[0];
+  point_new[idx].match_y_3d = coords_est[1];
+  point_new[idx].match_z_3d = coords_est[2];
+
+  point_new[idx].match_distance = coords_est[0];
+  float x_div = coords_est[1] / coords_est[0];
+  float x_tan = atan(x_div) / (WIDTH_ANGLE)*128;
+  point_new[idx].match_xpos = 128.0 - (x_tan);
+  point_new[idx].match_ypos = 102.5 - (atan(coords_est[2] / coords_est[0]) / (HEIGHT_ANGLE)*102.5);
+  point_new[idx].draw = true;
+  if (idx == 0)
+  {
+    printf("orig point: %f, %f, %f ; estimated point: %f, %f, %f\n",
+           point_new[idx].x_3d, point_new[idx].y_3d, point_new[idx].z_3d, point_new[idx].match_x_3d, point_new[idx].match_y_3d, point_new[idx].match_z_3d);
+    printf("orig img: %f, %f, %f ; estimated img: %f, %f, %f\n",
+           point_new[idx].xpos, point_new[idx].ypos, point_new[idx].distance, point_new[idx].match_xpos, point_new[idx].match_ypos, point_new[idx].match_distance);
+  }
+}
+
+__global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempMemory, mat4x4 *rotation, vec4 *translation, int numPts)
+{
+  int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
+  mat4x4 rot;
   mat4x4 h;
   vec4 cent_old;
   vec4 cent_new;
-  mat4x4 rot;
   if (idx0 == 0)
   {
     int idx;
@@ -1329,7 +1368,7 @@ __global__ void gpuFindRotationTranslation(SiftPoint *point, SiftPoint *point_ol
     //printf("centroids\n%f,%f,%f\n%f,%f,%f\n",
     //       cent_new[0], cent_new[1], cent_new[2],  // matrix 1st row
     //       cent_old[0], cent_old[1], cent_old[2]); // matrix 3rd row)
-//
+    //
     //printf("h\n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
     //       h[0][0], h[1][0], h[2][0],  // matrix 1st row
     //       h[0][1], h[1][1], h[2][1],  // matrix 2nd row
@@ -1479,8 +1518,8 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   {
     return;
   }
-  // overwrite first three with test data
-  #ifdef USE_TEST_DATA
+// overwrite first three with test data
+#ifdef USE_TEST_DATA
   if (idx == 0)
   {
     data[idx].match = idx;
@@ -1571,7 +1610,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
     return;
   }
-  #endif 
+#endif
   if ((depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] > 60000) || (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] == 0))
   {
     data[idx].distance = 0.0;
@@ -1584,9 +1623,9 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   {
     data[idx].conf = conf[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
     data[idx].distance = depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
-    data[idx].x_3d = depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];            //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].x_3d = x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];            //
+    data[idx].y_3d = y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //
+    data[idx].z_3d = z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //
   }
 }
 
@@ -4235,17 +4274,29 @@ void Computation::addDepthInfoToSift(SiftData &data, float *depthData, cudaStrea
 {
   dim3 blocks = dim3(512);
   dim3 threads = dim3(1);
-  #ifdef USE_TEST_DATA
+#ifdef USE_TEST_DATA
   data.numPts = 5;
-  #endif
+#endif
   gpuAddDepthInfoToSift<<<blocks, threads, 0, stream>>>(data.d_data, depthData, data.numPts, x, y, z, conf);
   checkMsg("Problem with gpuAddDepthInfoToSift:\n");
 }
 
-void Computation::findRotationTranslation(SiftData &data, SiftData &data_old, float *tempMemory, vec4 translation, quat rotation, cudaStream_t stream)
+void Computation::findRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, cudaStream_t stream)
 {
   dim3 blocks = dim3(512);
   dim3 threads = dim3(1);
-  gpuFindRotationTranslation<<<blocks, threads, 0, stream>>>(data.d_data, data_old.d_data, tempMemory, translation, rotation, data.numPts, data_old.numPts);
+  gpuFindRotationTranslation<<<blocks, threads, 0, stream>>>(data.d_data, tempMemory, rotation, translation, data.numPts);
   checkMsg("Problem with findRotationTranslation:\n");
+}
+
+void Computation::ransacFromFoundRotationTranslation(SiftData &data, SiftData &data_old, mat4x4 *rotation, vec4 *translation, cudaStream_t stream)
+{
+  dim3 blocks = dim3(512);
+  dim3 threads = dim3(1);
+  gpuRematchSiftPoints<<<blocks, threads, 0, stream>>>(data.d_data, data_old.d_data, rotation, translation, data.numPts, data_old.numPts);
+  checkMsg("Problem with gpuRematchSiftPoints:\n");
+}
+
+void Computation::findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 rotation, vec4 translation, cudaStream_t stream)
+{
 }

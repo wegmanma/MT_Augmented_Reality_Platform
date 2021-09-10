@@ -12,7 +12,7 @@
 #include <any>
 #include <computation.cuh>
 
-
+// #define PRINT_DATA
 
 #define FRAME_LENGTH 11 * 352 * 286 // Bytes
 #define checkMsg(msg)       __checkMsg(msg, __FILE__, __LINE__)
@@ -117,7 +117,10 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaHostAlloc((void **)&z_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped); 
     cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
     cudaHostAlloc((void **)&ampl_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);    
-    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);     
+    cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);    
+    cudaHostAlloc((void **)&temp_mem_265x205xfloat_nocache_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);  
+    cudaHostAlloc((void **)&best_translation_h, sizeof(vec4), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&best_rotation_h, sizeof(mat4x4), cudaHostAllocMapped);
 
     cudaHostGetDevicePointer((void **)&buffers_d[0] ,  (void *) buffers_h[0] , 0);
     cudaHostGetDevicePointer((void **)&buffers_d[1] , (void *) buffers_h[1], 0);
@@ -130,6 +133,10 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaHostGetDevicePointer((void **)&z_d    , (void *) z_h   , 0);    
     cudaHostGetDevicePointer((void **)&conf_d    , (void *) conf_h   , 0); 
     cudaHostGetDevicePointer((void **)&cos_alpha_map_d    , (void *) cos_alpha_map_h   , 0); 
+    cudaHostGetDevicePointer((void **)&temp_mem_265x205xfloat_nocache_d    , (void *) temp_mem_265x205xfloat_nocache_h   , 0); 
+    cudaHostGetDevicePointer((void **)&best_translation_d    , (void *) best_translation_h   , 0);
+    cudaHostGetDevicePointer((void **)&best_rotation_d    , (void *) best_rotation_h   , 0);
+
 
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[0],2*205 * 265 * sizeof(float));
     // checkMsg("Problem with cudaMalloc [0]");
@@ -141,8 +148,13 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[4],2*205 * 265 * sizeof(float));
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[5],2*205 * 265 * sizeof(float));
     // checkMsg("Problem with cudaMalloc [3]");
-    computation->InitSiftData(siftData[0], 100000,1, false, true);
-    computation->InitSiftData(siftData[1], 100000,1, false, true);
+    #ifdef PRINT_DATA
+    computation->InitSiftData(siftData[0], 512,1, true, true);
+    computation->InitSiftData(siftData[1], 512,1, true, true);
+    #else
+    computation->InitSiftData(siftData[0], 512,1, false, true);
+    computation->InitSiftData(siftData[1], 512,1, false, true);
+    #endif
     siftImage.Allocate(256,205,256,false,NULL,NULL);
     memoryTmp = computation->AllocSiftTempMemory(256, 205, 5, true);
 
@@ -304,7 +316,7 @@ void TCPFrameCapture::run()
         vec4 translation;
         quat rotation;
         float initBlur = 0.0f;
-        float thresh = 2.5f;
+        float thresh = 4.5f;
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[4],conf_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
         computation->tof_camera_undistort(siftImage.d_data,ampl_d,image_x_d,image_y_d, tcpCaptureStream);
@@ -326,14 +338,91 @@ void TCPFrameCapture::run()
         if (write_buf_id == 0)
         {
             computation->MatchSiftData(siftData[0],siftData[1], tcpCaptureStream);
-            computation->findRotationTranslation(siftData[0],siftData[1], temp_mem_265x205xfloat_0_d[5], translation, rotation, tcpCaptureStream);  
+            computation->findRotationTranslation(siftData[0], temp_mem_265x205xfloat_nocache_d, best_rotation_d, best_translation_d, tcpCaptureStream); 
+            // computation->ransacFromFoundRotationTranslation(siftData[0],siftData[1],best_rotation_d,best_translation_d,tcpCaptureStream);
+            #ifdef PRINT_DATA
+            std::cout << "x_new = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                std::cout << siftData[0].h_data[i].x_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "y_new = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                std::cout << siftData[0].h_data[i].y_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "z_new = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                std::cout << siftData[0].h_data[i].z_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "x_old = [";
+            for (int i = 0; i < siftData[1].numPts; i++) {
+                std::cout << siftData[1].h_data[i].x_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "y_old = [";
+            for (int i = 0; i < siftData[1].numPts; i++) {
+                std::cout << siftData[1].h_data[i].y_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "z_old = [";
+            for (int i = 0; i < siftData[1].numPts; i++) {
+                std::cout << siftData[1].h_data[i].z_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            
+            std::cout << "x_new_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].x_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "y_new_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].y_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "z_new_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].z_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "x_old_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].match_x_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "y_old_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].match_y_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            std::cout << "z_old_match = [";
+            for (int i = 0; i < siftData[0].numPts; i++) {
+                if (siftData[0].h_data[i].score > 0.9)
+                std::cout << siftData[0].h_data[i].match_z_3d << ",";
+            } 
+            std::cout << "]" << std::endl;
+            #endif
         }
         else
         {
             computation->MatchSiftData(siftData[1],siftData[0],tcpCaptureStream);
-            computation->findRotationTranslation(siftData[1],siftData[0], temp_mem_265x205xfloat_0_d[5], translation, rotation, tcpCaptureStream);  
+            computation->findRotationTranslation(siftData[1], temp_mem_265x205xfloat_nocache_d, best_rotation_d, best_translation_d,  tcpCaptureStream);  
+            // computation->ransacFromFoundRotationTranslation(siftData[1],siftData[0],best_rotation_d,best_translation_d,tcpCaptureStream);
         }
-        
+        std::cout << "Best matrix:" << std::endl;
+        for (int i = 0; i<3; i++) {
+            for (int j = 0; j<3; j++) {
+                std::cout << *(best_rotation_h[j][i]) << " ";
+            }
+            std::cout << std::endl;
+        }
         computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
         //computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
         // Processing finished, change buffer index.      
