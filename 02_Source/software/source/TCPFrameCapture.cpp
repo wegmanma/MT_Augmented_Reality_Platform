@@ -147,6 +147,7 @@ void TCPFrameCapture::start(Computation* computation_p)
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[3],2*205 * 265 * sizeof(float));
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[4],2*205 * 265 * sizeof(float));
     cudaMalloc((void **)&temp_mem_265x205xfloat_0_d[5],2*205 * 265 * sizeof(float));
+    cudaMalloc((void **)&index_list_d,512*512 * sizeof(bool));
     // checkMsg("Problem with cudaMalloc [3]");
     #ifdef PRINT_DATA
     computation->InitSiftData(siftData[0], 512,1, true, true);
@@ -260,6 +261,7 @@ void TCPFrameCapture::run()
     std::cout << "Start loop" << std::endl;    
     while (running)
     {
+        // std::cout << "Start of loop" << std::endl;
         startTime = std::chrono::steady_clock::now();
         //Receive a reply from the server
         size_t len = receive_all(sock, server_data, FRAME_LENGTH);
@@ -317,29 +319,34 @@ void TCPFrameCapture::run()
         quat rotation;
         float initBlur = 0.0f;
         float thresh = 4.5f;
+        // std::cout << "start undistorting" << std::endl;
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[0],radial_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[4],conf_d,image_x_d,image_y_d, tcpCaptureStream, cos_alpha_map_d);
         computation->tof_camera_undistort(siftImage.d_data,ampl_d,image_x_d,image_y_d, tcpCaptureStream);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],x_d,image_x_d,image_y_d, tcpCaptureStream);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[2],y_d,image_x_d,image_y_d, tcpCaptureStream);
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[3],z_d,image_x_d,image_y_d, tcpCaptureStream);
-        cudaStreamSynchronize(tcpCaptureStream);
+        // cudaStreamSynchronize(tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2], tcpCaptureStream);
         //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0, tcpCaptureStream);
         computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 1.0f, false, memoryTmp, NULL);
-        // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
+      // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
         computation->addDepthInfoToSift(siftData[write_buf_id],temp_mem_265x205xfloat_0_d[0],tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
-        // std::cout << "number of extracted features: " << siftData[write_buf_id].numPts << std::endl; 
-        // std::cout << "buffers_h right after filling: "<< buffers_h[write_buf_id][50*265*4+50*4+0] << std::endl;
         if (write_buf_id == 0)
         {
+            
             computation->MatchSiftData(siftData[0],siftData[1], tcpCaptureStream);
-            computation->findRotationTranslation(siftData[0], temp_mem_265x205xfloat_nocache_d, best_rotation_d, best_translation_d, tcpCaptureStream); 
-            // computation->ransacFromFoundRotationTranslation(siftData[0],siftData[1],best_rotation_d,best_translation_d,tcpCaptureStream);
+            //std::cout << "matched" << std::endl;
+            computation->findRotationTranslation_step0(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream); 
+            computation->findRotationTranslation_step1(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
+            computation->findRotationTranslation_step2(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
+            // std::cout << "rot_trans" << std::endl;
+            computation->ransacFromFoundRotationTranslation(siftData[0],siftData[1],best_rotation_d,best_translation_d,tcpCaptureStream);
+            // std::cout << "matched" << std::endl;
             #ifdef PRINT_DATA
             std::cout << "x_new = [";
             for (int i = 0; i < siftData[0].numPts; i++) {
@@ -412,19 +419,32 @@ void TCPFrameCapture::run()
         }
         else
         {
+            
             computation->MatchSiftData(siftData[1],siftData[0],tcpCaptureStream);
-            computation->findRotationTranslation(siftData[1], temp_mem_265x205xfloat_nocache_d, best_rotation_d, best_translation_d,  tcpCaptureStream);  
-            // computation->ransacFromFoundRotationTranslation(siftData[1],siftData[0],best_rotation_d,best_translation_d,tcpCaptureStream);
+            
+            computation->findRotationTranslation_step0(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d,  tcpCaptureStream);  
+            computation->findRotationTranslation_step1(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d,  tcpCaptureStream);  
+            computation->findRotationTranslation_step2(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d,  tcpCaptureStream);  
+            computation->ransacFromFoundRotationTranslation(siftData[1],siftData[0],best_rotation_d,best_translation_d,tcpCaptureStream);
         }
-        std::cout << "Best matrix:" << std::endl;
+        cudaStreamSynchronize(tcpCaptureStream);
+        // std::cout << "Best matrix:" << std::endl;
         for (int i = 0; i<3; i++) {
             for (int j = 0; j<3; j++) {
                 std::cout << *(best_rotation_h[j][i]) << " ";
             }
             std::cout << std::endl;
         }
+        // std::cout << "Translation:" << std::endl;
+        for (int i = 0; i<3; i++) {
+            std::cout << *(best_translation_h[i]) << " ";
+            std::cout << std::endl;
+        }
         computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
-        //computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
+        std::cout << "drawn" << std::endl;
+        // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
+        // cudaStreamSynchronize(tcpCaptureStream);
+        std::cout << "synchronized" << std::endl;
         // Processing finished, change buffer index.      
         if (write_buf_id == 0)
         {
@@ -439,7 +459,7 @@ void TCPFrameCapture::run()
         endTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        // std::cout << "ToF Frame by frame time: " << nseconds << "s"<<  std::endl;
+        std::cout << "ToF Frame by frame time: " << nseconds << "s"<<  std::endl;
         // while(1) {
         //     std::this_thread::sleep_for(std::chrono::microseconds(5000));
         // }

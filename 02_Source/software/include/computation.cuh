@@ -227,7 +227,11 @@ void FindHomography(SiftData &data, float *homography, int *numMatches, int numL
 
 void addDepthInfoToSift(SiftData &data, float* depthData, cudaStream_t stream, float *x, float *y, float *z, float *conf);
 
-void findRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
+void findRotationTranslation_step0(SiftData &data, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
+
+void findRotationTranslation_step1(SiftData &data, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
+
+void findRotationTranslation_step2(SiftData &data, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
 void ransacFromFoundRotationTranslation(SiftData &data, SiftData &data_old, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
