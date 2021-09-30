@@ -68,6 +68,11 @@ private:
     uint16_t * buffers_h[2];
     uint16_t * buffers_d[2];
 
+    float *ransac_dx_h;
+    float *ransac_dy_h;
+    float *ransac_dx_d;
+    float *ransac_dy_d;
+
     CudaImage siftImage;
     SiftData siftData[2];
     float *memoryTmp;

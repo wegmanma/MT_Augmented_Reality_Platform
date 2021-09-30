@@ -91,6 +91,10 @@ typedef struct {
   int match;
   float match_xpos;
   float match_ypos;
+  float ransac_xpos;
+  float ransac_ypos;
+  float ransac_score;
+  float ransac_match;
   float match_error;
   float subsampling;
   float x_3d;
@@ -189,7 +193,7 @@ void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool 
 
 float *AllocSiftTempMemory(int width, int height, int numOctaves, bool scaleUp);
 
-void ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh, float lowestScale, bool scaleUp, float *tempMemory, unsigned char * chardata);
+void ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh, float lowestScale, bool scaleUp, float *tempMemory, unsigned char * chardata, cudaStream_t stream);
 
 void MatchSiftData(SiftData &data1, SiftData &data2, cudaStream_t stream);
 
@@ -211,7 +215,11 @@ void tof_minfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
 
 void tof_meanfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
 
+void tof_medianfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
+
 void tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh, cudaStream_t stream);
+
+void scale_float_to_float(float *dst, float *src, int width, int height, cudaStream_t stream);
 
 void buffer_Float_to_uInt16x4(uint16_t *dst, float *src, int width, int height, cudaStream_t stream);
 
@@ -236,6 +244,8 @@ void findRotationTranslation_step2(SiftData &data, float *tempMemory, bool *inde
 void ransacFromFoundRotationTranslation(SiftData &data, SiftData &data_old, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
 void findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 rotation, vec4 translation, cudaStream_t stream);
+
+void ransac2d(SiftData &data, SiftData &data_old, float *tempMemory, bool *index_list, float *dx, float *dy, cudaStream_t stream);
 
 private:
 
