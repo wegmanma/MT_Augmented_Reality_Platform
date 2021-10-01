@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 150
+#define MIN_THRESH_RANSAC 32
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -993,6 +993,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
       if ((det < 1.1f) && (det > 0.9f) && (rot[0][0] > 0.6) && (rot[1][1] > 0.6) && (rot[2][2] > 0.6))
       {
         float ssd_local;
+        inliners_metric = 0.0f;
         for (int idx = 0; idx < numPts; idx++)
         {
           index_list[idx0 * 512 + idx] = false;
@@ -1000,14 +1001,17 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
           {
             vec4 temp_vec_new;
             vec4 temp_vec_old;
-            temp_vec_new[0] = point[idx].x_3d;       // - centroids.x_3d;
-            temp_vec_new[1] = point[idx].y_3d;       // - centroids.y_3d;
-            temp_vec_new[2] = point[idx].z_3d;       // - centroids.z_3d;
-            temp_vec_old[0] = point[idx].match_x_3d; // - centroids.match_x_3d;
-            temp_vec_old[1] = point[idx].match_y_3d; // - centroids.match_y_3d;
-            temp_vec_old[2] = point[idx].match_z_3d; // - centroids.match_z_3d;
-            vec4 temp_vec_old_rot;
+            temp_vec_old[0] = ld_gbl_cg(&(point[idx].match_x_3d)); // - centroids.match_x_3d;
+            temp_vec_old[1] = ld_gbl_cg(&(point[idx].match_y_3d)); // - centroids.match_y_3d;
+            temp_vec_old[2] = ld_gbl_cg(&(point[idx].match_z_3d)); // - centroids.match_z_3d;
+            temp_vec_old[3] = 1.0;
+            temp_vec_new[0] = ld_gbl_cg(&(point[idx].x_3d));       // - centroids.x_3d;
+            temp_vec_new[1] = ld_gbl_cg(&(point[idx].y_3d));       // - centroids.y_3d;
+            temp_vec_new[2] = ld_gbl_cg(&(point[idx].z_3d));       // - centroids.z_3d;
+            temp_vec_new[3] = 1.0;
 
+            vec4 temp_vec_old_rot;
+            //printf("i= %d temp vec 2: %f\n",idx,temp_vec_old[2]);
             for (j = 0; j < 4; ++j)
             {
               temp_vec_old_rot[j] = t[j];
@@ -1015,17 +1019,22 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
                 temp_vec_old_rot[j] += rot[i][j] * temp_vec_old[i];
             }
 
-            // if (idx0 == 5)
-            //   printf("temp_vec: %f->%f=%f, %f->%f=%f, %f->%f=%f\n", temp_vec_old[0], temp_vec_old_rot[0], temp_vec_new[0], temp_vec_old[1], temp_vec_old_rot[1], temp_vec_new[1], temp_vec_old[2], temp_vec_old_rot[2], temp_vec_new[2]);
+            // if (idx0 <= 5)
+            //   printf("idx0: %d, idx %d: : temp_vec: %f->%f=%f, %f->%f=%f, %f->%f=%f\n", idx0, idx, temp_vec_old[0], temp_vec_old_rot[0], temp_vec_new[0], temp_vec_old[1], temp_vec_old_rot[1], temp_vec_new[1], temp_vec_old[2], temp_vec_old_rot[2], temp_vec_new[2]);
             ssd_local = 0.0f;
             ssd_local += (temp_vec_old_rot[0] - temp_vec_new[0]) * (temp_vec_old_rot[0] - temp_vec_new[0]);
             ssd_local += (temp_vec_old_rot[1] - temp_vec_new[1]) * (temp_vec_old_rot[1] - temp_vec_new[1]);
             ssd_local += (temp_vec_old_rot[2] - temp_vec_new[2]) * (temp_vec_old_rot[2] - temp_vec_new[2]);
             if (ssd_local < MIN_THRESH_RANSAC)
             {
+              
+              printf("Inlier, idx %d: : %f->%f=%f(%f), %f->%f=%f(%f), %f->%f=%f(%f)\n", idx, temp_vec_old[0], temp_vec_old_rot[0], temp_vec_new[0], temp_vec_old_rot[0]-temp_vec_new[0], temp_vec_old[1], temp_vec_old_rot[1], temp_vec_new[1], temp_vec_old_rot[1]-temp_vec_new[1], temp_vec_old[2], temp_vec_old_rot[2], temp_vec_new[2], temp_vec_old_rot[2]-temp_vec_new[2]);
               inliners_metric += ssd_local;
               num_inliners++;
               index_list[idx0 * 512 + idx] = true;
+            } else {
+              printf("Outier, idx %d: : %f->%f=%f(%f), %f->%f=%f(%f), %f->%f=%f(%f)\n", idx, temp_vec_old[0], temp_vec_old_rot[0], temp_vec_new[0], temp_vec_old_rot[0]-temp_vec_new[0], temp_vec_old[1], temp_vec_old_rot[1], temp_vec_new[1], temp_vec_old_rot[1]-temp_vec_new[1], temp_vec_old[2], temp_vec_old_rot[2], temp_vec_new[2], temp_vec_old_rot[2]-temp_vec_new[2]);
+
             }
           }
         }
@@ -1033,15 +1042,15 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
           inliners_metric = -1.0;
         else
           inliners_metric = inliners_metric / ((float)num_inliners);
-        // printf("IDX0 = %d: num inliners = %d, metric = %f, matrix[0][0] = %f\n", idx0, num_inliners, inliners_metric, rot[0][0]);
+        printf("IDX0 = %d: num inliners = %d, metric = %f, matrix[0][0] = %f\n", idx0, num_inliners, inliners_metric, rot[0][0]);
       }
     }
   }
-  // if (idx0 == 2)
-  // printf("rot\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n",
-  //      rot[0][0], rot[1][0], rot[2][0], t[0],  // matrix 1st row
-  //      rot[0][1], rot[1][1], rot[2][1], t[1],  // matrix 2nd row
-  //      rot[0][2], rot[1][2], rot[2][2], t[2]); // matrix 3rd row)
+  if (idx0 == 2)
+  printf("rot\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n",
+       rot[0][0], rot[1][0], rot[2][0], t[0],  // matrix 1st row
+       rot[0][1], rot[1][1], rot[2][1], t[1],  // matrix 2nd row
+       rot[0][2], rot[1][2], rot[2][2], t[2]); // matrix 3rd row)
   tempMemory[6 + idx0 * 15 + 0] = rot[0][0];
   tempMemory[6 + idx0 * 15 + 1] = rot[0][1];
   tempMemory[6 + idx0 * 15 + 2] = rot[0][2];
@@ -1089,15 +1098,15 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
       }
     }
   }
-  // printf("======== BEST ONES: max_idx: %d, max_inliners %f, its matrix[0][0] %f, min_idx, %d, min_metric %f,its matrix[0][0]%f\n",
-  //       max_idx, max_inliners, tempMemory[6 + max_idx * 15 + 0], min_idx, min_metric, tempMemory[6 + min_idx * 15 + 0]);
+  printf("======== BEST ONES: max_idx: %d, max_inliners %f, its matrix[0][0] %f, min_idx, %d, min_metric %f,its matrix[0][0]%f\n",
+        max_idx, max_inliners, tempMemory[6 + max_idx * 15 + 0], min_idx, min_metric, tempMemory[6 + min_idx * 15 + 0]);
   tempMemory[0] = (float)min_idx;
   tempMemory[1] = (float)max_idx;
 }
 
 __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
-  int idx0 = (int)(tempMemory[0]); // = blockIdx.x * blockDim.x + threadIdx.x;
+  int idx0 = (int)(ld_gbl_cg(&(tempMemory[0]))); // = blockIdx.x * blockDim.x + threadIdx.x;
   vec4 t;
   mat4x4 h;
   mat4x4 rot;
@@ -1107,10 +1116,10 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   int i, j;
   int k, r, c;
 
-  // printf("rot before\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num inliners: %f, metric: %f\n",
-  //        tempMemory[6 + idx0 * 15 + 0], tempMemory[6 + idx0 * 15 + 1], tempMemory[6 + idx0 * 15 + 2], tempMemory[6 + idx0 * 15 + 9],                                                                   // matrix 1st row
-  //        tempMemory[6 + idx0 * 15 + 3], tempMemory[6 + idx0 * 15 + 4], tempMemory[6 + idx0 * 15 + 5], tempMemory[6 + idx0 * 15 + 10],                                                                  // matrix 2nd row
-  //        tempMemory[6 + idx0 * 15 + 6], tempMemory[6 + idx0 * 15 + 7], tempMemory[6 + idx0 * 15 + 8], tempMemory[6 + idx0 * 15 + 11], tempMemory[6 + idx0 * 15 + 12], tempMemory[6 + idx0 * 15 + 13]); // matrix 3rd row)
+  printf("rot before: idx %d\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num inliners: %f, metric: %f\n", idx0,
+         tempMemory[6 + idx0 * 15 + 0], tempMemory[6 + idx0 * 15 + 1], tempMemory[6 + idx0 * 15 + 2], tempMemory[6 + idx0 * 15 + 9],                                                                   // matrix 1st row
+         tempMemory[6 + idx0 * 15 + 3], tempMemory[6 + idx0 * 15 + 4], tempMemory[6 + idx0 * 15 + 5], tempMemory[6 + idx0 * 15 + 10],                                                                  // matrix 2nd row
+         tempMemory[6 + idx0 * 15 + 6], tempMemory[6 + idx0 * 15 + 7], tempMemory[6 + idx0 * 15 + 8], tempMemory[6 + idx0 * 15 + 11], tempMemory[6 + idx0 * 15 + 12], tempMemory[6 + idx0 * 15 + 13]); // matrix 3rd row)
 
   for (i = 0; i < 4; ++i)
   {
@@ -1163,7 +1172,13 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
       h[0][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_x_3d - centroids.match_x_3d);
       h[1][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_y_3d - centroids.match_y_3d);
       h[2][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_z_3d - centroids.match_z_3d);
-    }
+      // printf("idx0: %d index %d: distance: %f \n",idx0,i,sqrt((point[i].x_3d-point[i].match_x_3d)*(point[i].x_3d-point[i].match_x_3d)+
+      //                                           (point[i].y_3d-point[i].match_y_3d)*(point[i].y_3d-point[i].match_y_3d)+
+      //                                           (point[i].z_3d-point[i].match_z_3d)*(point[i].z_3d-point[i].match_z_3d)));
+      point[i].draw = true;
+    } else {
+        // point[i].draw = false;
+      }
   }
   mat4x4 u;
   mat4x4 s;
@@ -1247,10 +1262,10 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   *translation[0] = t[0];
   *translation[1] = t[1];
   *translation[2] = t[2];
-  // printf("rot after\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num_inliers = %d \n",
-  //        rot[0][0], rot[1][0], rot[2][0], t[0],                // matrix 1st row
-  //        rot[0][1], rot[1][1], rot[2][1], t[1],                // matrix 2nd row
-  //        rot[0][2], rot[1][2], rot[2][2], t[2], num_inliners); // matrix 3rd row)
+  printf("rot after\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num_inliers = %d \n",
+         rot[0][0], rot[1][0], rot[2][0], t[0],                // matrix 1st row
+         rot[0][1], rot[1][1], rot[2][1], t[1],                // matrix 2nd row
+         rot[0][2], rot[1][2], rot[2][2], t[2], num_inliners); // matrix 3rd row)
 }
 
 #define EXP_LAMBDA 2.0f
@@ -1307,8 +1322,7 @@ __global__ void gpuRansac2d(SiftPoint *point, SiftPoint *point_old, float *tempM
   }
   __syncthreads();
   int tmp_index = (int)ld_gbl_cg(&(tempMemory[512]));
-  if (idx0 == 1)
-    printf("Index %d sees value: %d!\n", idx0, tmp_index);
+
   if (idx0 == tmp_index)
   {
     float total_dx = 0.0f;
@@ -1325,7 +1339,7 @@ __global__ void gpuRansac2d(SiftPoint *point, SiftPoint *point_old, float *tempM
     }
     total_dx /= inliers_cnt;
     total_dy /= inliers_cnt;
-    printf("Index %d says hi! total inliers: %d of %d, dx: %f, dy%f\n", idx0, inliers_cnt, numPts, total_dx, total_dy);
+    // printf("Index %d says hi! total inliers: %d of %d, dx: %f, dy%f\n", idx0, inliers_cnt, numPts, total_dx, total_dy);
     tempMemory[513] = total_dx;
     tempMemory[514] = total_dy;
     *ransac_dx = total_dx;
@@ -1364,9 +1378,9 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
   point_new[idx].score = 1.0f;
   point_new[idx].match = -1;
   vec4 coords_new;
-  coords_new[0] = point_new[idx].x_3d;
-  coords_new[1] = point_new[idx].y_3d;
-  coords_new[2] = point_new[idx].z_3d;
+  coords_new[0] = point_new[idx].x_3d - *(translation[0]);
+  coords_new[1] = point_new[idx].y_3d - *(translation[1]);
+  coords_new[2] = point_new[idx].z_3d - *(translation[2]);
   coords_new[3] = 1.0f;
   vec4 coords_est;
   mat4x4 rot_trans;
@@ -1375,12 +1389,12 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     for (i = 0; i < 4; ++i)
       rot_trans[i][j] = *(rotation[j][i]);
   rot_trans[3][3] = 1.0;
-  if (idx == 0)
-    printf("Rot trans:\n %f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
-           rot_trans[0][0], rot_trans[0][1], rot_trans[0][2], rot_trans[0][3],
-           rot_trans[1][0], rot_trans[1][1], rot_trans[1][2], rot_trans[1][3],
-           rot_trans[2][0], rot_trans[2][1], rot_trans[2][2], rot_trans[2][3],
-           rot_trans[3][0], rot_trans[3][1], rot_trans[3][2], rot_trans[3][3]);
+  // if (idx == 0)
+  //   printf("Rot trans:\n %f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
+  //          rot_trans[0][0], rot_trans[0][1], rot_trans[0][2], rot_trans[0][3],
+  //          rot_trans[1][0], rot_trans[1][1], rot_trans[1][2], rot_trans[1][3],
+  //          rot_trans[2][0], rot_trans[2][1], rot_trans[2][2], rot_trans[2][3],
+  //          rot_trans[3][0], rot_trans[3][1], rot_trans[3][2], rot_trans[3][3]);
 
   for (j = 0; j < 4; ++j)
   {
@@ -1389,13 +1403,11 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     {
       coords_est[j] += rot_trans[i][j] * coords_new[i];
     }
-    if (idx == 0)
-      printf("j = %d from %f, to %f\n", j, coords_new[j], coords_est[j]);
   }
 
-  coords_est[0] = coords_est[0] + *(translation[0]);
-  coords_est[1] = coords_est[1] + *(translation[1]);
-  coords_est[2] = coords_est[2] + *(translation[2]);
+  coords_est[0] = coords_est[0];//
+  coords_est[1] = coords_est[1];//
+  coords_est[2] = coords_est[2];//
   float d_x;
   float d_y;
   float d_z;
@@ -1427,15 +1439,15 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
   // } else {
   //   point_new[idx].draw = false;
   // }
-
+  
   point_new[idx].match_distance = coords_est[0];
   float x_div = coords_est[1] / coords_est[0];
   float x_tan = atan(x_div);
-  point_new[idx].match_xpos = (-128 * (x_tan - (WIDTH_ANGLE))) / (WIDTH_ANGLE);
+  point_new[idx].ransac_xpos_3d = (-128 * (x_tan - (WIDTH_ANGLE))) / (WIDTH_ANGLE);
   float y_div = coords_est[2] / coords_est[0];
   float y_tan = atan(y_div);
-  point_new[idx].match_ypos = (-102.5 * (y_tan - (HEIGHT_ANGLE))) / (HEIGHT_ANGLE);
-  point_new[idx].draw = true;
+  point_new[idx].ransac_ypos_3d = (-102.5 * (y_tan - (HEIGHT_ANGLE))) / (HEIGHT_ANGLE);
+  // point_new[idx].draw = true;
 
   // if (idx == 0)
   // {
@@ -1738,9 +1750,9 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
         (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].match_ypos)) < height) &&
         (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].match_xpos)) < width))
     {
-
       dst[((int)(d_sift[idx].ypos)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
       dst[((int)(d_sift[idx].match_ypos)) * width * 4 + ((int)(d_sift[idx].match_xpos)) * 4 + 1] = 255 * 255;
+      dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(d_sift[idx].ransac_xpos)) * 4 + 2] = 255 * 255;
       // printf("idx = %d, ypos = %d, xpos = %d; match ypos= %d, match_xpos = %d\n", idx, (int)(d_sift[idx].ypos), (int)(d_sift[idx].xpos), (int)(d_sift[idx].match_ypos),(int)(d_sift[idx].match_xpos));
       if (d_sift[idx].ypos < d_sift[idx].match_ypos)
       {
@@ -1762,6 +1774,56 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
         for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].match_xpos; i--)
           dst[((int)(d_sift[idx].match_ypos)) * width * 4 + ((int)(i)) * 4 + 2] = 255 * 255;
       }
+    }
+    if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
+        (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos)) < height) &&
+        (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos)) < width))
+    {
+      if (d_sift[idx].ypos < d_sift[idx].ransac_ypos)
+      {
+        for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos - 1; i++)
+          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
+      }
+      else
+      {
+        for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos; i--)
+          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
+      }
+      if (d_sift[idx].xpos < d_sift[idx].ransac_xpos)
+      {
+        for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos - 1; i++)
+          dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
+      }
+      else
+      {
+        for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos; i--)
+          dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
+      }
+    }
+    if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
+    (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos_3d)) < height) &&
+    (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos_3d)) < width))
+    {
+      if (d_sift[idx].ypos < d_sift[idx].ransac_ypos_3d)
+      {
+        for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos_3d - 1; i++)
+          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
+      }
+      else
+      {
+        for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos_3d; i--)
+          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
+      }
+      if (d_sift[idx].xpos < d_sift[idx].ransac_xpos_3d)
+      {
+        for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos_3d - 1; i++)
+          dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
+      }
+      else
+      {
+        for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos_3d; i--)
+          dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
+      }
       //printf("New;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].xpos, d_sift[idx].ypos, d_sift[idx].distance, d_sift[idx].x_3d, d_sift[idx].y_3d, d_sift[idx].z_3d);
       //printf("Old;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].match_xpos, d_sift[idx].match_ypos, d_sift[idx].match_distance, d_sift[idx].match_x_3d, d_sift[idx].match_y_3d, d_sift[idx].match_z_3d);
 
@@ -1777,7 +1839,7 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
   }
 }
 
-// #define USE_TEST_DATA
+#define USE_TEST_DATA
 
 __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPoints, float *x, float *y, float *z, float *conf)
 {
@@ -1801,6 +1863,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].xpos = 102.99331315;
     data[idx].ypos = 124.96098776;
     data[idx].distance = 1192.66243651;
+    data[idx].draw = true;
     data[idx].x_3d = data[idx].distance;
     data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
@@ -1819,6 +1882,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].xpos = 127.91434393;
     data[idx].ypos = 127.31468943 * 2;
     data[idx].distance = 993.15426132;
+    data[idx].draw = true;
     data[idx].x_3d = data[idx].distance;
     data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
@@ -1837,6 +1901,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].xpos = 98.05438935;
     data[idx].ypos = 151.20425739;
     data[idx].distance = 1369.64237417;
+    data[idx].draw = true;
     data[idx].x_3d = data[idx].distance;
     data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
@@ -1855,6 +1920,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].xpos = 108.91867911;
     data[idx].ypos = 136.2342138;
     data[idx].distance = 1679.43575987;
+    data[idx].draw = true;
     data[idx].x_3d = data[idx].distance;
     data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
@@ -1873,11 +1939,13 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].xpos = 80.22861221;
     data[idx].ypos = 113.04208145;
     data[idx].distance = 1099.89691147;
+    data[idx].draw = true;
     data[idx].x_3d = data[idx].distance;
     data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
     data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
     return;
   }
+  return;
 #endif
   if ((depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] > 60000) || (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] == 0))
   {

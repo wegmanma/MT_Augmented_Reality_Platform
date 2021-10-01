@@ -95,6 +95,13 @@ typedef struct {
   float ransac_ypos;
   float ransac_score;
   float ransac_match;
+  float ransac_x_3d;
+  float ransac_y_3d;
+  float ransac_z_3d;
+  float ransac_xpos_3d;
+  float ransac_ypos_3d;
+  float ransac_score_3d;
+  float ransac_match_3d;
   float match_error;
   float subsampling;
   float x_3d;

@@ -334,26 +334,27 @@ void TCPFrameCapture::run()
         cudaStreamSynchronize(tcpCaptureStream);
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],siftImage.d_data,256,205, tcpCaptureStream);
         checkMsg("Error at cudaStreamSynchronize\n");
-        computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 0.0f, false, memoryTmp, NULL, tcpCaptureStream);
+        // computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 0.0f, false, memoryTmp, NULL, tcpCaptureStream);
         checkMsg("Error at ExtractSift\n");
         printf("extracted %d features\n", siftData[write_buf_id].numPts);
-        if (siftData[write_buf_id].numPts == 0)
-        {
-
-            continue;
-        }
+        // if (siftData[write_buf_id].numPts == 0)
+        // {
+// 
+        //     continue;
+        // }
         // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
         computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
         std::cout << "added depth" << std::endl;
+        cudaStreamSynchronize(tcpCaptureStream);
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
         if (write_buf_id == 0)
         {
 
-            computation->MatchSiftData(siftData[0], siftData[1], tcpCaptureStream);
+            // computation->MatchSiftData(siftData[0], siftData[1], tcpCaptureStream);
             std::cout << "matched" << std::endl;
             computation->ransac2d(siftData[0], siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, ransac_dx_d, ransac_dy_d, tcpCaptureStream);
             std::cout << sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) << std::endl;
-            if (sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)
+            if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(1))
             {
                 computation->findRotationTranslation_step0(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
                 computation->findRotationTranslation_step1(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
@@ -373,10 +374,10 @@ void TCPFrameCapture::run()
         else
         {
 
-            computation->MatchSiftData(siftData[1], siftData[0], tcpCaptureStream);
+            // computation->MatchSiftData(siftData[1], siftData[0], tcpCaptureStream);
             computation->ransac2d(siftData[1], siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, ransac_dx_d, ransac_dy_d, tcpCaptureStream);
             std::cout << sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) << std::endl;
-            if (sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)
+            if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(1))
             {
                 computation->findRotationTranslation_step0(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
                 computation->findRotationTranslation_step1(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
@@ -396,18 +397,18 @@ void TCPFrameCapture::run()
             computation->ransacFromFoundRotationTranslation(siftData[1], siftData[0], best_rotation_d, best_translation_d, tcpCaptureStream);
         }
         cudaStreamSynchronize(tcpCaptureStream);
-         std::cout << "Best matrix:" << std::endl;
-        for (int i = 0; i<3; i++) {
-            for (int j = 0; j<3; j++) {
-                std::cout << *(best_rotation_h[j][i]) << " ";
-            }
-            std::cout << std::endl;
-        }
-         std::cout << "Translation:" << std::endl;
-        for (int i = 0; i<3; i++) {
-            std::cout << *(best_translation_h[i]) << " ";
-            std::cout << std::endl;
-        }
+        // std::cout << "Best matrix:" << std::endl;
+        //for (int i = 0; i<3; i++) {
+        //    for (int j = 0; j<3; j++) {
+        //        std::cout << *(best_rotation_h[j][i]) << " ";
+        //    }
+        //    std::cout << std::endl;
+        // }
+        //  std::cout << "Translation:" << std::endl;
+        // for (int i = 0; i<3; i++) {
+        //     std::cout << *(best_translation_h[i]) << " ";
+        //     std::cout << std::endl;
+        // }
         if (min_diag > *(best_rotation_h[0][0]))
             min_diag = *(best_rotation_h[0][0]);
         if (min_diag > *(best_rotation_h[1][1]))
@@ -439,8 +440,8 @@ void TCPFrameCapture::run()
             // if (frame_count == 1000) exit(0);
         }
         frame_count++;
-        // computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
-        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
+        computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
+        // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
         // cudaStreamSynchronize(tcpCaptureStream);
         // Processing finished, change buffer index.
         if (write_buf_id == 0)
