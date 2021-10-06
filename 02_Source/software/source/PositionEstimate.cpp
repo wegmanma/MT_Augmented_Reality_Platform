@@ -130,7 +130,6 @@ bool vec3_check_around_zero(vec3 val, float tresh)
 PositionEstimate::PositionEstimate()
 {
     bmi160 = new BMI160(2, 0x69);
-
     tid = std::thread(&PositionEstimate::thrBMI160, this);
     sched_param sch;
     int policy;
@@ -190,71 +189,6 @@ void PositionEstimate::thrBMI160()
     vec4 accel_m_per_sq_s{};
     accel_m_per_sq_s[3] = 1.0f;
 
-    // debug
-
-    // double cal_value_rotation[3]{};
-    // double cal_value_translation[3]{};
-    // std::ofstream myfile;
-    // myfile.open ("data.txt");
-
-    // vec3 showValue{};
-
-    // std::cout << "Calculating values..." << std::endl;
-    //  for (int n = 0;n<OFFSET_MEAS_TIME;n++) {
-    //      rslt = bmi160->getAccelGyroData(accelGyro);
-    //      std::cout << n << "\t\t";
-    //      myfile << n << ";";
-    //      for (i = 0; i < 3; i++)
-    //      {
-    //          cal_value_rotation[i] += (double)accelGyro[i];
-    //          // std::cout << (double)accelGyro[i] << ";";
-    //          myfile << (double)accelGyro[i] << ";";
-    //      }
-    //      for (i = 3; i < 6; i++)
-    //      {
-    //          cal_value_translation[i-3] += (double)accelGyro[i];
-    //          showValue[i-3] *= 0.9;
-    //          showValue[i-3] += 0.1*accelGyro[i];
-    //          std::cout << showValue[i-3] << "    \t";
-    //          myfile << (double)accelGyro[i] << ";";
-    //      }
-    //      std::cout << std::endl;
-    //      myfile << std::endl;
-    //  }
-
-    //  myfile.close();
-    //  std::cout << "Cal values" << std::endl;
-    //  for (i = 0; i < 3; i++)
-    //  {
-    //      // kill offset for gyro
-    //      cal_value_rotation[i] /= OFFSET_MEAS_TIME;
-    //      cal_value_translation[i] /= OFFSET_MEAS_TIME;
-    //      printf("%d: Rotation: %f, Translation: %f\n",i, cal_value_rotation[i],cal_value_translation[i]);
-
-    //  }
-    // return;
-    #ifdef SAVE_DATA
-    std::ofstream myfile;
-    myfile.open("data.csv");
-    myfile << "time_passed"
-           << ";";
-    for (int i = 0; i < 3; i++)
-        myfile << "accel_m_per_sq_s[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "gyro_rad_per_s[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "measured_orientation[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "delta_vector_abc[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "delta_vector_xyz[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "velocity_xyz[" << i << "];";
-    for (int i = 0; i < 3; i++)
-        myfile << "position_xyz[" << i << "];";
-    myfile << "nseconds" << std::endl;
-    myfile.close();
-    #endif
 
     zero_rotation_abc[0] = CAL_GYRO_X;
     zero_rotation_abc[1] = CAL_GYRO_Y;
@@ -263,15 +197,12 @@ void PositionEstimate::thrBMI160()
     zero_translation_abc[1] = CAL_ACC_Y;
     zero_translation_abc[2] = CAL_ACC_Z;
 
-    float vec_len{};
-
+    
     bmi160->getAccelGyroData(accelGyro);
     for (int i = 0; i < 9; i++)
     {
         accelGyroLast[i] = accelGyro[i];
     }
-
-    vec_len = 0.0f;
     for (int i = 0; i < 3; i++)
     {
         gyro_rad_per_s[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
@@ -294,12 +225,15 @@ void PositionEstimate::thrBMI160()
     else
         accel_m_per_sq_s[2] *= FLIP_FRONT_CORR; // z_pos
     // Calculate vector length
+
+    float vec_len{};
+    vec_len = 0.0f;
     for (int i = 0; i < 3; i++)
     {
         vec_len += accel_m_per_sq_s[i] * accel_m_per_sq_s[i];
     }
     vec_len = sqrt(vec_len);
-
+    // normalized up-direction at start
     for (int i = 0; i < 3; i++)
     {
         initial_orientation[i] = accel_m_per_sq_s[i] / vec_len;
@@ -308,24 +242,6 @@ void PositionEstimate::thrBMI160()
     int file = bmi160->I2CGetDataOpenDevice();
     double time_passed = 0.0;
 
-    double KG = 0.0;
-    double Eest = 1.0;
-    double Emeat = 1.0;
-    double Emeap = 1.0;
-    double ESTt = 0.0;
-    double ESTp = 0.0;
-
-    // vec4 x = {0, 0, 0, 0};
-    // mat4x4 P = {{0.04, 0, 0, 0}, {0, 0.04, 0, 0}, {0, 0, 0.04, 0}, {0, 0, 0, 0.04}};
-    // vec4 H = {1, 0, 0, 0};
-    // mat4x4 R = {{0.04, 0, 0, 0}, {0, 0.04, 0, 0}, {0, 0, 0.04, 0}, {0, 0, 0, 0.04}};
-    // mat4x4 F = {{1, nseconds, 1 / 2 * nseconds * nseconds, 1 / 6 * nseconds * nseconds * nseconds}, {0, 1, nseconds, 1 / 2 * nseconds * nseconds}, {0, 0, 1, nseconds}, {0, 0, 0, 1}};
-
-    double velocity_raw = 0.0;
-    double velocity_corrected = 0.0;
-
-    double position_raw = 0.0;
-    double position_corrected = 0.0;
     while (1)
     {
 
@@ -339,25 +255,19 @@ void PositionEstimate::thrBMI160()
             nseconds = (double)(accelGyro[6] - accelGyroLast[6] + 65536) * SENS_TIME_RESOLUTION;
         else
             nseconds = (double)(accelGyro[6] - accelGyroLast[6]) * SENS_TIME_RESOLUTION;
-
-        // std::cout << nseconds;
+        std::cout << "nseconds: " << nseconds << std::endl;
         if (GyroDataEqual(accelGyro, accelGyroLast))
         {
-            // std::cout << " continue" << std::endl;
             continue;
         }
         time_passed += nseconds;
-        // std::cout << std::endl;
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
-        //std::cout << "gyro raw values: ( ";
         for (int i = 0; i < 3; i++)
         {
-            //std::cout << accelGyro[i] << ", ";
             gyro_rad_per_s[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
             accel_m_per_sq_s[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
         }
-        // std::cout << ")" << std::endl;
 
         // gain correction
         if (accel_m_per_sq_s[0] <= 0)
@@ -374,19 +284,6 @@ void PositionEstimate::thrBMI160()
             accel_m_per_sq_s[2] *= FACE_DOWN_CORR; // z_neg
         else
             accel_m_per_sq_s[2] *= FACE_UP_CORR; // z_pos
-        // calibrated and noisy measurement ready
-        Emeat = 0.04;
-        Emeap = 0.04;
-        KG = Eest / (Eest + Emeat);
-        ESTt = ESTp + KG * (accel_m_per_sq_s[0] - ESTp);
-        Eest = (Emeat * Emeap) / (Emeat + Emeap);
-        ESTp = ESTt;
-        velocity_raw += accel_m_per_sq_s[0] * nseconds;
-        velocity_corrected += ESTt * nseconds;
-        position_raw += velocity_raw * nseconds;
-        position_corrected += velocity_corrected * nseconds;
-
-
 
         // Calculate vector length
         for (int i = 0; i < 3; i++)
@@ -453,7 +350,7 @@ void PositionEstimate::thrBMI160()
 
         if ((vec_len >= 9.77) && (vec_len <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH))
         {
-            // std::cout << "Stable: \U00002705 (no motion)" << std::endl;
+            std::cout << "Stable: \U00002705 (no motion)" << std::endl;
             for (int i = 0; i < 3; i++)
             {
                 delta_vector_xyz_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_vector_xyz_moving[i] + ACC_FILTER_DEPTH * delta_vector_xyz[i];
@@ -470,7 +367,7 @@ void PositionEstimate::thrBMI160()
         }
         else
         {
-            // std::cout << "Stable: \U0000274C (motion detected)" << std::endl;
+            std::cout << "Stable: \U0000274C (motion detected)" << std::endl;
             for (int i = 0; i < 3; i++)
             {
                 // delta_vector_xyz_moving[i] = (1-ACC_FILTER_DEPTH)*delta_vector_xyz_moving[i]+0.0;

@@ -52,7 +52,7 @@ public:
     MainCamera mainCamera{};
     ProjectedSurface projectedSurface{};
 
-    TCPFrameCapture tcpCapture{};
+    TCPFrameCapture* tcpCapture{};
 
     CudaCapture cudaCapture{};
 

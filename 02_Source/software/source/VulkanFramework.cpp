@@ -20,6 +20,7 @@
 #include <tuple>
 
  // Project Includes
+#include "linmath.h"
 #include "VulkanFramework.hpp"
 #include "computation.cuh"
 #include "VulkanHelper.hpp"
@@ -109,10 +110,10 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 void VulkanFramework::initVulkan() {
     computation = new Computation{};
     computation->initCuda();
-    positionEstimate = new PositionEstimate();
     
-    tcpCapture.start(computation);
-    
+    tcpCapture = new TCPFrameCapture;
+    tcpCapture->start(computation);
+    positionEstimate = new PositionEstimate();  
     // cudaCapture.start(computation);
     createInstance();
     
@@ -624,12 +625,12 @@ void VulkanFramework::createCommandBuffers() {
        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mainCamera.indices.size()), 1, 0, 0, 0);   
 
 
-       // VkBuffer vertexBufferProjected[] = { projectedSurface.vertexBuffer };
-       // vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
-       // vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
-       // vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-       // vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
-       // vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
+       VkBuffer vertexBufferProjected[] = { projectedSurface.vertexBuffer };
+       vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.graphicsPipeline);
+       vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBufferProjected, offsets);
+       vkCmdBindIndexBuffer(commandBuffers[i], projectedSurface.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+       vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, projectedSurface.pipelineLayout, 0, 1, &projectedSurface.descriptorSets[i], 0, nullptr);
+       vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(projectedSurface.indices.size()), 1, 0, 0, 0);        
 
 
         vkCmdEndRenderPass(commandBuffers[i]);
@@ -805,8 +806,9 @@ void VulkanFramework::createTextureImage() {
     texWidth = 256;
     texHeight = 205;    
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
-    int mtx = tcpCapture.lockMutex();
-    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame(mtx));
+    int mtx = tcpCapture->lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
+
     // memset(pixels,0,imageSize);
     // for (int i = 0; i<352*286; i++) {
     //     pixels[8*i+0] = 0;
@@ -828,7 +830,7 @@ void VulkanFramework::createTextureImage() {
 
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
-    tcpCapture.unlockMutex(mtx);
+    tcpCapture->unlockMutex(mtx);
     vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mainImage, mainImageMemory);
     
     vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
@@ -893,8 +895,14 @@ void VulkanFramework::updateTextureImage() {
     texWidth = 256;
     texHeight = 205;    
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
-    int mtx = tcpCapture.lockMutex();
-    pixels = (unsigned char*)((void*)tcpCapture.getToFFrame(mtx));
+    int mtx = tcpCapture->lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
+
+    mat4x4 rotation;
+    vec4 translation;
+    bool newdata;
+    newdata = tcpCapture->getRotationTranslation(mtx,rotation,translation);
+    std::cout << "in VulkanFramework.cpp, Matrix[0][0]: " << rotation[0][0] << " and translation[0]: " << translation[0] << "newdata? " << newdata << std::endl;
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
@@ -903,7 +911,7 @@ void VulkanFramework::updateTextureImage() {
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
-    tcpCapture.unlockMutex(mtx);
+    tcpCapture->unlockMutex(mtx);
     
     vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
     vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);

@@ -4,6 +4,8 @@
 #include <thread>
 #include "linmath.h"
 
+// #include "TCPFrameCapture.hpp"
+
 class PositionEstimate  {
 
 public:
@@ -16,6 +18,7 @@ void get_gyro_matrix(mat4x4 gyro_matrix);
 private:
 
     BMI160 *bmi160;
+    // TCPFrameCapture *tcpCapture_i;
 
     void thrBMI160();
 

@@ -18,6 +18,8 @@ public:
 
     uint16_t* getToFFrame(int buffer);
 
+    bool getRotationTranslation(int buffer, mat4x4 rotation, vec4 translation);
+
     int lockMutex();
 
     void unlockMutex(int mtx_nr);
@@ -51,7 +53,12 @@ private:
     vec4 *best_translation_d;
     vec4 *best_translation_h;
     vec4 *opt_translation_d;
-    vec4 *opt_translation_h;    
+    vec4 *opt_translation_h;  
+
+    mat4x4 rotation_buf[2]; // for interface to PositionEstimate
+    vec4 translation_buf[2]; // for interface to PositionEstimate
+
+    bool newdata;
 
     uint16_t *ampl_h;
     uint16_t *conf_h;
