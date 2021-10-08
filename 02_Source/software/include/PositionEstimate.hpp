@@ -3,14 +3,13 @@
 #include <mutex>
 #include <thread>
 #include "linmath.h"
-
-// #include "TCPFrameCapture.hpp"
+#include "TCPFrameCapture.hpp"
 
 class PositionEstimate  {
 
 public:
 
-PositionEstimate();
+PositionEstimate(TCPFrameCapture *tcpCapture_p);
 ~PositionEstimate();
 
 void get_gyro_matrix(mat4x4 gyro_matrix);
@@ -18,11 +17,27 @@ void get_gyro_matrix(mat4x4 gyro_matrix);
 private:
 
     BMI160 *bmi160;
-    // TCPFrameCapture *tcpCapture_i;
+    TCPFrameCapture *tcpCapture;
 
     void thrBMI160();
 
     std::mutex mtx;
+
+    vec3 gyro_rad_per_s{};
+    vec4 accel_m_per_sq_s{};
+    float vec_len{};
+
+    int16_t accelGyro[9] = {0};
+    int16_t accelGyroLast[9] = {0};
+    uint32_t time, time_last;
+    double nseconds;
+    int meas_cnt;
+
+    // rotation quaternions
+    quat quat_integrated{}; // q(t), q_0 = (1,0,0,0)
+    quat quat_gyro{};       // instantaneous rotation measured by gyro
+    quat quat_correction{}; // correction rotation by accelerometer ("up direction")
+
 
     // orientation quaternions
     quat initial_orientation{}; // (a,b,c) measured at start (up direction)

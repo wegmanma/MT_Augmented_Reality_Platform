@@ -113,7 +113,7 @@ void VulkanFramework::initVulkan() {
     
     tcpCapture = new TCPFrameCapture;
     tcpCapture->start(computation);
-    positionEstimate = new PositionEstimate();  
+    positionEstimate = new PositionEstimate(tcpCapture);  
     // cudaCapture.start(computation);
     createInstance();
     
@@ -898,11 +898,6 @@ void VulkanFramework::updateTextureImage() {
     int mtx = tcpCapture->lockMutex();
     pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
 
-    mat4x4 rotation;
-    vec4 translation;
-    bool newdata;
-    newdata = tcpCapture->getRotationTranslation(mtx,rotation,translation);
-    std::cout << "in VulkanFramework.cpp, Matrix[0][0]: " << rotation[0][0] << " and translation[0]: " << translation[0] << "newdata? " << newdata << std::endl;
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");

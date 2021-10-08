@@ -53,7 +53,7 @@ bin/VulkanHelper.o: source/VulkanHelper.cpp include/VulkanHelper.hpp
 	g++  -c $(CFLAGS) -c -I$(INCLUDE) -o bin/VulkanHelper.o source/VulkanHelper.cpp $(LDFLAGS)
 bin/ProjectedSurface.o: source/ProjectedSurface.cpp include/ProjectedSurface.hpp
 	@ mkdir -p bin
-	g++ -c -I../../common/inc $(CFLAGS) -c -I$(INCLUDE) -o bin/ProjectedSurface.o source/ProjectedSurface.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2) -I$(INCLUDE) -o bin/ProjectedSurface.o source/ProjectedSurface.cpp $(LDFLAGS)
 bin/MainCamera.o: source/MainCamera.cpp include/MainCamera.hpp
 	@ mkdir -p bin
 	g++ -c -I../../common/inc $(CFLAGS) -c -I$(INCLUDE) -o bin/MainCamera.o source/MainCamera.cpp $(LDFLAGS)
@@ -62,10 +62,10 @@ bin/CudaCapture.o: source/CudaCapture.cpp include/CudaCapture.hpp
 	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE) -I$(INCLUDE) -o bin/CudaCapture.o source/CudaCapture.cpp $(LDFLAGS)
 bin/TCPFrameCapture.o: source/TCPFrameCapture.cpp include/TCPFrameCapture.hpp
 	@ mkdir -p bin
-	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE) -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c  -I$(NVINCLUDE)  -I$(NVINCLUDE2) -I$(INCLUDE) -o bin/TCPFrameCapture.o source/TCPFrameCapture.cpp $(LDFLAGS)
 bin/PositionEstimate.o: source/PositionEstimate.cpp include/PositionEstimate.hpp
 	@ mkdir -p bin
-	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2) -o bin/PositionEstimate.o source/PositionEstimate.cpp $(LDFLAGS)
+	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2) -I$(INCLUDE) -o bin/PositionEstimate.o source/PositionEstimate.cpp $(LDFLAGS)
 bin/computation.o: source/computation.cu include/computation.cuh
 	@ mkdir -p bin
 	nvcc  $(NVFLAGS) -c -I$(NVINCLUDE) -I$(NVINCLUDE2)  -o bin/computation.o source/computation.cu
