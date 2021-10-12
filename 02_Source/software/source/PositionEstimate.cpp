@@ -21,19 +21,19 @@
 #define SENS_TIME_RESOLUTION 0.000039
 
 #define OFFSET_MEAS_TIME 1000
-#define CAL_GYRO_X 2.381310
-#define CAL_GYRO_Y -2.783860
-#define CAL_GYRO_Z 6.784730
-#define CAL_ACC_X -153.7980625 // -65.8768
-#define CAL_ACC_Y -105.7320625 // -90.7988
-#define CAL_ACC_Z 30.81325     // 41.24667
+#define CAL_GYRO_X  0.0 //2.381310
+#define CAL_GYRO_Y  0.0 //-2.783860
+#define CAL_GYRO_Z  0.0 //6.784730
+#define CAL_ACC_X   0.0 //-153.7980625 // -65.8768
+#define CAL_ACC_Y   0.0 //-105.7320625 // -90.7988
+#define CAL_ACC_Z   0.0 //30.81325     // 41.24667
 // orientational corrections
-#define FACE_UP_CORR 0.9821081568    //0.00163
-#define FACE_DOWN_CORR 0.9966960825  //0.018828
-#define FLIP_LEFT_CORR 0.9882184034  //0.011186
-#define FLIP_RIGHT_CORR 0.9936513847 //0.006859
-#define FLIP_FRONT_CORR 0.9944487206 //0.001764
-#define FLIP_BACK_CORR 1.0004113867  //-0.006346
+#define FACE_UP_CORR    1.0 //0.9821081568    //0.00163
+#define FACE_DOWN_CORR  1.0 //0.9966960825  //0.018828
+#define FLIP_LEFT_CORR  1.0 //0.9882184034  //0.011186
+#define FLIP_RIGHT_CORR 1.0 //0.9936513847 //0.006859
+#define FLIP_FRONT_CORR 1.0 //0.9944487206 //0.001764
+#define FLIP_BACK_CORR  1.0 //1.0004113867  //-0.006346
 
 bool GyroDataEqual(int16_t *old_data, int16_t *new_data)
 {
@@ -161,26 +161,28 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
         mtx.lock();
         vec4 accel_m_per_sq_s_i;
         meas_cnt_i = meas_cnt;
-        accel_m_per_sq_s_i[0] = accel_m_per_sq_s[0] / meas_cnt;
-        accel_m_per_sq_s_i[1] = accel_m_per_sq_s[1] / meas_cnt;
-        accel_m_per_sq_s_i[2] = accel_m_per_sq_s[2] / meas_cnt;
-        accel_m_per_sq_s_i[3] = accel_m_per_sq_s[3] / meas_cnt;
+        accel_m_per_sq_s_i[0] = accel_m_per_sq_s[0] / (meas_cnt);
+        accel_m_per_sq_s_i[1] = accel_m_per_sq_s[1] / (meas_cnt);
+        accel_m_per_sq_s_i[2] = accel_m_per_sq_s[2] / (meas_cnt);
+        accel_m_per_sq_s_i[3] = accel_m_per_sq_s[3] / (meas_cnt);
         double nseconds_i = nseconds;
         vec3 gyro_rad_per_s_i;
         double theta;
-        gyro_rad_per_s_i[0] = gyro_rad_per_s[0] / meas_cnt;
-        gyro_rad_per_s_i[1] = gyro_rad_per_s[1] / meas_cnt;
-        gyro_rad_per_s_i[2] = gyro_rad_per_s[2] / meas_cnt;
+        gyro_rad_per_s_i[0] = gyro_rad_per_s[0] / (meas_cnt);
+        gyro_rad_per_s_i[1] = gyro_rad_per_s[1] / (meas_cnt);
+        gyro_rad_per_s_i[2] = gyro_rad_per_s[2] / (meas_cnt);
         accel_m_per_sq_s[0] = 0.0f;
         accel_m_per_sq_s[1] = 0.0f;
         accel_m_per_sq_s[2] = 0.0f;
-        accel_m_per_sq_s[3] = 1.0f;
+        accel_m_per_sq_s[3] = 0.0f;
         gyro_rad_per_s[0] = 0.0f;
         gyro_rad_per_s[1] = 0.0f;
         gyro_rad_per_s[2] = 0.0f;
         meas_cnt = 0;
         nseconds = 0.0f;
         mtx.unlock();
+        std::cout << gyro_rad_per_s_i[0] << ";" << gyro_rad_per_s_i[1] << ";" << gyro_rad_per_s_i[2];
+        std::cout << ";" << accel_m_per_sq_s_i[0] << ";" << accel_m_per_sq_s_i[1] << ";" << accel_m_per_sq_s_i[2] << ";" << accel_m_per_sq_s_i[3] << std::endl;
         if (meas_cnt_i > 0)
         {
             // Calculate vector length
@@ -189,6 +191,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 vec_len += accel_m_per_sq_s_i[i] * accel_m_per_sq_s_i[i];
             }
             vec_len = sqrt(vec_len);
+            std::cout << "vec_len = " << vec_len << std::endl;
             float inv_omega_len;
             // get rotation quaternion from gyro data
             inv_omega_len = Q_rsqrt((float)(gyro_rad_per_s_i[0] * gyro_rad_per_s_i[0] + gyro_rad_per_s_i[1] * gyro_rad_per_s_i[1] + gyro_rad_per_s_i[2] * gyro_rad_per_s_i[2]));
@@ -263,6 +266,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             else
             {
                 std::cout << "Stable: \U0000274C (motion detected)" << std::endl;
+                // print_quat("quat integrated", quat_integrated);
                 for (int i = 0; i < 3; i++)
                 {
                     // delta_vector_xyz_moving[i] = (1-ACC_FILTER_DEPTH)*delta_vector_xyz_moving[i]+0.0;
@@ -404,6 +408,7 @@ void PositionEstimate::thrBMI160()
             gyro_i[i] = ((accelGyro[i] - zero_rotation_abc[i]) * GYRO_RESOLUTION) / 180.0 * pi;
             accel_i[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
         }
+        accel_i[3] = 1.0;
 
         // gain correction
         if (accel_i[0] <= 0)
