@@ -3463,10 +3463,10 @@ inline void __checkMsg(const char *errorMessage, const char *file, const int lin
 inline void __checkMsgNoFail(const char *errorMessage, const char *file, const int line)
 {
   cudaError_t err = cudaGetLastError();
-  if (cudaSuccess != err)
-  {
-    fprintf(stderr, "checkMsg() CUDA warning: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
-  }
+  // if (cudaSuccess != err)
+  // {
+  //   fprintf(stderr, "checkMsg() CUDA warning: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
+  // }
 }
 
 void Computation::initCuda()
@@ -4706,7 +4706,7 @@ int8_t Computation::gpuConvertBayer10toRGB(uint16_t *src, uint16_t *dst, const i
   unsigned int flags;
 
   size_t planeSize = width * height * sizeof(unsigned char);
-  checkMsg("Problem before cudaHostGetFlags:\n");
+  // checkMsg("Problem before cudaHostGetFlags:\n");
   bool srcIsMapped = (cudaHostGetFlags(&flags, (void *)src) == cudaSuccess) && (flags & cudaHostAllocMapped);
 
   checkMsgNoFail("Problem with cudaHostGetFlags:\n");
