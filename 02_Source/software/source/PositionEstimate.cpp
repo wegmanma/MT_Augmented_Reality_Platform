@@ -43,24 +43,6 @@ bool GyroDataEqual(int16_t *old_data, int16_t *new_data)
     return true;
 }
 
-void print_quat(std::string name, quat e)
-{
-    std::cout << std::fixed << std::setprecision(5);
-    std::cout << std::setw(20) << name << " = (" << std::setw(8) << e[3] << " | " << std::setw(8) << e[0] << ", " << std::setw(8) << e[1] << ", " << std::setw(8) << e[2] << ")" << std::endl;
-    std::cout << std::defaultfloat << std::setprecision(6);
-}
-
-void print_mat4x4(std::string name, mat4x4 m)
-{
-    std::cout << std::fixed << std::setprecision(5);
-    std::cout << std::setw(26) << "┌" << std::setw(39) << "┐" << std::endl;
-    std::cout << std::setw(26) << "│" << std::setw(8) << m[0][0] << " " << std::setw(8) << m[0][1] << " " << std::setw(8) << m[0][2] << " " << std::setw(8) << m[0][3] << " │" << std::endl;
-    std::cout << std::setw(20) << name << " = │" << std::setw(8) << m[1][0] << " " << std::setw(8) << m[1][1] << " " << std::setw(8) << m[1][2] << " " << std::setw(8) << m[1][3] << " │" << std::endl;
-    std::cout << std::setw(26) << "│" << std::setw(8) << m[2][0] << " " << std::setw(8) << m[2][1] << " " << std::setw(8) << m[2][2] << " " << std::setw(8) << m[2][3] << " │" << std::endl;
-    std::cout << std::setw(26) << "│" << std::setw(8) << m[3][0] << " " << std::setw(8) << m[3][1] << " " << std::setw(8) << m[3][2] << " " << std::setw(8) << m[3][3] << " │" << std::endl;
-    std::cout << std::setw(26) << "└" << std::setw(39) << "┘" << std::endl;
-    std::cout << std::defaultfloat << std::setprecision(6);
-}
 
 void quat_rotate(quat result, quat rotation, quat vector)
 {
@@ -163,6 +145,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
 {
     mat4x4 ToFrotation;
     vec4 ToFtranslation;
+    quat ToFQuaterion;
     bool newdata;
     int ToFmtx = tcpCapture->lockMutex();
     newdata = tcpCapture->getRotationTranslation(ToFmtx, ToFrotation, ToFtranslation);
@@ -196,6 +179,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
         mtx.unlock();
         // std::cout << meas_cnt_i << ";" << nseconds_i << ";" <<gyro_rad_per_s_i[0] << ";" << gyro_rad_per_s_i[1] << ";" << gyro_rad_per_s_i[2];
         // std::cout << ";" << accel_m_per_sq_s_i[0] << ";" << accel_m_per_sq_s_i[1] << ";" << accel_m_per_sq_s_i[2] << ";" << accel_m_per_sq_s_i[3] << std::endl;
+
         if (meas_cnt_i > 0)
         {
             // Calculate vector length
@@ -216,6 +200,22 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             {
                 quat_identity(quat_gyro);
             }
+    
+    quat_from_mat4x4(ToFQuaterion,ToFrotation);
+
+    if (ToFrotation[0][0]> 0.75) {
+            quat temp;
+    quat_mul(temp,quat_tof_integrated,ToFQuaterion);
+    quat_tof_integrated[0] = temp[0];
+    quat_tof_integrated[1] = temp[1];
+    quat_tof_integrated[2] = temp[2];
+    quat_tof_integrated[3] = temp[3];
+    }
+    // print_quat("quat_tof_integrated",quat_tof_integrated);
+    // print_quat("quat_integrated",quat_integrated);
+    // print_mat4x4("ToFrotation",ToFrotation);
+    print_quat("ToFQuaterion",ToFQuaterion, true, true);
+    print_quat("quat_gyro",quat_gyro, true);
             // update rotation quaternion
             {
                 quat temp{};
@@ -317,8 +317,10 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
         }
     }
-    print_mat4x4("ToFrotation", ToFrotation);
-    print_mat4x4("quat_matrix",quat_matrix);
+    //print_mat4x4("ToFrotation", ToFrotation);
+    //print_mat4x4("quat_matrix",quat_matrix);
+
+
     mat4x4_dup(gyro_matrix, quat_matrix);
 }
 
@@ -343,6 +345,11 @@ void PositionEstimate::thrBMI160()
     //Quaternion Calculation Variables
 
     // general positioning calculation
+
+    quat_tof_integrated[0] = 0.0f;
+    quat_tof_integrated[1] = 0.0f;
+    quat_tof_integrated[2] = 0.0f;
+    quat_tof_integrated[3] = 1.0f;
 
     accel_m_per_sq_s[3] = 1.0f;
 

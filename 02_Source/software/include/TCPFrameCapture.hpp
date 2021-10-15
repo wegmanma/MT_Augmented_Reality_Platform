@@ -45,6 +45,7 @@ private:
     float *temp_mem_265x205xfloat_nocache_h;
     float *temp_mem_265x205xfloat_nocache_d;
     bool *index_list_d;
+    mat4x4 best_rotation;
     mat4x4 *best_rotation_d;
     mat4x4 *best_rotation_h;
     mat4x4 *opt_rotation_d;

@@ -8,6 +8,7 @@
 #include <sys/socket.h> //socket
 #include <arpa/inet.h>  //inet_addr
 #include <unistd.h>
+#include <iomanip>
 #include <fcntl.h>
 #include <any>
 #include <computation.cuh>
@@ -203,6 +204,7 @@ uint16_t *TCPFrameCapture::getToFFrame(int buffer)
 bool TCPFrameCapture::getRotationTranslation(int buffer, mat4x4 rotation, vec4 translation)
 {
     mat4x4_dup(rotation, rotation_buf[buffer]);
+    // print_mat4x4("rotation",rotation);
     translation[0] = translation_buf[buffer][0];
     translation[1] = translation_buf[buffer][1];
     translation[2] = translation_buf[buffer][2];
@@ -370,7 +372,9 @@ void TCPFrameCapture::run()
              }
              else
              {
-                 mat4x4_identity(*best_rotation_h);
+                 int i, j;
+                 for (i = 0; i < 4; ++i)
+                     for (j = 0; j < 4; ++j) *(best_rotation_h[i][j]) = i == j ? 1.f : 0.f;
                  *best_translation_h[0] = 0.0f;
                  *best_translation_h[1] = 0.0f;
                  *best_translation_h[2] = 0.0f;
@@ -438,7 +442,7 @@ void TCPFrameCapture::run()
          if ((frame_count > 0) && (frame_count % 100 == 0))
          {
              // quality = quality/((double)inliers_count);
-             std::cout << thresh << ";" << initBlur << ";" << lowestScale << ";" << quality / ((double)inliers_count) << ";" << x_traveled << ";" << y_traveled << ";" << z_traveled << ";" << outliers_count << ";" << min_diag << std::endl;
+             // std::cout << thresh << ";" << initBlur << ";" << lowestScale << ";" << quality / ((double)inliers_count) << ";" << x_traveled << ";" << y_traveled << ";" << z_traveled << ";" << outliers_count << ";" << min_diag << std::endl;
              // quality = 0;
              // inliers_count = 0;
              // outliers_count = 0;
@@ -451,7 +455,13 @@ void TCPFrameCapture::run()
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
         // cudaStreamSynchronize(tcpCaptureStream);
         // Processing finished, change buffer index.
-        mat4x4_dup(rotation_buf[write_buf_id],*best_rotation_h);
+          for (int i = 0; i<4; i++) {
+              for (int j = 0; j<4; j++) {
+                  best_rotation[j][i] = *(best_rotation_h[i][j]);
+              }
+           }        
+        // print_mat4x4("best_rotation",best_rotation);
+        mat4x4_dup(rotation_buf[write_buf_id],best_rotation);
         translation_buf[write_buf_id][0] = *best_translation_h[0];
         translation_buf[write_buf_id][1] = *best_translation_h[1];
         translation_buf[write_buf_id][2] = *best_translation_h[2];

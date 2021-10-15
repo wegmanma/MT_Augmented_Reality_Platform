@@ -22,6 +22,8 @@
 #define LINMATH_H
 
 #include <math.h>
+#include <iostream>
+#include <iomanip>
 
 // Converts degrees to radians.
 #define degreesToRadians(angleDegrees) (angleDegrees * M_PI / 180.0)
@@ -472,19 +474,7 @@ static inline void mat4x4o_mul_quat(mat4x4 R, mat4x4 M, quat q) {
 }
 static inline void quat_from_mat4x4(quat q, mat4x4 M) {
     float r = 0.f;
-    int i;
-
-    int perm[] = {0, 1, 2, 0, 1};
-    int *p = perm;
-
-    for (i = 0; i < 3; i++) {
-        float m = M[i][i];
-        if (m < r) continue;
-        m = r;
-        p = &perm[i];
-    }
-
-    r = sqrtf(1.f + M[p[0]][p[0]] - M[p[1]][p[1]] - M[p[2]][p[2]]);
+    r = sqrtf(1.f + M[0][0] + M[1][1] + M[2][2]);
 
     if (r < 1e-6) {
         q[0] = 1.f;
@@ -492,10 +482,43 @@ static inline void quat_from_mat4x4(quat q, mat4x4 M) {
         return;
     }
 
-    q[0] = r / 2.f;
-    q[1] = (M[p[0]][p[1]] - M[p[1]][p[0]]) / (2.f * r);
-    q[2] = (M[p[2]][p[0]] - M[p[0]][p[2]]) / (2.f * r);
-    q[3] = (M[p[2]][p[1]] - M[p[1]][p[2]]) / (2.f * r);
+    q[3] = r / 2.f;
+    q[2] = -(M[1][0] - M[0][1]) / (2.f * r);
+    q[1] = -(M[0][2] - M[2][0]) / (2.f * r);
+    q[0] = -(M[2][1] - M[1][2]) / (2.f * r);
+}
+
+static inline void print_quat(std::string name, quat e, bool semicolon_separated = false, bool no_endline = false)
+{
+
+
+    std::cout << std::fixed << std::setprecision(6);
+    if (semicolon_separated) {
+        std::cout  << e[3] << ";"  << e[0] << ";" << e[1] << ";" << e[2];
+        if (no_endline) 
+            std::cout << ";";
+        else
+            std::cout << std::endl;
+    }
+    
+    else
+    std::cout << std::setw(20) << name << " = (" << std::setw(8) << e[3] << " | " << std::setw(8) << e[0] << ", " << std::setw(8) << e[1] << ", " << std::setw(8) << e[2] << ")" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
+}
+
+static inline void print_mat4x4(std::string name, mat4x4 m)
+{
+    float det =   m[0][0] * m[1][1] * m[2][2] + m[1][0] * m[2][1] * m[0][2] +
+                  m[2][0] * m[0][1] * m[1][2] - m[2][0] * m[1][1] * m[0][2] -
+                  m[1][0] * m[0][1] * m[2][2] - m[0][0] * m[2][1] * m[1][2];
+    std::cout << std::fixed << std::setprecision(5);
+    std::cout << std::setw(26) << "┌" << std::setw(39) << "┐" << std::endl;
+    std::cout << std::setw(26) << "│" << std::setw(8) << m[0][0] << " " << std::setw(8) << m[0][1] << " " << std::setw(8) << m[0][2] << " " << std::setw(8) << m[0][3] << " │" << std::endl;
+    std::cout << std::setw(20) << name << " = │" << std::setw(8) << m[1][0] << " " << std::setw(8) << m[1][1] << " " << std::setw(8) << m[1][2] << " " << std::setw(8) << m[1][3] << " │" << std::endl;
+    std::cout << std::setw(26) << "│" << std::setw(8) << m[2][0] << " " << std::setw(8) << m[2][1] << " " << std::setw(8) << m[2][2] << " " << std::setw(8) << m[2][3] << " │" << std::endl;
+    std::cout << std::setw(16) << "det =" << std::setw(6) << det << "│" << std::setw(8) << m[3][0] << " " << std::setw(8) << m[3][1] << " " << std::setw(8) << m[3][2] << " " << std::setw(8) << m[3][3] << " │" << std::endl;
+    std::cout << std::setw(26) << "└" << std::setw(39) << "┘" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
 }
 
 #endif

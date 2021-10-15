@@ -52,6 +52,7 @@ private:
     // (a,b,c) acceleration is instantaneous and therefore kept within function
 
     mat4x4 quat_matrix{}; // final matrix to hand over to Vulkan
+    quat quat_tof_integrated{}; // temp matrix used for estimating how ToF camera motion develops over time
 
     vec3 zero_rotation_abc = { 0.0, 0.0, 0.0}; 
     vec3 accel_gain_correct = { 0.0, 0.0, 0.0};

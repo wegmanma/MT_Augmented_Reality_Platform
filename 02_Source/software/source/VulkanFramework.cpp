@@ -801,25 +801,21 @@ void VulkanFramework::createTextureImage() {
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
  
+    #ifdef DRAW_RPI_IMAGE
     texWidth = 1273;
     texHeight = 709;
-    // texWidth = 256;
-    // texHeight = 205;    
+    #else
+    texWidth = 256;
+    texHeight = 205; 
+    #endif     
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
+    #ifdef DRAW_RPI_IMAGE
     int mtx = cudaCapture.lockMutex();
     pixels = (unsigned char*)((void*)cudaCapture.getRPiFrame(mtx));
-
-    // memset(pixels,0,imageSize);
-    // for (int i = 0; i<352*286; i++) {
-    //     pixels[8*i+0] = 0;
-    //     pixels[8*i+1] = 0;
-    //     pixels[8*i+2] = 0;
-    //     pixels[8*i+3] = 0;
-    //     pixels[8*i+4] = 255;
-    //     pixels[8*i+5] = 255;
-    //     pixels[8*i+6] = 0;
-    //     pixels[8*i+7] = 0;        
-    // }
+    #else
+    int mtx = tcpCapture->lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
+    #endif 
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
@@ -830,7 +826,11 @@ void VulkanFramework::createTextureImage() {
 
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
+    #ifdef DRAW_RPI_IMAGE
     cudaCapture.unlockMutex(mtx);
+    #else
+    tcpCapture->unlockMutex(mtx);
+    #endif 
     vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mainImage, mainImageMemory);
     
     vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
@@ -889,14 +889,23 @@ void VulkanFramework::updateTextureImage() {
     // vkh::copyBufferToImage(device, commandPool, stagingProjectedBuffer, projectedImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
     // vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, graphicsQueue);
 
-
+    #ifdef DRAW_RPI_IMAGE
     texWidth = 1273;
     texHeight = 709;
-    // texWidth = 256;
-    // texHeight = 205;    
+    #else
+    texWidth = 256;
+    texHeight = 205; 
+    #endif   
     imageSize = texWidth * texHeight * 4*sizeof(uint16_t);
+    
+    #ifdef DRAW_RPI_IMAGE
     int mtx = cudaCapture.lockMutex();
     pixels = (unsigned char*)((void*)cudaCapture.getRPiFrame(mtx));
+    #else
+    int mtx = tcpCapture->lockMutex();
+    pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
+    #endif  
+    
 
 
     if (!pixels) {
@@ -906,7 +915,12 @@ void VulkanFramework::updateTextureImage() {
     vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
     memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingMainBufferMemory);
+
+    #ifdef DRAW_RPI_IMAGE
     cudaCapture.unlockMutex(mtx);
+    #else
+    tcpCapture->unlockMutex(mtx);
+    #endif  
     
     vkh::transitionImageLayout(device, commandPool, mainImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
     vkh::copyBufferToImage(device, commandPool, stagingMainBuffer, mainImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), graphicsQueue);
