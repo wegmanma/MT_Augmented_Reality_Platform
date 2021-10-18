@@ -123,6 +123,8 @@ void TCPFrameCapture::start(Computation *computation_p)
     cudaHostAlloc((void **)&temp_mem_265x205xfloat_nocache_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);
     cudaHostAlloc((void **)&best_translation_h, sizeof(vec4), cudaHostAllocMapped);
     cudaHostAlloc((void **)&best_rotation_h, sizeof(mat4x4), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&opt_translation_h, sizeof(vec4), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&opt_rotation_h, sizeof(mat4x4), cudaHostAllocMapped);
     cudaHostAlloc((void **)&ransac_dx_h, sizeof(float), cudaHostAllocMapped);
     cudaHostAlloc((void **)&ransac_dy_h, sizeof(float), cudaHostAllocMapped);
 
@@ -140,6 +142,8 @@ void TCPFrameCapture::start(Computation *computation_p)
     cudaHostGetDevicePointer((void **)&temp_mem_265x205xfloat_nocache_d, (void *)temp_mem_265x205xfloat_nocache_h, 0);
     cudaHostGetDevicePointer((void **)&best_translation_d, (void *)best_translation_h, 0);
     cudaHostGetDevicePointer((void **)&best_rotation_d, (void *)best_rotation_h, 0);
+    cudaHostGetDevicePointer((void **)&opt_translation_d, (void *)opt_translation_h, 0);
+    cudaHostGetDevicePointer((void **)&opt_rotation_d, (void *)opt_rotation_h, 0);
     cudaHostGetDevicePointer((void **)&ransac_dx_d, (void *)ransac_dx_h, 0);
     cudaHostGetDevicePointer((void **)&ransac_dy_d, (void *)ransac_dy_h, 0);
 
@@ -364,7 +368,7 @@ void TCPFrameCapture::run()
 // 
              computation->MatchSiftData(siftData[0], siftData[1], tcpCaptureStream);
              computation->ransac2d(siftData[0], siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, ransac_dx_d, ransac_dy_d, tcpCaptureStream);
-             if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(0))
+             if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(1))
              {
                  computation->findRotationTranslation_step0(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
                  computation->findRotationTranslation_step1(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
@@ -381,13 +385,14 @@ void TCPFrameCapture::run()
              }
              // std::cout << "rot_trans" << std::endl;
              computation->ransacFromFoundRotationTranslation(siftData[0], siftData[1], best_rotation_d, best_translation_d, tcpCaptureStream);
+             computation->findOptimalRotationTranslation(siftData[0],temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
          }
          else
          {
 // 
              computation->MatchSiftData(siftData[1], siftData[0], tcpCaptureStream);
              computation->ransac2d(siftData[1], siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, ransac_dx_d, ransac_dy_d, tcpCaptureStream);
-             if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(0))
+             if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 1.0)||(1))
              {
                  computation->findRotationTranslation_step0(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
                  computation->findRotationTranslation_step1(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
@@ -405,20 +410,28 @@ void TCPFrameCapture::run()
              }
              // std::cout << "Num points: "  << siftData[1].numPts << "\n";
              computation->ransacFromFoundRotationTranslation(siftData[1], siftData[0], best_rotation_d, best_translation_d, tcpCaptureStream);
+             computation->findOptimalRotationTranslation(siftData[1],temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
          }
          cudaStreamSynchronize(tcpCaptureStream);
-         //  std::cout << "Best matrix:" << std::endl;
-         // for (int i = 0; i<3; i++) {
-         //     for (int j = 0; j<3; j++) {
-         //         std::cout << *(best_rotation_h[j][i]) << " ";
-         //     }
-         //     std::cout << std::endl;
-         //  }
-         //   std::cout << "Translation:" << std::endl;
-         //  for (int i = 0; i<3; i++) {
-         //      std::cout << *(best_translation_h[i]) << " ";
-         //      std::cout << std::endl;
-         //  }
+        //   std::cout << "Best matrix:" << std::endl;
+        //  for (int i = 0; i<3; i++) {
+        //      for (int j = 0; j<3; j++) {
+        //          std::cout << *(best_rotation_h[j][i]) << " ";
+        //      }
+        //      std::cout << std::endl;
+        //   }
+        //    std::cout << "Translation:" << std::endl;
+        //   for (int i = 0; i<3; i++) {
+        //       std::cout << *(best_translation_h[i]) << " ";
+        //       std::cout << std::endl;
+        //   }
+        //   std::cout << "Optimal matrix:" << std::endl;
+        //  for (int i = 0; i<3; i++) {
+        //      for (int j = 0; j<3; j++) {
+        //          std::cout << *(opt_rotation_h[j][i]) << " ";
+        //      }
+        //      std::cout << std::endl;
+        //   }          
          if (min_diag > *(best_rotation_h[0][0]))
              min_diag = *(best_rotation_h[0][0]);
          if (min_diag > *(best_rotation_h[1][1]))

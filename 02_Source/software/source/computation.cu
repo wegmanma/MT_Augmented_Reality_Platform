@@ -1240,6 +1240,7 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
     for (i = 0; i < 4; ++i)
       rp_dash[j] += rot[i][j] * p_dash[i];
   }
+  printf("Centroid diff before rematch: %f, %f, %f\n", centroids.x_3d-centroids.match_x_3d, centroids.y_3d- centroids.match_y_3d, centroids.z_3d-centroids.match_z_3d);
   t[0] = isnan(centroids.x_3d - rp_dash[0]) ? 0.0 : centroids.x_3d - rp_dash[0];
   t[1] = isnan(centroids.y_3d - rp_dash[1]) ? 0.0 : centroids.y_3d - rp_dash[1];
   t[2] = isnan(centroids.z_3d - rp_dash[2]) ? 0.0 : centroids.z_3d - rp_dash[2];
@@ -1408,6 +1409,7 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
   float distance;
   float distance_min;
   distance_min = 100000;
+  int idx_min = numPts_old+1;
   for (i = 0; i < numPts_old; i++)
   {
     d_x = point_old[i].x_3d - coords_est[0];
@@ -1417,30 +1419,36 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     if (distance < distance_min)
     {
       distance_min = distance;
+      idx_min = i;
     }
   }
   // printf("idx: %d min distance to matching point: %f\n", idx, distance_min);
 
-  // if (distance_min < 0.2) {
-  //   point_new[idx].match = idx_min;
+  if ((distance_min < 1.0f)&&(idx_min < numPts_old)) {
+     point_new[idx].ransac_match = idx_min;
+     float ransac_xpos = point_old[idx_min].xpos;
+     float ransac_ypos = point_old[idx_min].ypos;
+     float ransac_x_3d = point_old[idx_min].x_3d;
+     float ransac_y_3d = point_old[idx_min].y_3d;
+     float ransac_z_3d = point_old[idx_min].z_3d;
   //   point_new[idx].match_distance = point_old[idx_min].distance;
-  //   point_new[idx].match_xpos = point_old[idx_min].xpos;
-  //   point_new[idx].match_ypos = point_old[idx_min].ypos;
-  //   point_new[idx].match_x_3d = point_old[idx_min].x_3d;
-  //   point_new[idx].match_y_3d = point_old[idx_min].y_3d;
-  //   point_new[idx].match_z_3d = point_old[idx_min].z_3d;
-  //   point_new[idx].draw = true;
-  // } else {
-  //   point_new[idx].draw = false;
-  // }
+     point_new[idx].ransac_xpos_3d = ransac_xpos; // point_old[idx_min].xpos;
+     point_new[idx].ransac_ypos_3d = ransac_ypos;
+     point_new[idx].ransac_x_3d = ransac_x_3d;
+     point_new[idx].ransac_y_3d = ransac_y_3d;
+     point_new[idx].ransac_z_3d = ransac_z_3d;
+     point_new[idx].draw = true;
+  } else {
+     point_new[idx].draw = false;
+  }
   
-  point_new[idx].match_distance = coords_est[0];
-  float x_div = coords_est[1] / coords_est[0];
-  float x_tan = atan(x_div);
-  point_new[idx].ransac_xpos_3d = (-128 * (x_tan - (WIDTH_ANGLE))) / (WIDTH_ANGLE);
-  float y_div = coords_est[2] / coords_est[0];
-  float y_tan = atan(y_div);
-  point_new[idx].ransac_ypos_3d = (-102.5 * (y_tan - (HEIGHT_ANGLE))) / (HEIGHT_ANGLE);
+  // point_new[idx].match_distance = coords_est[0];
+  // float x_div = coords_est[1] / coords_est[0];
+  // float x_tan = atan(x_div);
+  // point_new[idx].ransac_xpos_3d = (-128 * (x_tan - (WIDTH_ANGLE))) / (WIDTH_ANGLE);
+  // float y_div = coords_est[2] / coords_est[0];
+  // float y_tan = atan(y_div);
+  // point_new[idx].ransac_ypos_3d = (-102.5 * (y_tan - (HEIGHT_ANGLE))) / (HEIGHT_ANGLE);
   // point_new[idx].draw = true;
 
   // if (idx == 0)
@@ -1489,12 +1497,15 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
           if (idx == 2)
             cent_new[2] += point[i].z_3d;
           if (idx == 3)
-            cent_old[0] += point[i].match_x_3d;
+            cent_old[0] += point[i].ransac_x_3d;
           if (idx == 4)
-            cent_old[1] += point[i].match_y_3d;
+            cent_old[1] += point[i].ransac_y_3d;
           if (idx == 5)
-            cent_old[2] += point[i].match_z_3d;
+            cent_old[2] += point[i].ransac_z_3d;
         }
+      }
+      if (divisor == 0) {
+        return;
       }
       if (idx == 0)
         cent_new[0] /= divisor;
@@ -1509,7 +1520,7 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
       if (idx == 5)
         cent_old[2] /= divisor;
     }
-
+    printf("Centroid diff after rematch: %f, %f, %f\n", cent_new[0]-cent_old[0], cent_new[1]-cent_old[1], cent_new[2]-cent_old[2]);
     for (idx = 0; idx < 9; idx++)
     {
       if (idx == 0)
@@ -1641,10 +1652,26 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
     //       h[0][0], h[1][0], h[2][0],  // matrix 1st row
     //       h[0][1], h[1][1], h[2][1],  // matrix 2nd row
     //       h[0][2], h[1][2], h[2][2]); // matrix 3rd row)
-    printf("rot\n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
-           rot[0][0], rot[1][0], rot[2][0],  // matrix 1st row
-           rot[0][1], rot[1][1], rot[2][1],  // matrix 2nd row
-           rot[0][2], rot[1][2], rot[2][2]); // matrix 3rd row)
+    // printf("rot\n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
+    //        rot[0][0], rot[1][0], rot[2][0],  // matrix 1st row
+    //        rot[0][1], rot[1][1], rot[2][1],  // matrix 2nd row
+    //        rot[0][2], rot[1][2], rot[2][2]); // matrix 3rd row)
+  // t[0] = isnan(centroids.x_3d - rp_dash[0]) ? 0.0 : centroids.x_3d - rp_dash[0];
+  // t[1] = isnan(centroids.y_3d - rp_dash[1]) ? 0.0 : centroids.y_3d - rp_dash[1];
+  // t[2] = isnan(centroids.z_3d - rp_dash[2]) ? 0.0 : centroids.z_3d - rp_dash[2];
+  // t[3] = 1.0;
+  *rotation[0][0] = isnan(rot[0][0]) ? 1.0 : rot[0][0];
+  *rotation[0][1] = isnan(rot[0][1]) ? 0.0 : rot[0][1];
+  *rotation[0][2] = isnan(rot[0][2]) ? 0.0 : rot[0][2];
+  *rotation[1][0] = isnan(rot[1][0]) ? 0.0 : rot[1][0];
+  *rotation[1][1] = isnan(rot[1][1]) ? 1.0 : rot[1][1];
+  *rotation[1][2] = isnan(rot[1][2]) ? 0.0 : rot[1][2];
+  *rotation[2][0] = isnan(rot[2][0]) ? 0.0 : rot[2][0];
+  *rotation[2][1] = isnan(rot[2][1]) ? 0.0 : rot[2][1];
+  *rotation[2][2] = isnan(rot[2][2]) ? 1.0 : rot[2][2];
+  // *translation[0] = t[0];
+  // *translation[1] = t[1];
+  // *translation[2] = t[2];
   }
 }
 
@@ -4845,6 +4872,10 @@ void Computation::ransac2d(SiftData &data, SiftData &data_old, float *tempMemory
   checkMsg("Problem with findRotationTranslation:\n");
 }
 
-void Computation::findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 rotation, vec4 translation, cudaStream_t stream)
+void Computation::findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, cudaStream_t stream)
 {
+  dim3 blocks = dim3(1);
+  dim3 threads = dim3(1);
+  gpuFindOptimalRotationTranslation<<<blocks, threads, 0, stream>>>(data.d_data, tempMemory, rotation, translation, data.numPts);
+  checkMsg("Problem with findRotationTranslation:\n");
 }

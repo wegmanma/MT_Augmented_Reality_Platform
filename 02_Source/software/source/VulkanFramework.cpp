@@ -33,6 +33,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+// #define DRAW_RPI_IMAGE
+
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
@@ -114,7 +116,9 @@ void VulkanFramework::initVulkan() {
     tcpCapture = new TCPFrameCapture;
     tcpCapture->start(computation);
     positionEstimate = new PositionEstimate(tcpCapture);  
+    #ifdef DRAW_RPI_IMAGE
     cudaCapture.start(computation);
+    #endif // DRAW_RPI_IMAGE
     createInstance();
     
     setupDebugCallback();

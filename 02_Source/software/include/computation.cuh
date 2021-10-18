@@ -250,7 +250,7 @@ void findRotationTranslation_step2(SiftData &data, float *tempMemory, bool *inde
 
 void ransacFromFoundRotationTranslation(SiftData &data, SiftData &data_old, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
-void findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 rotation, vec4 translation, cudaStream_t stream);
+void findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
 void ransac2d(SiftData &data, SiftData &data_old, float *tempMemory, bool *index_list, float *dx, float *dy, cudaStream_t stream);
 

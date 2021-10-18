@@ -21,19 +21,19 @@
 #define SENS_TIME_RESOLUTION 0.000039
 
 #define OFFSET_MEAS_TIME 1000
-#define CAL_GYRO_X  0.0056189002//2.381310
-#define CAL_GYRO_Y  -0.0020643455 //-2.783860
-#define CAL_GYRO_Z 0.0082736398 //6.784730
-#define CAL_ACC_X   -153.7980625 // -65.8768
-#define CAL_ACC_Y   75.7320625 // -90.7988
-#define CAL_ACC_Z   30.81325     // 41.24667
+#define CAL_GYRO_X 0.0056189002  //2.381310
+#define CAL_GYRO_Y -0.0020643455 //-2.783860
+#define CAL_GYRO_Z 0.0082736398  //6.784730
+#define CAL_ACC_X -153.7980625   // -65.8768
+#define CAL_ACC_Y 75.7320625     // -90.7988
+#define CAL_ACC_Z 30.81325       // 41.24667
 // orientational corrections
-#define FACE_UP_CORR     0.9821081568    //0.00163
-#define FACE_DOWN_CORR   0.9966960825  //0.018828
-#define FLIP_LEFT_CORR   0.9882184034  //0.011186
-#define FLIP_RIGHT_CORR  0.9936513847 //0.006859
-#define FLIP_FRONT_CORR  0.9944487206 //0.001764
-#define FLIP_BACK_CORR   1.0004113867  //-0.006346
+#define FACE_UP_CORR 0.9821081568    //0.00163
+#define FACE_DOWN_CORR 0.9966960825  //0.018828
+#define FLIP_LEFT_CORR 0.9882184034  //0.011186
+#define FLIP_RIGHT_CORR 0.9936513847 //0.006859
+#define FLIP_FRONT_CORR 0.9944487206 //0.001764
+#define FLIP_BACK_CORR 1.0004113867  //-0.006346
 
 bool GyroDataEqual(int16_t *old_data, int16_t *new_data)
 {
@@ -42,7 +42,6 @@ bool GyroDataEqual(int16_t *old_data, int16_t *new_data)
             return false;
     return true;
 }
-
 
 void quat_rotate(quat result, quat rotation, quat vector)
 {
@@ -158,15 +157,15 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
         meas_cnt_i = meas_cnt;
         accel_m_per_sq_s_i[1] = accel_m_per_sq_s[0] / (meas_cnt);
         accel_m_per_sq_s_i[2] = accel_m_per_sq_s[1] / (meas_cnt);
-        accel_m_per_sq_s_i[0] = - accel_m_per_sq_s[2] / (meas_cnt);
+        accel_m_per_sq_s_i[0] = -accel_m_per_sq_s[2] / (meas_cnt);
         accel_m_per_sq_s_i[3] = accel_m_per_sq_s[3] / (meas_cnt);
         // std::cout << "get_gyro_matrix: " << nseconds << std::endl;
         double nseconds_i = nseconds;
         vec3 gyro_rad_per_s_i;
         double theta;
         gyro_rad_per_s_i[1] = -gyro_rad_per_s[0] / (meas_cnt);
-        gyro_rad_per_s_i[2] =  gyro_rad_per_s[1] / (meas_cnt);
-        gyro_rad_per_s_i[0] =  gyro_rad_per_s[2] / (meas_cnt);
+        gyro_rad_per_s_i[2] = gyro_rad_per_s[1] / (meas_cnt);
+        gyro_rad_per_s_i[0] = gyro_rad_per_s[2] / (meas_cnt);
         accel_m_per_sq_s[0] = 0.0f;
         accel_m_per_sq_s[1] = 0.0f;
         accel_m_per_sq_s[2] = 0.0f;
@@ -191,7 +190,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             float inv_omega_len;
             // get rotation quaternion from gyro data
             inv_omega_len = Q_rsqrt((float)(gyro_rad_per_s_i[0] * gyro_rad_per_s_i[0] + gyro_rad_per_s_i[1] * gyro_rad_per_s_i[1] + gyro_rad_per_s_i[2] * gyro_rad_per_s_i[2]));
-            if ((inv_omega_len != 0.0)&&(gyro_rad_per_s_i[0] != 0.0f)&&(gyro_rad_per_s_i[1] != 0.0f)&&(gyro_rad_per_s_i[2] != 0.0f))
+            if ((inv_omega_len != 0.0) && (gyro_rad_per_s_i[0] != 0.0f) && (gyro_rad_per_s_i[1] != 0.0f) && (gyro_rad_per_s_i[2] != 0.0f))
             {
                 theta = nseconds_i / inv_omega_len;
                 quat_from_angle_axis(quat_gyro, -theta, gyro_rad_per_s_i);
@@ -200,22 +199,22 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             {
                 quat_identity(quat_gyro);
             }
-    
-    quat_from_mat4x4(ToFQuaterion,ToFrotation);
 
-    if (ToFrotation[0][0]> 0.75) {
-            quat temp;
-    quat_mul(temp,quat_tof_integrated,ToFQuaterion);
-    quat_tof_integrated[0] = temp[0];
-    quat_tof_integrated[1] = temp[1];
-    quat_tof_integrated[2] = temp[2];
-    quat_tof_integrated[3] = temp[3];
-    }
-    // print_quat("quat_tof_integrated",quat_tof_integrated);
-    // print_quat("quat_integrated",quat_integrated);
-    // print_mat4x4("ToFrotation",ToFrotation);
-    print_quat("ToFQuaterion",ToFQuaterion, true, true);
-    print_quat("quat_gyro",quat_gyro, true);
+            quat_from_mat4x4(ToFQuaterion, ToFrotation);
+
+            if (ToFrotation[0][0] > 0.75)
+            {
+                quat temp;
+                quat_mul(temp, quat_tof_integrated, ToFQuaterion);
+                quat_tof_integrated[0] = temp[0];
+                quat_tof_integrated[1] = temp[1];
+                quat_tof_integrated[2] = temp[2];
+                quat_tof_integrated[3] = temp[3];
+            }
+            // print_quat("quat_tof_integrated",quat_tof_integrated);
+            // print_quat("quat_integrated",quat_integrated);
+            // print_mat4x4("ToFrotation",ToFrotation);
+
             // update rotation quaternion
             {
                 quat temp{};
@@ -225,6 +224,9 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 quat_integrated[2] = temp[2];
                 quat_integrated[3] = temp[3];
             }
+            // print_quat("ToFQuaterion", quat_tof_integrated, true, true);
+            // print_quat("quat_gyro", quat_integrated, true);
+            print_vec4("tofTranslation", ToFtranslation, true, true);
             // compute current measured orientation - might be unstable, only apply when stable
             for (int i = 0; i < 3; i++)
             {
@@ -258,6 +260,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 quat_mul(temp, quat_integrated_conj, delta_vector_abc);
                 quat_mul(delta_vector_xyz, temp, quat_integrated);
             }
+            print_quat("delta_vector_abc", delta_vector_abc, true);
             // if no movement and no rotation: Use accelerometer to find G
 
             if ((vec_len >= 9.77) && (vec_len <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH))
@@ -319,7 +322,6 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
     }
     //print_mat4x4("ToFrotation", ToFrotation);
     //print_mat4x4("quat_matrix",quat_matrix);
-
 
     mat4x4_dup(gyro_matrix, quat_matrix);
 }
@@ -399,7 +401,6 @@ void PositionEstimate::thrBMI160()
     initial_orientation[1] = accel_m_per_sq_s[0] / vec_len;
     initial_orientation[2] = accel_m_per_sq_s[1] / vec_len;
     initial_orientation[0] = -accel_m_per_sq_s[2] / vec_len;
-    
 
     int file = bmi160->I2CGetDataOpenDevice();
     double nseconds_i;
@@ -451,7 +452,7 @@ void PositionEstimate::thrBMI160()
             accel_i[2] *= FACE_UP_CORR; // z_pos
         mtx.lock();
         meas_cnt++;
-        
+
         nseconds = nseconds_i;
         // std::cout << "main_thread, t= " << nseconds_i << "gyro = " << gyro_i[0] << "; " << gyro_i[1] << "; " << gyro_i[2] << std::endl;
         nseconds_i = 0.0;
@@ -463,7 +464,6 @@ void PositionEstimate::thrBMI160()
         accel_m_per_sq_s[2] += accel_i[2];
         accel_m_per_sq_s[3] += accel_i[3];
         mtx.unlock();
-        
     }
     bmi160->I2CGetDataCloseDevice(file);
 }
