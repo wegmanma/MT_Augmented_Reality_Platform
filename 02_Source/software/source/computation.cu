@@ -1240,7 +1240,7 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
     for (i = 0; i < 4; ++i)
       rp_dash[j] += rot[i][j] * p_dash[i];
   }
-  printf("Centroid diff before rematch: %f, %f, %f\n", centroids.x_3d-centroids.match_x_3d, centroids.y_3d- centroids.match_y_3d, centroids.z_3d-centroids.match_z_3d);
+  // printf("Centroid diff before rematch: %f, %f, %f\n", centroids.x_3d-centroids.match_x_3d, centroids.y_3d- centroids.match_y_3d, centroids.z_3d-centroids.match_z_3d);
   t[0] = isnan(centroids.x_3d - rp_dash[0]) ? 0.0 : centroids.x_3d - rp_dash[0];
   t[1] = isnan(centroids.y_3d - rp_dash[1]) ? 0.0 : centroids.y_3d - rp_dash[1];
   t[2] = isnan(centroids.z_3d - rp_dash[2]) ? 0.0 : centroids.z_3d - rp_dash[2];
@@ -1467,8 +1467,7 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   mat4x4 h;
   vec4 cent_old;
   vec4 cent_new;
-  if (idx0 == 0)
-  {
+
     int idx;
     for (idx = 0; idx < 6; idx++)
     {
@@ -1520,49 +1519,31 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
       if (idx == 5)
         cent_old[2] /= divisor;
     }
-    printf("Centroid diff after rematch: %f, %f, %f\n", cent_new[0]-cent_old[0], cent_new[1]-cent_old[1], cent_new[2]-cent_old[2]);
+    // printf("Centroid diff after rematch: %f, %f, %f\n", cent_new[0]-cent_old[0], cent_new[1]-cent_old[1], cent_new[2]-cent_old[2]);
     for (idx = 0; idx < 9; idx++)
     {
-      if (idx == 0)
         h[0][0] = 0.f;
-      if (idx == 1)
         h[1][0] = 0.f;
-      if (idx == 2)
         h[2][0] = 0.f;
-      if (idx == 3)
         h[0][1] = 0.f;
-      if (idx == 4)
         h[1][1] = 0.f;
-      if (idx == 5)
         h[2][1] = 0.f;
-      if (idx == 6)
         h[0][2] = 0.f;
-      if (idx == 7)
         h[1][2] = 0.f;
-      if (idx == 8)
         h[2][2] = 0.f;
       for (int i = 0; i < numPts; i++)
       {
         if (point[i].draw == true)
         {
-          if (idx == 0)
-            h[0][0] += (point[i].x_3d - cent_new[0]) * (point[i].match_x_3d - cent_old[0]);
-          if (idx == 1)
-            h[1][0] += (point[i].x_3d - cent_new[0]) * (point[i].match_y_3d - cent_old[1]);
-          if (idx == 2)
-            h[2][0] += (point[i].x_3d - cent_new[0]) * (point[i].match_z_3d - cent_old[2]);
-          if (idx == 3)
-            h[0][1] += (point[i].y_3d - cent_new[1]) * (point[i].match_x_3d - cent_old[0]);
-          if (idx == 4)
-            h[1][1] += (point[i].y_3d - cent_new[1]) * (point[i].match_y_3d - cent_old[1]);
-          if (idx == 5)
-            h[2][1] += (point[i].y_3d - cent_new[1]) * (point[i].match_z_3d - cent_old[2]);
-          if (idx == 6)
-            h[0][2] += (point[i].z_3d - cent_new[2]) * (point[i].match_x_3d - cent_old[0]);
-          if (idx == 7)
-            h[1][2] += (point[i].z_3d - cent_new[2]) * (point[i].match_y_3d - cent_old[1]);
-          if (idx == 8)
-            h[2][2] += (point[i].z_3d - cent_new[2]) * (point[i].match_z_3d - cent_old[2]);
+            h[0][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_x_3d - cent_old[0]);
+            h[1][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_y_3d - cent_old[1]);
+            h[2][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_z_3d - cent_old[2]);
+            h[0][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_x_3d - cent_old[0]);
+            h[1][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_y_3d - cent_old[1]);
+            h[2][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_z_3d - cent_old[2]);
+            h[0][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_x_3d - cent_old[0]);
+            h[1][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_y_3d - cent_old[1]);
+            h[2][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_z_3d - cent_old[2]);
         }
       }
     }
@@ -1603,24 +1584,10 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
           vu_t[c][r] += v[k][r] * u_t[c][k];
       }
 
-    float s1[6];
-    float c1[6];
-    s1[0] = vu_t[0][0] * vu_t[1][1] - vu_t[1][0] * vu_t[0][1];
-    s1[1] = vu_t[0][0] * vu_t[1][2] - vu_t[1][0] * vu_t[0][2];
-    s1[2] = vu_t[0][0] * vu_t[1][3] - vu_t[1][0] * vu_t[0][3];
-    s1[3] = vu_t[0][1] * vu_t[1][2] - vu_t[1][1] * vu_t[0][2];
-    s1[4] = vu_t[0][1] * vu_t[1][3] - vu_t[1][1] * vu_t[0][3];
-    s1[5] = vu_t[0][2] * vu_t[1][3] - vu_t[1][2] * vu_t[0][3];
-
-    c1[0] = vu_t[2][0] * vu_t[3][1] - vu_t[3][0] * vu_t[2][1];
-    c1[1] = vu_t[2][0] * vu_t[3][2] - vu_t[3][0] * vu_t[2][2];
-    c1[2] = vu_t[2][0] * vu_t[3][3] - vu_t[3][0] * vu_t[2][3];
-    c1[3] = vu_t[2][1] * vu_t[3][2] - vu_t[3][1] * vu_t[2][2];
-    c1[4] = vu_t[2][1] * vu_t[3][3] - vu_t[3][1] * vu_t[2][3];
-    c1[5] = vu_t[2][2] * vu_t[3][3] - vu_t[3][2] * vu_t[2][3];
-
-    float idet = 1.0f / (s1[0] * c1[5] - s1[1] * c1[4] + s1[2] * c1[3] + s1[3] * c1[2] - s1[4] * c1[1] + s1[5] * c1[0]);
-    s_det[2][2] = idet;
+  float det = vu_t[0][0] * vu_t[1][1] * vu_t[2][2] + vu_t[1][0] * vu_t[2][1] * vu_t[0][2] +
+              vu_t[2][0] * vu_t[0][1] * vu_t[1][2] - vu_t[2][0] * vu_t[1][1] * vu_t[0][2] -
+              vu_t[1][0] * vu_t[0][1] * vu_t[2][2] - vu_t[0][0] * vu_t[2][1] * vu_t[1][2];
+    s_det[2][2] = det;
     mat4x4 vs_det;
     for (c = 0; c < 4; ++c)
       for (r = 0; r < 4; ++r)
@@ -1641,7 +1608,15 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
     for (j = 0; j < 4; ++j)
       for (i = 0; i < 4; ++i)
         rot[i][j] = rot_t[j][i];
+  vec4 p_dash = {cent_old[0], cent_old[1], cent_old[2], 1.0};
+  vec4 rp_dash;
+  for (j = 0; j < 4; ++j)
+  {
+    rp_dash[j] = 0.f;
+    for (i = 0; i < 4; ++i)
+      rp_dash[j] += rot[i][j] * p_dash[i];
   }
+  
   if (idx0 == 0)
   {
     //printf("centroids\n%f,%f,%f\n%f,%f,%f\n",
@@ -1669,9 +1644,10 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   *rotation[2][0] = isnan(rot[2][0]) ? 0.0 : rot[2][0];
   *rotation[2][1] = isnan(rot[2][1]) ? 0.0 : rot[2][1];
   *rotation[2][2] = isnan(rot[2][2]) ? 1.0 : rot[2][2];
-  // *translation[0] = t[0];
-  // *translation[1] = t[1];
-  // *translation[2] = t[2];
+  *translation[0] = isnan(cent_new[0] - rp_dash[0]) ? 0.0 : cent_new[0] - rp_dash[0];
+  *translation[1] = isnan(cent_new[1] - rp_dash[1]) ? 0.0 : cent_new[1] - rp_dash[1];
+  *translation[2] = isnan(cent_new[2] - rp_dash[2]) ? 0.0 : cent_new[2] - rp_dash[2];
+  *translation[3] = 1.0;
   }
 }
 

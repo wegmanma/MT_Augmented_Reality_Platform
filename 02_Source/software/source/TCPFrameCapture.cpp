@@ -470,15 +470,15 @@ void TCPFrameCapture::run()
         // Processing finished, change buffer index.
           for (int i = 0; i<4; i++) {
               for (int j = 0; j<4; j++) {
-                  best_rotation[j][i] = *(best_rotation_h[i][j]);
+                  best_rotation[j][i] = *(opt_rotation_h[i][j]);
               }
            }        
         // print_mat4x4("best_rotation",best_rotation);
         mat4x4_dup(rotation_buf[write_buf_id],best_rotation);
-        translation_buf[write_buf_id][0] = *best_translation_h[0];
-        translation_buf[write_buf_id][1] = *best_translation_h[1];
-        translation_buf[write_buf_id][2] = *best_translation_h[2];
-        translation_buf[write_buf_id][3] = *best_translation_h[3];
+        translation_buf[write_buf_id][0] = *opt_translation_h[0];
+        translation_buf[write_buf_id][1] = *opt_translation_h[1];
+        translation_buf[write_buf_id][2] = *opt_translation_h[2];
+        translation_buf[write_buf_id][3] = *opt_translation_h[3];
         newdata = true;
 
         if (write_buf_id == 0)

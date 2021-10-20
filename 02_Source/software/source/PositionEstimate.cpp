@@ -224,8 +224,8 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 quat_integrated[2] = temp[2];
                 quat_integrated[3] = temp[3];
             }
-            // print_quat("ToFQuaterion", quat_tof_integrated, true, true);
-            // print_quat("quat_gyro", quat_integrated, true);
+            // print_quat("ToFQuaterion", ToFQuaterion, true, true);
+            // print_quat("quat_gyro", quat_gyro, true);
             print_vec4("tofTranslation", ToFtranslation, true, true);
             // compute current measured orientation - might be unstable, only apply when stable
             for (int i = 0; i < 3; i++)
