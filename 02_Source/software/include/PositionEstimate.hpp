@@ -5,6 +5,7 @@
 #include "linmath.h"
 #include "TCPFrameCapture.hpp"
 
+
 class PositionEstimate  {
 
 public:
@@ -32,6 +33,13 @@ private:
     uint32_t time, time_last;
     double nseconds;
     int meas_cnt;
+
+    vec17 x = {0};
+    vec17 K = {0};
+    vec17 x_apriori = {0};
+    mat17x17 F = {0};
+    mat17x17 P_apriori = {0};
+    mat17x17 P_aposteriori = {0};
 
     // rotation quaternions
     quat quat_integrated{}; // q(t), q_0 = (1,0,0,0)

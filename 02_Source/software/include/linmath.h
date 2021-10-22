@@ -574,7 +574,7 @@ static inline void quat_from_mat4x4(quat q, mat4x4 M)
 static inline void print_quat(std::string name, quat e, bool semicolon_separated = false, bool no_endline = false)
 {
 
-    std::cout << std::fixed << std::setprecision(6);
+    std::cout << std::fixed << std::setprecision(5);
     if (semicolon_separated)
     {
         std::cout << e[3] << ";" << e[0] << ";" << e[1] << ";" << e[2];
@@ -592,7 +592,7 @@ static inline void print_quat(std::string name, quat e, bool semicolon_separated
 static inline void print_vec4(std::string name, vec4 e, bool semicolon_separated = false, bool no_endline = false)
 {
 
-    std::cout << std::fixed << std::setprecision(6);
+    std::cout << std::fixed << std::setprecision(5);
     if (semicolon_separated)
     {
         std::cout << e[0] << ";" << e[1] << ";" << e[2] << ";" << e[3];
@@ -624,6 +624,188 @@ static inline void print_mat4x4(std::string name, mat4x4 m)
     std::cout << std::setw(26) << "│" << std::setw(8) << m[2][0] << " " << std::setw(8) << m[2][1] << " " << std::setw(8) << m[2][2] << " " << std::setw(8) << m[2][3] << " │" << std::endl;
     std::cout << std::setw(16) << "det =" << std::setw(6) << det << "│" << std::setw(8) << m[3][0] << " " << std::setw(8) << m[3][1] << " " << std::setw(8) << m[3][2] << " " << std::setw(8) << m[3][3] << " │" << std::endl;
     std::cout << std::setw(26) << "└" << std::setw(39) << "┘" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
+}
+
+typedef float vec17[17];
+
+
+static inline void vec17_add(vec17 r, vec17 const a, vec17 const b)
+{
+    int i;
+    for (i = 0; i < 17; ++i)
+        r[i] = a[i] + b[i];
+}
+
+static inline float vec17_mul_inner(vec17 a, vec17 b)
+{
+    float p = 0.f;
+    int i;
+    for (i = 0; i < 17; ++i)
+        p += b[i] * a[i];
+    return p;
+}
+
+static inline void vec17_scale(vec17 r, vec17 v, float s)
+{
+    int i;
+    for (i = 0; i < 17; ++i)
+        r[i] = v[i] * s;
+}
+
+typedef vec17 mat17x17[17];
+
+static inline void mat17x17_transpose(mat17x17 M, mat17x17 N)
+{
+    int i, j;
+    for (j = 0; j < 17; ++j)
+        for (i = 0; i < 17; ++i)
+            M[i][j] = N[j][i];
+}
+
+static inline void mat17x17_mul(mat17x17 M, mat17x17 a, mat17x17 b)
+{
+    int k, r, c;
+    for (c = 0; c < 17; ++c)
+        for (r = 0; r < 17; ++r)
+        {
+            M[c][r] = 0.f;
+            for (k = 0; k < 17; ++k)
+                M[c][r] += a[k][r] * b[c][k];
+        }
+}
+static inline void mat17x17_mul_vec17(vec17 r, mat17x17 M, vec17 v)
+{
+    int i, j;
+    for (j = 0; j < 17; ++j)
+    {
+        r[j] = 0.f;
+        for (i = 0; i < 17; ++i)
+            r[j] += M[i][j] * v[i];
+    }
+}
+
+typedef vec4 mat4x17[17];
+typedef vec17 mat17x4[4];
+
+static inline void mat4x17_transpose(mat17x4 M, mat4x17 N) {
+    int i, j;
+    for (j = 0; j < 17; ++j)
+        for (i = 0; i < 4; ++i)
+            M[i][j] = N[j][i];
+}
+
+static inline void mat17x17_mul_mat17x4(mat17x4 M, mat17x17 a, mat17x4 b) {
+    int k, r, c;
+    for (c = 0; c < 4; ++c)
+        for (r = 0; r < 17; ++r)
+        {
+            M[c][r] = 0.f;
+            for (k = 0; k < 17; ++k)
+                M[c][r] += a[k][r] * b[c][k];
+        }
+}
+
+static inline void mat4x17_mul_mat17x17(mat4x17 M, mat4x17 a, mat17x17 b) {
+    int k, r, c;
+    for (c = 0; c < 17; ++c)
+        for (r = 0; r < 4; ++r)
+        {
+            M[c][r] = 0.f;
+            for (k = 0; k < 17; ++k)
+                M[c][r] += a[k][r] * b[c][k];
+        }
+}
+
+static inline void mat4x17_mul_mat17x4(mat4x4 M, mat4x17 a, mat17x4 b) {
+    int k, r, c;
+    for (c = 0; c < 4; ++c)
+        for (r = 0; r < 4; ++r)
+        {
+            M[c][r] = 0.f;
+            for (k = 0; k < 17; ++k)
+                M[c][r] += a[k][r] * b[c][k];
+        }
+}
+
+static inline void mat4x17_mul_vec17(vec4 r, mat4x17 M, vec17 v)
+{
+    int i, j;
+    for (j = 0; j < 4; ++j)
+    {
+        r[j] = 0.f;
+        for (i = 0; i < 17; ++i)
+            r[j] += M[i][j] * v[i];
+    }
+}
+
+static inline void mat17x4_mul_mat4x4(mat17x4 M, mat17x4 a, mat4x4 b) {
+    int k, r, c;
+    for (c = 0; c < 4; ++c)
+        for (r = 0; r < 17; ++r)
+        {
+            M[c][r] = 0.f;
+            for (k = 0; k < 4; ++k)
+                M[c][r] += a[k][r] * b[c][k];
+        }
+}
+
+static inline void mat17x4_mul_vec4(vec17 r, mat17x4 M, vec4 v)
+{
+    int i, j;
+    for (j = 0; j < 17; ++j)
+    {
+        r[j] = 0.f;
+        for (i = 0; i < 4; ++i)
+            r[j] += M[i][j] * v[i];
+    }
+}
+
+static inline void print_mat17x17(std::string name, mat17x17 m)
+{
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << std::setw(26) << "┌" << std::setw(139) << "┐" << std::endl;
+    for (int i = 0; i<17; i++) {
+        if (i == 8) std::cout << std::setw(20) << name << " = │";
+        else std::cout << std::setw(26) << "│";
+        for (int j = 0; j<17; j++) {
+            std::cout << std::setw(7) << m[j][i] << " ";
+        }
+        std::cout << "│" << std::endl;
+    }
+    std::cout << std::setw(26) << "└" << std::setw(139) << "┘" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
+}
+
+static inline void print_mat4x17(std::string name, mat4x17 m)
+{
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << std::setw(26) << "┌" << std::setw(139) << "┐" << std::endl;
+    for (int i = 0; i<4; i++) {
+        if (i == 1) std::cout << std::setw(20) << name << " = │";
+        else std::cout << std::setw(26) << "│";
+        for (int j = 0; j<17; j++) {
+            std::cout << std::setw(7) << m[j][i] << " ";
+        }
+        std::cout << "│" << std::endl;
+    }
+    std::cout << std::setw(26) << "└" << std::setw(139) << "┘" << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6);
+}
+
+static inline void print_mat17x4(std::string name, mat17x4 m)
+{
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << std::setw(26) << "┌" << std::setw(35) << "┐" << std::endl;
+    for (int i = 0; i<17; i++) {
+        if (i == 8) std::cout << std::setw(20) << name << " = │";
+        else std::cout << std::setw(26) << "│";
+        for (int j = 0; j<4; j++) {
+            std::cout << std::setw(7) << m[j][i] << " ";
+        }
+        std::cout << "│" << std::endl;
+    }
+    std::cout << std::setw(26) << "└" << std::setw(35) << "┘" << std::endl;
     std::cout << std::defaultfloat << std::setprecision(6);
 }
 

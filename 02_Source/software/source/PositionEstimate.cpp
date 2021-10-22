@@ -226,7 +226,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
             // print_quat("ToFQuaterion", ToFQuaterion, true, true);
             // print_quat("quat_gyro", quat_gyro, true);
-            print_vec4("tofTranslation", ToFtranslation, true, true);
+            print_vec4("tofTranslation", ToFtranslation);
             // compute current measured orientation - might be unstable, only apply when stable
             for (int i = 0; i < 3; i++)
             {
@@ -260,7 +260,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 quat_mul(temp, quat_integrated_conj, delta_vector_abc);
                 quat_mul(delta_vector_xyz, temp, quat_integrated);
             }
-            print_quat("delta_vector_abc", delta_vector_abc, true);
+            print_quat("delta_vector_abc", delta_vector_abc);
             // if no movement and no rotation: Use accelerometer to find G
 
             if ((vec_len >= 9.77) && (vec_len <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH))
@@ -320,6 +320,113 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
         }
     }
+    { // Prediction: Fill F
+        F[1][0] = nseconds;
+        F[2][0] = (nseconds * nseconds) / 2;
+        F[2][1] = nseconds;
+        F[4][3] = nseconds;
+        F[5][3] = (nseconds * nseconds) / 2;
+        F[5][4] = nseconds;
+        F[7][6] = nseconds;
+        F[8][6] = (nseconds * nseconds) / 2;
+        F[8][7] = nseconds;
+        F[9][9] = x[13];
+        F[9][10] = x[14];
+        F[9][11] = x[15];
+        F[9][12] = x[16];
+        F[10][9] = -x[14];
+        F[10][10] = x[13];
+        F[10][11] = -x[16];
+        F[10][12] = x[15];
+        F[11][9] = -x[15];
+        F[11][10] = x[16];
+        F[11][11] = x[13];
+        F[11][12] = -x[14];
+        F[12][9] = -x[16];
+        F[12][10] = -x[15];
+        F[12][11] = x[14];
+        F[12][12] = x[13];
+    }
+    {                                                                         // Prediction: x_t_pred = F * x_t(_past);
+        x_apriori[0] = F[0][0] * x[0] + F[1][0] * x[1] + F[2][0] * x[2]; // x
+        x_apriori[1] = F[1][1] * x[1] + F[2][1] * x[2];                    // x_dot
+        x_apriori[2] = F[2][2] * x[2];
+        x_apriori[3] = F[3][3] * x[3] + F[4][3] * x[4] + F[5][3] * x[5]; // x
+        x_apriori[4] = F[4][4] * x[4] + F[5][4] * x[5];                    // x_dot
+        x_apriori[5] = F[5][5] * x[5];
+        x_apriori[6] = F[6][6] * x[6] + F[7][6] * x[7] + F[8][6] * x[8]; // x
+        x_apriori[7] = F[7][7] * x[7] + F[8][7] * x[8];                    // x_dot
+        x_apriori[8] = F[8][8] * x[8];
+        x_apriori[9] = F[9][9] * x[9] + F[10][9] * x[10] + F[11][9] * x[11] + F[12][9] * x[12];
+        x_apriori[10] = F[9][10] * x[9] + F[10][10] * x[10] + F[11][10] * x[11] + F[12][10] * x[12];
+        x_apriori[11] = F[9][11] * x[9] + F[10][11] * x[10] + F[11][11] * x[11] + F[12][11] * x[12];
+        x_apriori[12] = F[9][12] * x[9] + F[10][12] * x[10] + F[11][12] * x[11] + F[12][12] * x[12];
+        x_apriori[13] = F[13][13] * x[13];
+        x_apriori[14] = F[14][14] * x[14];
+        x_apriori[15] = F[15][15] * x[15];
+        x_apriori[16] = F[16][16] * x[16];
+    }
+    { // Prediction Covariance Matrix Apriori
+        mat17x17 temp;
+        mat17x17 F_trans;
+        mat17x17_mul(temp, F, P_aposteriori);
+        mat17x17_transpose(F_trans, F);
+        mat17x17_mul(P_apriori, temp, F_trans);
+    }
+    
+    { // IMU Translation Correction: Compute Kalman Gain
+        mat17x4 K_Imu;
+        mat4x17 H_k = {0};
+        H_k[2][0] = 1;
+        H_k[5][1] = 1;
+        H_k[8][2] = 1;
+        print_mat4x17("H_k", H_k);
+        mat17x4 H_k_trans;
+        mat4x17_transpose(H_k_trans,H_k);
+        mat17x4 PHt;
+        mat17x17_mul_mat17x4(PHt,P_apriori,H_k_trans);
+        mat4x4 HPHt;
+        mat4x17_mul_mat17x4(HPHt,H_k,PHt);
+        mat4x4 temp;
+        mat4x4 R_k;
+        mat4x4_identity(temp);        
+        mat4x4_scale(R_k, temp,0.01);
+        R_k[3][3] = 1.0;
+        mat4x4 bracket;
+        mat4x4 bracket_inv;
+        mat4x4_add(bracket,HPHt,R_k);
+        mat4x4_invert(bracket_inv, bracket);
+        print_mat17x17("P_apriori",P_apriori);
+        print_mat17x4("PHt", PHt);
+        print_mat4x4("HPHt", HPHt);
+        print_mat4x4("bracket",bracket);
+        print_mat4x4("bracket_inv",bracket_inv);
+        mat17x4 K_k;
+        mat17x4_mul_mat4x4(K_k,PHt,bracket_inv);
+        print_mat17x4("K",K_k);
+
+        // IMU Translation Correction: Compute x
+        vec4 hx;
+        mat4x17_mul_vec17(hx,H_k,x_apriori);
+        vec4 bracket2;
+        vec4 z_k; // measurement
+        z_k[0] = delta_vector_xyz[0];
+        z_k[1] = delta_vector_xyz[1];
+        z_k[2] = delta_vector_xyz[2];
+        z_k[3] = 0;
+        bracket2[0] = z_k[0]-hx[0];
+        bracket2[1] = z_k[1]-hx[1];
+        bracket2[2] = z_k[2]-hx[2];
+        bracket2[3] = z_k[3]-hx[3];
+        vec17 corr_vector;
+        mat17x4_mul_vec4(corr_vector,K_k,bracket2);
+        vec17_add(x,x_apriori,corr_vector);
+
+        // Todo: Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
+    } 
+    {
+
+    }
     //print_mat4x4("ToFrotation", ToFrotation);
     //print_mat4x4("quat_matrix",quat_matrix);
 
@@ -341,6 +448,20 @@ void PositionEstimate::thrBMI160()
 
     quat_integrated[3] = 1; // Initial Quaternion: (1|0,0,0)
     quat_correction[3] = 1; // Initial Quaternion: (1|0,0,0)
+    x_apriori[10] = 1.0;
+    x_apriori[13] = 1.0;
+    x[10] = 1.0;
+    x[13] = 1.0;
+
+    for (int i = 0; i < 17; i++)
+    {
+        for (int j = 0; j < 17; j++)
+        {
+            P_apriori[i][j] = i == j ? 1.f : 0.f;
+            P_aposteriori[i][j] = i == j ? 1.f : 0.f;
+            F[i][j] = i == j ? 1.f : 0.f;
+        }
+    }
 
     // raw AccelGyro-Data
 
