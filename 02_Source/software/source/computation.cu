@@ -1746,32 +1746,7 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
     if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
         (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].match_ypos)) < height) &&
         (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].match_xpos)) < width))
-    // {
-    //   dst[((int)(d_sift[idx].ypos)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
-    //   dst[((int)(d_sift[idx].match_ypos)) * width * 4 + ((int)(d_sift[idx].match_xpos)) * 4 + 1] = 255 * 255;
-    //   dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(d_sift[idx].ransac_xpos)) * 4 + 2] = 255 * 255;
-    //   // printf("idx = %d, ypos = %d, xpos = %d; match ypos= %d, match_xpos = %d\n", idx, (int)(d_sift[idx].ypos), (int)(d_sift[idx].xpos), (int)(d_sift[idx].match_ypos),(int)(d_sift[idx].match_xpos));
-    //   if (d_sift[idx].ypos < d_sift[idx].match_ypos)
-    //   {
-    //     for (int i = d_sift[idx].ypos; i < d_sift[idx].match_ypos - 1; i++)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 2] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].match_ypos; i--)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 2] = 255 * 255;
-    //   }
-    //   if (d_sift[idx].xpos < d_sift[idx].match_xpos)
-    //   {
-    //     for (int i = d_sift[idx].xpos; i < d_sift[idx].match_xpos - 1; i++)
-    //       dst[((int)(d_sift[idx].match_ypos)) * width * 4 + ((int)(i)) * 4 + 2] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].match_xpos; i--)
-    //       dst[((int)(d_sift[idx].match_ypos)) * width * 4 + ((int)(i)) * 4 + 2] = 255 * 255;
-    //   }
-    // }
+
     if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
         (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos)) < height) &&
         (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos)) < width))

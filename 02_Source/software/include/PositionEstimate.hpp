@@ -24,6 +24,8 @@ private:
 
     std::mutex mtx;
 
+    int cycle_count{};
+
     vec3 gyro_rad_per_s{};
     vec4 accel_m_per_sq_s{};
     float vec_len{};
@@ -45,19 +47,19 @@ private:
     quat quat_integrated{}; // q(t), q_0 = (1,0,0,0)
     quat quat_gyro{};       // instantaneous rotation measured by gyro
     quat quat_correction{}; // correction rotation by accelerometer ("up direction")
-
+    
 
     // orientation quaternions
     quat initial_orientation{}; // (a,b,c) measured at start (up direction)
     quat updated_orientation{}; // (a,b,c) current quat_integrated applied to initial_orientation;
     quat measured_orientation{}; // (a,b,c) up direction measured whenever device is still, corrects "updated_orientation"
     // position estimation
-    quat delta_vector_xyz{}; // true accelerations
+    quat delta_vector_abc{}; // acceleration without G in ABC-direction
+    quat delta_vector_xyz{}; // true accelerations in XYZ-direction
     quat delta_vector_xyz_moving{}; // used for filtering.
-    vec4 position_xyz{}; // (x,y,z) Physical position change from start in m
-    vec4 velocity_xyz{}; // (x,y,z) Current velocity in m/s 
-    // (x,y,z) acceleration is instantaneous and therefore kept within function
-    // (a,b,c) acceleration is instantaneous and therefore kept within function
+    quat delta_tof_vector_moving{};
+
+    quat kalman_rotation;
 
     mat4x4 quat_matrix{}; // final matrix to hand over to Vulkan
     quat quat_tof_integrated{}; // temp matrix used for estimating how ToF camera motion develops over time
