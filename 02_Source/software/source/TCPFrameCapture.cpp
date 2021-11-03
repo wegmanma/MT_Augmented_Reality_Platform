@@ -205,7 +205,7 @@ uint16_t *TCPFrameCapture::getToFFrame(int buffer)
     return buffers_h[buffer];
 }
 
-int TCPFrameCapture::getRotationTranslation(int buffer, mat4x4 rotation, vec4 translation)
+int TCPFrameCapture::getRotationTranslation(int buffer, mat4x4 rotation, quat translation)
 {
     mat4x4_dup(rotation, rotation_buf[buffer]);
     // print_mat4x4("rotation",rotation);

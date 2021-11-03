@@ -140,15 +140,68 @@ PositionEstimate::~PositionEstimate()
 {
 }
 
+void kalmanCorrectionStep(mat4x17 H_k, mat17x17 P_apriori, mat17x17 P_aposteriori, vec17 x, vec17 x_apriori, quat sourceQuaternion, float weight)
+{
+    { // ToF Translation Correction: Compute Kalman Gain
+        mat17x4 K_Imu;
+        // print_mat4x17("ToF H_k", H_k);
+        mat17x4 H_k_trans;
+        mat4x17_transpose(H_k_trans, H_k);
+        mat17x4 PHt;
+        mat17x17_mul_mat17x4(PHt, P_apriori, H_k_trans);
+        mat4x4 HPHt;
+        mat4x17_mul_mat17x4(HPHt, H_k, PHt);
+        mat4x4 temp;
+        mat4x4 R_k;
+        mat4x4_identity(temp);
+        mat4x4_scale(R_k, temp, weight);
+        R_k[3][3] = 1.0;
+        mat4x4 bracket;
+        mat4x4 bracket_inv;
+        mat4x4_add(bracket, HPHt, R_k);
+        mat4x4_invert(bracket_inv, bracket);
+        // print_mat4x4("bracket_inv",bracket_inv);
+        mat17x4 K_k;
+        mat17x4_mul_mat4x4(K_k, PHt, bracket_inv);
+        // ToF Translation Correction: Compute x
+        vec4 hx;
+        mat4x17_mul_vec17(hx, H_k, x_apriori);
+        vec4 bracket2;
+        vec4 z_k; // measurement
+        {
+            z_k[0] = sourceQuaternion[3];
+            z_k[1] = sourceQuaternion[0];
+            z_k[2] = sourceQuaternion[1];
+            z_k[3] = sourceQuaternion[2];
+        }
+        bracket2[0] = z_k[0] - hx[0];
+        bracket2[1] = z_k[1] - hx[1];
+        bracket2[2] = z_k[2] - hx[2];
+        bracket2[3] = z_k[3] - hx[3];
+        vec17 corr_vector;
+        mat17x4_mul_vec4(corr_vector, K_k, bracket2);
+        vec17_add(x, x_apriori, corr_vector);
+        // ToF Translation Correction:  Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
+        mat17x17 I;
+        mat17x17_identity(I);
+        mat17x17 KH;
+        mat17x4_mul_mat4x17(KH, K_k, H_k);
+        //print_mat17x17("ToF KH",KH);
+        mat17x17 P_corr_factor;
+        mat17x17_subtract(P_corr_factor, I, KH);
+        mat17x17_mul(P_aposteriori, P_corr_factor, P_apriori);
+        //print_mat17x17("ToF P_aposteriori",P_aposteriori);
+    }
+}
+
 void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
 {
     mat4x4 ToFrotation;
-    vec4 ToFtranslation;
     quat ToFQuaterion;
     int newdata;
     float vec_len_i;
     int ToFmtx = tcpCapture->lockMutex();
-    newdata = tcpCapture->getRotationTranslation(ToFmtx, ToFrotation, ToFtranslation);
+    newdata = tcpCapture->getRotationTranslation(ToFmtx, ToFrotation, tof_translation_abc);
     tcpCapture->unlockMutex(ToFmtx);
     if (newdata > 0)
     {
@@ -156,18 +209,18 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
         mtx.lock();
         vec4 accel_m_per_sq_s_i;
         meas_cnt_i = meas_cnt;
-        accel_m_per_sq_s_i[1] = accel_m_per_sq_s[0] / (meas_cnt);
-        accel_m_per_sq_s_i[2] = accel_m_per_sq_s[1] / (meas_cnt);
-        accel_m_per_sq_s_i[0] = -accel_m_per_sq_s[2] / (meas_cnt);
+        accel_m_per_sq_s_i[1] = accel_m_per_sq_s[0] / ((float)meas_cnt);
+        accel_m_per_sq_s_i[2] = accel_m_per_sq_s[1] / ((float)meas_cnt);
+        accel_m_per_sq_s_i[0] = -accel_m_per_sq_s[2] / ((float)meas_cnt);
         accel_m_per_sq_s_i[3] = (meas_cnt);
         // print_vec4("accel_m_per_sq_s_i", accel_m_per_sq_s_i);
         // std::cout << "get_gyro_matrix: " << nseconds << std::endl;
         double nseconds_i = nseconds;
         vec3 gyro_rad_per_s_i;
         double theta;
-        gyro_rad_per_s_i[1] = -gyro_rad_per_s[0] / (meas_cnt);
-        gyro_rad_per_s_i[2] = gyro_rad_per_s[1] / (meas_cnt);
-        gyro_rad_per_s_i[0] = gyro_rad_per_s[2] / (meas_cnt);
+        gyro_rad_per_s_i[1] = -gyro_rad_per_s[0] / ((float)meas_cnt);
+        gyro_rad_per_s_i[2] = gyro_rad_per_s[1] / ((float)meas_cnt);
+        gyro_rad_per_s_i[0] = gyro_rad_per_s[2] / ((float)meas_cnt);
         accel_m_per_sq_s[0] = 0.0f;
         accel_m_per_sq_s[1] = 0.0f;
         accel_m_per_sq_s[2] = 0.0f;
@@ -178,12 +231,10 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
         meas_cnt = 0;
         nseconds = 0.0f;
         mtx.unlock();
-        // std::cout << meas_cnt_i << ";" << nseconds_i << ";" <<gyro_rad_per_s_i[0] << ";" << gyro_rad_per_s_i[1] << ";" << gyro_rad_per_s_i[2];
-        // std::cout << ";" << accel_m_per_sq_s_i[0] << ";" << accel_m_per_sq_s_i[1] << ";" << accel_m_per_sq_s_i[2] << ";" << accel_m_per_sq_s_i[3] << std::endl;
-
         if (meas_cnt_i > 0)
         {
             // Calculate vector length
+            vec_len_i = 0.0f;
             for (int i = 0; i < 3; i++)
             {
                 vec_len_i += accel_m_per_sq_s_i[i] * accel_m_per_sq_s_i[i];
@@ -204,99 +255,11 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             // print_quat("quat_gyro",quat_gyro);
             quat_from_mat4x4(ToFQuaterion, ToFrotation);
 
-            // update rotation quaternion
-            {
-                quat temp{};
-                quat_mul(temp, quat_gyro, quat_integrated);
-                quat_integrated[0] = temp[0];
-                quat_integrated[1] = temp[1];
-                quat_integrated[2] = temp[2];
-                quat_integrated[3] = temp[3];
-            }
-
             // compute current measured orientation - might be unstable, only apply when stable
-            for (int i = 0; i < 3; i++)
-            {
-                measured_orientation[i] = accel_m_per_sq_s_i[i] / vec_len_i;
-            }
-            // compute orientation as seen by quat_integrated
-            {
-                quat quat_integrated_conj{};
-                quat temp{};
-                quat_conj(quat_integrated_conj, quat_integrated);
-                quat_mul(temp, quat_integrated, initial_orientation);
-                quat_mul(updated_orientation, temp, quat_integrated_conj);
-            }
-            // print_quat("updated_orientation",updated_orientation);
-            // compute correction rotation
-            {
-                quat_RotationBetweenVectors(quat_correction, updated_orientation, measured_orientation);
-            }
-            // print_quat("quat_correction",quat_correction);
-            // print_quat("delta_vector_abc", delta_vector_abc, true, true);
-            // if no movement and no rotation: Use accelerometer to find G
-            // compute velocity without gravity
-            {
 
-                quat quat_integrated_conj{};
-                quat temp{};
-                for (int i = 0; i < 3; i++)
-                {
-                    delta_vector_abc[i] = accel_m_per_sq_s_i[i] - updated_orientation[i] * CONST_G;
-                }
-                quat_conj(quat_integrated_conj, quat_integrated);
-                quat_mul(temp, quat_integrated_conj, delta_vector_abc);
-                quat_mul(delta_vector_xyz, temp, quat_integrated);
-            }
-            if (cycle_count == 0)
-                {
-                    delta_vector_xyz[0] = 0.0f;
-                    delta_vector_xyz[1] = 0.0f;
-                    delta_vector_xyz[2] = 0.0f;
-                    delta_vector_xyz[3] = 0.0f;
-                }
 
-            if (((vec_len_i >= 9.77) && (vec_len_i <= 9.86) && vec3_check_around_zero(gyro_rad_per_s, NO_ROTATION_TRESH)) || (newdata == 2))
-            {
-                // std::cout << "Stable: \U00002705 (no motion, newdata = " << newdata << ")" << std::endl;
-
-                for (int i = 0; i < 3; i++)
-                {
-                    delta_vector_xyz_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_vector_xyz_moving[i] + ACC_FILTER_DEPTH * delta_vector_xyz[i];
-                    delta_tof_vector_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_tof_vector_moving[i] + ACC_FILTER_DEPTH * ToFtranslation[i];
-                }
-                // correct rotation quaternion
-                {
-                    quat temp{};
-                    quat_mul(temp, quat_correction, quat_integrated);
-                    quat_integrated[0] = temp[0];
-                    quat_integrated[1] = temp[1];
-                    quat_integrated[2] = temp[2];
-                    quat_integrated[3] = temp[3];
-                }
-                // x[1] = 0.0f;
-                // x[4] = 0.0f;
-                // x[7] = 0.0f;
-                // x[2] = 0.0f;
-                // x[5] = 0.0f;
-                // x[8] = 0.0f;
-            }
-            else
-            {
-                // std::cout << "Stable: \U0000274C (motion)" << std::endl;
-            }
             //print_quat("delta_vector before",delta_vector_xyz);
             //  print_quat("delta_vector_xyz_moving", delta_vector_xyz_moving);
-            for (int i = 0; i < 3; i++)
-            {
-                delta_vector_xyz[i] = delta_vector_xyz[i] - delta_vector_xyz_moving[i];
-                ToFtranslation[i] = ToFtranslation[i] - delta_tof_vector_moving[i];
-            }
-
-            for (int i = 0; i < 9; i++)
-            {
-                accelGyroLast[i] = accelGyro[i];
-            }
 
             { // Prediction: Fill F
                 F[1][0] = nseconds_i;
@@ -355,277 +318,203 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 mat17x17_scale(Q, temp, nseconds_i / 2);
                 Q[2][2] = Q[2][2] * 10;
                 Q[5][5] = Q[5][5] * 10;
-                Q[8][8] = Q[8][2] * 10;
+                Q[8][8] = Q[8][8] * 10;
+                Q[13][13] = Q[13][13] * 50;
+                Q[14][14] = Q[14][14] * 50;
+                Q[15][15] = Q[15][15] * 50;
+                Q[16][16] = Q[16][16] * 50;
                 mat17x17_add(P_apriori, temp2, Q);
             }
+            {
+                mat4x17 H_k = {0};
+                H_k[13][0] = 1;
+                H_k[14][1] = 1;
+                H_k[15][2] = 1;
+                H_k[16][3] = 1;
+                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, quat_gyro, 0.0001);
+            }
+            mat17x17_dup(P_apriori, P_aposteriori);
+            vec17_dup(x_apriori, x);
+            {
+                mat4x17 H_k = {0};
+                H_k[13][0] = 1;
+                H_k[14][1] = 1;
+                H_k[15][2] = 1;
+                H_k[16][3] = 1;
+                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+            }
+            // compute orientation as seen by quat_integrated
+            {
+                quat_integrated[0] = x[10];
+                quat_integrated[1] = x[11];
+                quat_integrated[2] = x[12];
+                quat_integrated[3] = x[9];
 
-            { // IMU Translation Correction: Compute Kalman Gain
-                mat17x4 K_Imu;
+                quat quat_integrated_conj{};
+                quat temp{};
+                quat_conj(quat_integrated_conj, quat_integrated);
+                quat_mul(temp, quat_integrated, initial_orientation);
+                quat_mul(updated_orientation, temp, quat_integrated_conj);
+            }
+
+            // if standing still, compute orientation as seen by accelerometer.
+            if ((vec_len_i < 9.81 + 0.2) && (vec_len_i > 9.81 - 0.2))
+            {
+
+                for (int i = 0; i < 3; i++)
+                {
+                    measured_orientation[i] = accel_m_per_sq_s_i[i] / vec_len_i;
+                }
+                quat_RotationBetweenVectors(quat_correction, updated_orientation, measured_orientation);
+                mat17x17_dup(P_apriori, P_aposteriori);
+                vec17_dup(x_apriori, x);
+                {
+                    mat4x17 H_k = {0};
+                    H_k[13][0] = 1;
+                    H_k[14][1] = 1;
+                    H_k[15][2] = 1;
+                    H_k[16][3] = 1;
+                    // print_quat("quat_correction", quat_correction);
+                    kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, quat_correction, 0.001);
+                }
+                // as the orientation is now changed, update the current orientation
+                {
+                    quat_integrated[0] = x[10];
+                    quat_integrated[1] = x[11];
+                    quat_integrated[2] = x[12];
+                    quat_integrated[3] = x[9];
+
+                    quat quat_integrated_conj{};
+                    quat temp{};
+                    quat_conj(quat_integrated_conj, quat_integrated);
+                    quat_mul(temp, quat_integrated, initial_orientation);
+                    quat_mul(updated_orientation, temp, quat_integrated_conj);
+                }
+            }
+
+            // rotation complete, now rotate all the translational vectors from abc-coords to xyz-coords
+
+            {
+
+                quat_integrated[0] = x[10];
+                quat_integrated[1] = x[11];
+                quat_integrated[2] = x[12];
+                quat_integrated[3] = x[9];
+
+                quat quat_integrated_conj{};
+                quat temp{};
+                for (int i = 0; i < 3; i++)
+                {
+                    delta_vector_abc[i] = accel_m_per_sq_s_i[i] - updated_orientation[i] * CONST_G;
+                }
+                quat_conj(quat_integrated_conj, quat_integrated);
+                quat_mul(temp, quat_integrated_conj, delta_vector_abc);
+                quat_mul(delta_vector_xyz, temp, quat_integrated);
+                quat_mul(temp, quat_integrated_conj, tof_translation_abc);
+                quat_mul(tof_translation_xyz, temp, quat_integrated);
+            }
+            if (cycle_count < 5)
+            {
+                delta_vector_xyz[0] = 0.0f;
+                delta_vector_xyz[1] = 0.0f;
+                delta_vector_xyz[2] = 0.0f;
+                delta_vector_xyz[3] = 0.0f;
+                tof_translation_xyz[0] = 0.0f;
+                tof_translation_xyz[1] = 0.0f;
+                tof_translation_xyz[2] = 0.0f;
+                tof_translation_xyz[3] = 0.0f;
+            }
+
+            // offset correction in a moving average when standing still
+            if ((vec_len_i < 9.81 + 0.2) && (vec_len_i > 9.81 - 0.2))
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    delta_vector_xyz_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_vector_xyz_moving[i] + ACC_FILTER_DEPTH * delta_vector_xyz[i];
+                    delta_tof_vector_moving[i] = (1 - ACC_FILTER_DEPTH) * delta_tof_vector_moving[i] + ACC_FILTER_DEPTH * tof_translation_xyz[i];
+                }
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                delta_vector_xyz[i] = delta_vector_xyz[i] - delta_vector_xyz_moving[i];
+                // tof_translation_xyz[i] = tof_translation_xyz[i] - delta_tof_vector_moving[i];
+            }
+
+            quat delta_vector;
+
+            delta_vector[3] = delta_vector_xyz[0];
+            delta_vector[0] = delta_vector_xyz[1];
+            delta_vector[1] = delta_vector_xyz[2];
+            delta_vector[2] = 0;
+
+            mat17x17_dup(P_apriori, P_aposteriori);
+            vec17_dup(x_apriori, x);
+            {
                 mat4x17 H_k = {0};
                 H_k[2][0] = 1;
                 H_k[5][1] = 1;
                 H_k[8][2] = 1;
-                mat17x4 H_k_trans;
-                mat4x17_transpose(H_k_trans, H_k);
-                mat17x4 PHt;
-                mat17x17_mul_mat17x4(PHt, P_apriori, H_k_trans);
-                mat4x4 HPHt;
-                mat4x17_mul_mat17x4(HPHt, H_k, PHt);
-                mat4x4 temp;
-                mat4x4 R_k;
-                mat4x4_identity(temp);
-                mat4x4_scale(R_k, temp, 0.0001);
-                R_k[3][3] = 1.0;
-                mat4x4 bracket;
-                mat4x4 bracket_inv;
-                mat4x4_add(bracket, HPHt, R_k);
-                mat4x4_invert(bracket_inv, bracket);
-                mat17x4 K_k;
-                mat17x4_mul_mat4x4(K_k, PHt, bracket_inv);
-
-                // IMU Translation Correction: Compute x
-                vec4 hx;
-                mat4x17_mul_vec17(hx, H_k, x_apriori);
-                vec4 bracket2;
-                vec4 z_k; // measurement
-
-                    z_k[0] = delta_vector_xyz[0]; //+ delta_vector_correction_from_tof[0];
-                    z_k[1] = delta_vector_xyz[1]; //+ delta_vector_correction_from_tof[1];
-                    z_k[2] = delta_vector_xyz[2]; //+ delta_vector_correction_from_tof[2];
-                    z_k[3] = 0;
-                
-                bracket2[0] = z_k[0] - hx[0];
-                bracket2[1] = z_k[1] - hx[1];
-                bracket2[2] = z_k[2] - hx[2];
-                bracket2[3] = z_k[3] - hx[3];
-                vec17 corr_vector;
-                mat17x4_mul_vec4(corr_vector, K_k, bracket2);
-                vec17_add(x, x_apriori, corr_vector);
-                // IMU Translation Correction:  Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
-                mat17x17 I;
-                mat17x17_identity(I);
-                mat17x17 KH;
-                mat17x4_mul_mat4x17(KH, K_k, H_k);
-                // print_mat17x17("IMU KH",KH);
-                mat17x17 P_corr_factor;
-                mat17x17_subtract(P_corr_factor, I, KH);
-                mat17x17_mul(P_aposteriori, P_corr_factor, P_apriori);
-                // print_mat17x17("IMU P_aposteriori",P_aposteriori);
+                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, delta_vector, 0.0005);
             }
+            quat tof_translation;
+            tof_translation[3] = 0.5 * tof_translation_xyz[0];
+            tof_translation[0] = -0.5 * tof_translation_xyz[1];
+            tof_translation[1] = 0.5 * tof_translation_xyz[2];
+            tof_translation[2] = 0;
+
             mat17x17_dup(P_apriori, P_aposteriori);
             vec17_dup(x_apriori, x);
-            { // ToF Translation Correction: Compute Kalman Gain
-                mat17x4 K_Imu;
+            {
                 mat4x17 H_k = {0};
                 H_k[1][0] = 1;
                 H_k[4][1] = 1;
                 H_k[7][2] = 1;
-                // print_mat4x17("ToF H_k", H_k);
-                mat17x4 H_k_trans;
-                mat4x17_transpose(H_k_trans, H_k);
-                mat17x4 PHt;
-                mat17x17_mul_mat17x4(PHt, P_apriori, H_k_trans);
-                mat4x4 HPHt;
-                mat4x17_mul_mat17x4(HPHt, H_k, PHt);
-                mat4x4 temp;
-                mat4x4 R_k;
-                mat4x4_identity(temp);
-                mat4x4_scale(R_k, temp, 1);
-                R_k[3][3] = 1.0;
-                mat4x4 bracket;
-                mat4x4 bracket_inv;
-                mat4x4_add(bracket, HPHt, R_k);
-                mat4x4_invert(bracket_inv, bracket);
-                // print_mat4x4("bracket_inv",bracket_inv);
-                mat17x4 K_k;
-                mat17x4_mul_mat4x4(K_k, PHt, bracket_inv);
-                // print_mat17x4("ToF K",K_k);
-                //
-                // ToF Translation Correction: Compute x
-                vec4 hx;
-                mat4x17_mul_vec17(hx, H_k, x_apriori);
-                vec4 bracket2;
-                vec4 z_k; // measurement
-                z_k[0] = 0.5*ToFtranslation[0];
-                z_k[1] = -0.5*ToFtranslation[1];
-                z_k[2] = 0.5*ToFtranslation[2];
-                z_k[3] = 0;
-                bracket2[0] = z_k[0] - hx[0];
-                bracket2[1] = z_k[1] - hx[1];
-                bracket2[2] = z_k[2] - hx[2];
-                bracket2[3] = z_k[3] - hx[3];
-                vec17 corr_vector;
-                mat17x4_mul_vec4(corr_vector, K_k, bracket2);
-                vec17_add(x, x_apriori, corr_vector);
-                //
-                //print_vec17("ToF corr_vector",corr_vector);
-                //print_vec17("X",x);
-                // ToF Translation Correction:  Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
-                mat17x17 I;
-                mat17x17_identity(I);
-                mat17x17 KH;
-                mat17x4_mul_mat4x17(KH, K_k, H_k);
-                //print_mat17x17("ToF KH",KH);
-                mat17x17 P_corr_factor;
-                mat17x17_subtract(P_corr_factor, I, KH);
-                mat17x17_mul(P_aposteriori, P_corr_factor, P_apriori);
-                //print_mat17x17("ToF P_aposteriori",P_aposteriori);
+                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, tof_translation, 1.0);
             }
-            mat17x17_dup(P_apriori, P_aposteriori);
-            vec17_dup(x_apriori, x);
-            { // ToF Translation Correction: Compute Kalman Gain
-                mat17x4 K_Imu;
-                mat4x17 H_k = {0};
-                H_k[13][0] = 1;
-                H_k[14][1] = 1;
-                H_k[15][2] = 1;
-                H_k[16][3] = 1;
-                // print_mat4x17("ToF H_k", H_k);
-                mat17x4 H_k_trans;
-                mat4x17_transpose(H_k_trans, H_k);
-                mat17x4 PHt;
-                mat17x17_mul_mat17x4(PHt, P_apriori, H_k_trans);
-                mat4x4 HPHt;
-                mat4x17_mul_mat17x4(HPHt, H_k, PHt);
-                mat4x4 temp;
-                mat4x4 R_k;
-                mat4x4_identity(temp);
-                mat4x4_scale(R_k, temp, 0.0001);
-                R_k[3][3] = 1.0;
-                mat4x4 bracket;
-                mat4x4 bracket_inv;
-                mat4x4_add(bracket, HPHt, R_k);
-                mat4x4_invert(bracket_inv, bracket);
-                // print_mat4x4("bracket_inv",bracket_inv);
-                mat17x4 K_k;
-                mat17x4_mul_mat4x4(K_k, PHt, bracket_inv);
-                // print_mat17x4("ToF K",K_k);
-                //
-                // ToF Translation Correction: Compute x
-                vec4 hx;
-                mat4x17_mul_vec17(hx, H_k, x_apriori);
-                vec4 bracket2;
-                vec4 z_k; // measurement
-                z_k[0] = quat_gyro[3];
-                z_k[1] = quat_gyro[0];
-                z_k[2] = quat_gyro[1];
-                z_k[3] = quat_gyro[2];
-                bracket2[0] = z_k[0] - hx[0];
-                bracket2[1] = z_k[1] - hx[1];
-                bracket2[2] = z_k[2] - hx[2];
-                bracket2[3] = z_k[3] - hx[3];
-                vec17 corr_vector;
-                mat17x4_mul_vec4(corr_vector, K_k, bracket2);
-                vec17_add(x, x_apriori, corr_vector);
-                //
-                //print_vec17("ToF corr_vector",corr_vector);
-                //print_vec17("X",x);
-                // ToF Translation Correction:  Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
-                mat17x17 I;
-                mat17x17_identity(I);
-                mat17x17 KH;
-                mat17x4_mul_mat4x17(KH, K_k, H_k);
-                //print_mat17x17("ToF KH",KH);
-                mat17x17 P_corr_factor;
-                mat17x17_subtract(P_corr_factor, I, KH);
-                mat17x17_mul(P_aposteriori, P_corr_factor, P_apriori);
-                //print_mat17x17("ToF P_aposteriori",P_aposteriori);
-            }
-            // print_quat("quat_integrated", quat_integrated, true, true);
-            // print_quat("quat_gyro", quat_gyro, true, true);
-            // print_quat("quat_tof_integrated", quat_tof_integrated, true, true);
-            // print_quat("tofQuaternion", ToFQuaterion, true, true);
-            // print_vec17("X2", x);
-            mat17x17_dup(P_apriori, P_aposteriori);
-            vec17_dup(x_apriori, x);
-            { // ToF Translation Correction: Compute Kalman Gain
-                mat17x4 K_Imu;
-                mat4x17 H_k = {0};
-                H_k[13][0] = 1;
-                H_k[14][1] = 1;
-                H_k[15][2] = 1;
-                H_k[16][3] = 1;
-                // print_mat4x17("ToF H_k", H_k);
-                mat17x4 H_k_trans;
-                mat4x17_transpose(H_k_trans, H_k);
-                mat17x4 PHt;
-                mat17x17_mul_mat17x4(PHt, P_apriori, H_k_trans);
-                mat4x4 HPHt;
-                mat4x17_mul_mat17x4(HPHt, H_k, PHt);
-                mat4x4 temp;
-                mat4x4 R_k;
-                mat4x4_identity(temp);
-                mat4x4_scale(R_k, temp, 0.01);
-                R_k[3][3] = 1.0;
-                mat4x4 bracket;
-                mat4x4 bracket_inv;
-                mat4x4_add(bracket, HPHt, R_k);
-                mat4x4_invert(bracket_inv, bracket);
-                // print_mat4x4("bracket_inv",bracket_inv);
-                mat17x4 K_k;
-                mat17x4_mul_mat4x4(K_k, PHt, bracket_inv);
-                // print_mat17x4("ToF K",K_k);
-                //
-                // ToF Translation Correction: Compute x
-                vec4 hx;
-                mat4x17_mul_vec17(hx, H_k, x_apriori);
-                vec4 bracket2;
-                vec4 z_k; // measurement
-                if (ToFQuaterion[3] < 0.75)
-                {
-                    z_k[0] = 1.0;
-                    z_k[1] = 0.0;
-                    z_k[2] = 0.0;
-                    z_k[3] = 0.0;
-                }
-                else
-                {
-                    z_k[0] = ToFQuaterion[3];
-                    z_k[1] = ToFQuaterion[0];
-                    z_k[2] = ToFQuaterion[1];
-                    z_k[3] = ToFQuaterion[2];
-                }
 
-                bracket2[0] = z_k[0] - hx[0];
-                bracket2[1] = z_k[1] - hx[1];
-                bracket2[2] = z_k[2] - hx[2];
-                bracket2[3] = z_k[3] - hx[3];
-                vec17 corr_vector;
-                mat17x4_mul_vec4(corr_vector, K_k, bracket2);
-                vec17_add(x, x_apriori, corr_vector);
-                //
-                //print_vec17("ToF corr_vector",corr_vector);
-                //print_vec17("X",x);
-                // ToF Translation Correction:  Recalculate Error-Matrix P_k from Kalman-Gain, H and P_apriori
-                mat17x17 I;
-                mat17x17_identity(I);
-                mat17x17 KH;
-                mat17x4_mul_mat4x17(KH, K_k, H_k);
-                //print_mat17x17("ToF KH",KH);
-                mat17x17 P_corr_factor;
-                mat17x17_subtract(P_corr_factor, I, KH);
-                mat17x17_mul(P_aposteriori, P_corr_factor, P_apriori);
-                //print_mat17x17("ToF P_aposteriori",P_aposteriori);
-            }
             // print_quat("ToFquaternion", ToFQuaterion);
             print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
-            print_vec4("ToFTranlation", ToFtranslation, true, true);
-            print_vec17("X3", x, true);
+            print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
+            // print_vec17("X3", x, true);
             //    print_quat("quat_integrated", quat_integrated);
             //    // std::cout << "------------------------------------------------------------------" << cycle_count << "--------------------------------------------------" << std::endl;
             cycle_count++;
             if (cycle_count > 3000)
-                cycle_count = 1;
-            //    //print_mat4x4("ToFrotation", ToFrotation);
+                cycle_count = 5;
+            std::cout << vec_len_i << ";" << meas_cnt_i << ";";
+            // print_quat("quat_integrated", quat_integrated, true, true);
+            // print_quat("quat_gyro", quat_gyro, true, true);
+            // print_quat("ToFquaternion", ToFQuaterion, true, true);
             //    //print_mat4x4("quat_matrix",quat_matrix);
 
             kalman_rotation[0] = x[10];
             kalman_rotation[1] = x[11];
             kalman_rotation[2] = x[12];
             kalman_rotation[3] = x[9];
+
+            kalman_translation[0] = x[0];
+            kalman_translation[1] = x[1];
+            kalman_translation[2] = x[2];
+            kalman_translation[3] = 0;
+
+            quat kalman_velocity;
+            kalman_velocity[0] = x[3];
+            kalman_velocity[1] = x[4];
+            kalman_velocity[2] = x[5];
+            kalman_velocity[3] = 0;
+
+            quat kalman_acceleration;
+            kalman_acceleration[0] = x[6];
+            kalman_acceleration[1] = x[7];
+            kalman_acceleration[2] = x[8];
+            kalman_acceleration[3] = 0;
             // print_quat("kalman_rotation", kalman_rotation, true, true);
 
             quat kalman_rot_speed = {x[14], x[15], x[16], x[13]};
+
+            print_quat("kalman_translation", kalman_translation, true, true);
+            print_quat("kalman_velocity", kalman_velocity, true, true);
+            print_quat("kalman_acceleration", kalman_acceleration, true);
             // print_quat("kalman_rot_speed", kalman_rot_speed, true);
         }
     }
@@ -640,7 +529,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
     }
 
     // update the matrix
-    mat4x4_from_quat(quat_matrix, quat_integrated);
+    mat4x4_from_quat(quat_matrix, kalman_rotation);
     mat4x4_dup(gyro_matrix, quat_matrix);
 }
 
@@ -757,6 +646,9 @@ void PositionEstimate::thrBMI160()
             // std::cout << "continuing" << std::endl;
             continue;
         }
+        
+
+
         // extract all raw measurements with offset-correction
         vec_len = 0.0f;
 
@@ -766,7 +658,11 @@ void PositionEstimate::thrBMI160()
             accel_i[i] = ((accelGyro[i + 3] - zero_translation_abc[i]) / ACCEL_RESOLUTION);
         }
         accel_i[3] = 1.0;
-
+        for (int i = 0; i < 3; i++)
+        {
+            vec_len += accel_i[i] * accel_i[i];
+        }
+        vec_len = sqrt(vec_len);
         // gain correction
         if (accel_i[0] <= 0)
             accel_i[0] *= FLIP_BACK_CORR; // x_neg
@@ -785,9 +681,10 @@ void PositionEstimate::thrBMI160()
         mtx.lock();
         meas_cnt++;
 
-        nseconds = nseconds_i;
+        nseconds += nseconds_i;
         // std::cout << "main_thread, t= " << nseconds_i << "gyro = " << gyro_i[0] << "; " << gyro_i[1] << "; " << gyro_i[2] << std::endl;
         nseconds_i = 0.0;
+        
         gyro_rad_per_s[0] += gyro_i[0];
         gyro_rad_per_s[1] += gyro_i[1];
         gyro_rad_per_s[2] += gyro_i[2];
@@ -796,6 +693,10 @@ void PositionEstimate::thrBMI160()
         accel_m_per_sq_s[2] += accel_i[2];
         accel_m_per_sq_s[3] += accel_i[3];
         mtx.unlock();
+        for (int i = 0; i < 9; i++)
+        {
+            accelGyroLast[i] = accelGyro[i];
+        }
     }
     bmi160->I2CGetDataCloseDevice(file);
 }

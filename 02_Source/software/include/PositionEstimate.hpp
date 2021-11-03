@@ -60,8 +60,11 @@ private:
     quat delta_tof_vector_moving{};
 
     quat kalman_rotation;
+    quat kalman_translation;
 
     mat4x4 quat_matrix{}; // final matrix to hand over to Vulkan
+    quat tof_translation_abc{};
+    quat tof_translation_xyz{};
     quat quat_tof_integrated{}; // temp matrix used for estimating how ToF camera motion develops over time
 
     vec3 zero_rotation_abc = { 0.0, 0.0, 0.0}; 
