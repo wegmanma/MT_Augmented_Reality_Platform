@@ -46,7 +46,7 @@
 \usepackage{tabularx}
 \usepackage{lmodern}
 \usepackage{longtable}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{wallpaper} %\ThisTileWallPaper{}
 \usepackage[super,square]{natbib} %f�r BibTeX Literaturverzeichnis
 \usepackage{amsfonts}

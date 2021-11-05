@@ -2,10 +2,65 @@
 \chapter{Implementation}
 \label{sec:Implementation}
 This chapter describes the implementation and the connections of the individual components of the augmented reality system. There are two main tasks, the system needs to perform: A three dimensional estimation of the surrounding and the precise measurement of motion of the camera head.
+\section{Hardware}
+\label{sec:Hardware}
+The following section describes the evaluation and setup of the hardware used for the camera head and the processing system. 
+\subsection{Evaluation of ToF Camera}
+\label{sec:CamEvaluation}
+Having no prior experience with time-of-flight (ToF) cameras, a suitable device had to be evaluated first. Cost and availability have been the main factors in the evaluation, with it being directly CSI-2 connected being a big plus.\\
+Internet research has shown a handful of different sensors powering multiple products of other manufacturers in varying price ranges. \\
+\\
+\textbf{Sony DepthSense IMX556PLR}\\
+The Sony IMX556PLR ToF Sensor offers a resolution of 640 x 480 pixels at 30 frames per second and is used by Basler, Lucid Vision Labs, and DephtEye, primarily for Gigabit Ethernet cameras. The IMX556PLR seems to be the most capable ToF sensor freely available in off-the-shelf products at the time.  \\
+The technically most compelling product for this thesis would have been the Helios Flex by Lucid Vision Labs, which directly connects via CSI-2 and is sold specifically for use on an Nvidia Jetson TX2 Developer Kit. It features a maximum range of 6 meters for depth measurement and accuracy of ±10mm. Although with 749 US Dollars, the Helios Flex is relatively expensive and unsuitable for the thesis because of an unknown lead time.\\
+\\
+\textbf{Infineon REAL3 IRS1125}\\
+The Infineon IRS1125 ToF Sensor is available in a USB-based development kit by pmdtec – an integrator for ToF technology into smartphones – and on the affordable PiEye Nimbus 3D camera, which is sold as a Raspberry Pi accessory.  \\
+The sensor features a resolution of 352x288 pixels at 30 frames per second in the variant IRS1125A. The variant IRS1125C – used by pmdtec – allows 60 frames per second. The pmdtec development kit is tuned for measuring up to 6 meters, while the PiEye camera is limited to 5 meters.\\
+While both camera systems are readily available to be shipped, the pmdtec pico monstar costs about 1500 US Dollars; in contrast, the PiEye Nimbus costs only 230 Euros. The PiEye company advertises its camera with open source software to embed it into the Raspberry Pi ecosystem. However, further investigation has shown that the middleware – the library managing the camera’s settings and connecting to the video4linux2 framework – is still under NDA with Infineon. \\
+With a lightweight TCP/IP protocol, the module is suitable with a Raspberry Pi, acting as a Gigabit Ethernet camera. The PiEye Nimbus is the module of choice for this thesis – the availability, the price, and the specifications are all reasonable. The options to reverse engineer the middleware or sign an individual NDA with Infineon have been kept open initially but were not necessary as the Gigabit Ethernet implementation worked well enough.\\
+\\
+\textbf{Other image sensors}\\
+During the internet research, the Texas Instruments OPT8241 has shown up. TI declared the chip obsolete – the chip itself was still available, but the development kit was sold out. With 320 times 240 pixels and an advertised range of 4 meters, the OPT8241 is inferior to the chosen PiEye Nimbus. In addition, the Terabee 3Dcam features a custom sensor with a resolution of 80x60 pixels and 4 meters range. It is attached by USB 2.0 and costs 250 Euros. Due to the low resolution, the Terabee 3Dcam is also inferior to the PiEye Nimbus. 
+
+
+\subsection{Camera Head}
+\label{sec:camHead}
+The camera head contains the PiEye Nimbus ToF camera, mounted on a Raspberry Pi 4B, a Bosch BMI160 IMU, attached to a USB to I²C bridge, and a standard Raspberry Pi camera v2.1 which is connected to the processing system via an FPDLink module.\\
+All is held together by a plywood structure glued onto a tripod-baseplate, shown in figure \ref{fig:cameraHead}.
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[b]{0.45\textwidth}
+      \includegraphics[scale=0.40]{images/todo.png}
+      \caption{Frontside}
+      \label{fig:cameraHeadfront} 
+    \end{minipage} % Hier darf keine Leerzeile zwischen den beiden Minipages liegen!
+    \begin{minipage}[b]{0.45\textwidth}
+      \includegraphics[scale=0.40]{images/todo.png} 
+      \caption{Backside}
+      \label{fig:cameraHeadback} 
+    \end{minipage}
+    \caption{The camera head consisting of the ToF camera, the IMU and the Raspberry Pi camera}
+    \label{fig:cameraHead}
+  \end{figure}
+The IMU could have been attached directly to the Raspberry Pi, but at the time of the implementation, the decision on how to connect the ToF camera was not taken yet. Therefore, it was not certain that a Raspberry Pi would be mounted at the camera head.
+Four individual cables connect to the different components on the camera head: A USB-C power cable and an RJ45 Ethernet cable for the Raspberry Pi, a USB 2.0 cable for the USB to I²C bridge, and an FPDLink coaxial cable for the Raspberry Pi Camera.
+
+
+\subsection{Processing System}
+\label{sec:procSystem}
+An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rendering, and data acquisition. An Anyvision baseboard - shown in image \ref{fig:anyvision} - carries the Nvidia Jetson module and allows the direct attachment of the used data cables.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \caption{The Nvidia Jetson Xavier AGX on the Anyvision Baseboard.}
+    \label{fig:anyvision}
+\end{figure}
+A TCP/IP server application on the Raspberry Pi powering the PiEye ToF camera, to which the processing system connects, serves the necessary ToF camera data in a frame-based protocol. The USB to I²C bridge gets loaded as a standard I²C device by the Linux on the processing system. The IMU is then directly configured and polled by the userspace software on the processing system without an additional driver. The Raspberry Pi camera is attached via FPDLink and integrated as a video4linux2 device. The capturing is done with FFMPEG and the debayering in CUDA.
 \section{Video inputs}
+\label{sec:videoInputs}
 The system utilizes two cameras, a Raspberry Pi Camera v2 and a PiEye ToF camera that doubles as an infrared camera. The Sony IMX 219 based Raspberry Pi Camera v2 features a color image with an 8 megapixel resolution for single images, 1080p with 30 frames per second, 720p with 60 frames per second or 480p with 90 frames per second.\cite{raspiCamSpec} The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.\\
 The PiEye ToF camera is based on the Infineon REAL3 IRS1125A sensor which has a resolution of 352 x 288 pixels\cite{piEyeShop}. The ToF Camera is paired with infrared LED flashes to measure the time of flight of the light emitted and has an intended measurement range from 10 centimeters up to five meters. The entire ToF software stack runs on a Raspberry Pi that sends its video data via Ethernet to the augmented reality system.\\
-
 
 \subsection{ToF Camera calibration}
 \label{sec:ToFCalibration}
@@ -52,17 +107,59 @@ The accelerometer has been calibrated in 24 orientations to even out angle error
 \end{figure}
 The largest error has been 38 mG, that lies within the sensor's specification of ±40 mG\cite{BMI160}. In addition, the gain for the accelerometer has been corrected based on gravity. A maximum error of 1.8\% has been measured and corrected, which also lies in the sensor's specification of ±0.5\% full scale\cite{BMI160}.\\
 For the gyroscope, the range is set to ±2000 degrees per second with an output data rate of 200 Hz. The gyroscope has been calibrated only for zero offset, whose maximum error was 0.2 degrees per second which lies well in the specified ±3 degrees per second\cite{BMI160}. A gain correction was not made, because of not having the required equipment to do so.\\
-\section{Position estimation}
+\section{Position and Orientation Estimation}
 \label{sec:PositionEstimate}
-The position estimation of the camera head is crucial for the augmented reality platform. 
+The position estimation of the camera head is crucial for the augmented reality platform. The following section describes the implementation of the different systems involved in sensing motion.\\
+While the measurement using the IMU is standard implementation via I²C communication, the implementation of the ToF-Camera based measurement is more complex and got split into multiple subsections. 
+\subsection{Spatial coordinates and device coordinates}
+\label{sec:ABC_XYZ_coords}
+As the rotation of the camera head changes the coordinates of the measurement in respect to real-world coordinates, a convention helps carry out the calculations. For the sensors on the camera head, the coordinates are named $a$, $b$, and $c$, while the spatial coordinates are named $x$, $y$, and $z$.
+The coordinates can be transformed by the following formula, knowing the current orientation quaternion $Q_{rot}$.   
+\begin{equation*}
+    Q_{rot}
+    =
+    \begin{pmatrix}
+        r           \\
+        u\textbf{j} \\
+        v\textbf{j} \\
+        w\textbf{k}
+    \end{pmatrix}
+    \quad ; \quad
+    \begin{pmatrix}
+        0           \\
+        x\textbf{i} \\
+        y\textbf{j} \\
+        z\textbf{k}
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+        r           \\
+        u\textbf{i} \\
+        v\textbf{j} \\
+        w\textbf{k}
+    \end{pmatrix}
+    \begin{pmatrix}
+        0           \\
+        a\textbf{i} \\
+        b\textbf{j} \\
+        c\textbf{k}
+    \end{pmatrix}
+    \begin{pmatrix}
+        r           \\
+        -u\textbf{i} \\
+        -v\textbf{j} \\
+        -w\textbf{k}
+    \end{pmatrix}
+\end{equation*}
+Section \ref{sec:RotationQuaternion} describes how to carry out the mathematics of this quaternion multiplication. 
 \subsection{Gyroscope and Accelerometer}
 \label{sec:GyroPosition}
-TODO: Position estimate fast
+The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements via an I²C connection, which is extended by a Silicon Labs CP2112 USB to I²C bridge. 
 \subsection{SIFT features movement detection}
 \label{sec:SIFTPosition}
 TODO: Position estimate slow
 \subsection{Sensor Fusion with Kalman Filter}
-\label{sec:SIFTPosition}
+\label{sec:SensorFusion}
 TODO: Position estimate slow
 \section{Video display}
 \label{sec:VideoDisplay}

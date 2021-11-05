@@ -195,6 +195,7 @@ By division of the clip coordinate components $x_{c}$, $y_{c}$ and $z_{c}$ with 
 The transformation to the pixel coordinates are also done by Vulkan without requiring any action by the developer. The only noticable detail is the alignment of the normalized device coordinates. On the viewport surface, the point $(0 / 0)$ is located in the center. Top left is $(-1 / -1)$, top right is $(1 / -1)$, bottom left is $(-1 / 1)$ and bottom right is $(1 / 1)$.
 
 \subsection{Rotation with Quaternions}
+\label{sec:RotationQuaternion}
 Quaternions - also known as "Hamilton Numbers" - are the four dimensional equivalent to complex numbers. The theory of quaternions is vast, only the parts needed in this thesis are explained in this section. Analogue to complex numbers, quaternions also consist of a real part, but add three imaginary parts $\textbf{i}$, $\textbf{j}$ and $\textbf{k}$. Most often, quaternions get represented in the form $a+b\textbf{i}+c\textbf{j}+d\textbf{k}$ or a four dimensional vector $(a, b, c, d)$.\\
 The relations of the different imaginary parts in a quaternion are defined as following: $\textbf{i}^{2}=\textbf{j}^{2}=\textbf{k}^{2}=\textbf{ijk}=-1$, $\textbf{ij}=\textbf{k}, \textbf{jk}=\textbf{j}, \textbf{ki}=\textbf{j}$, and  $\textbf{ji}=-\textbf{k}, \textbf{kj}=-\textbf{i}, \textbf{ik}=-\textbf{j}$. These definitions cause the quaternion multiplication (or Hamilton Product) to be non-commutative. The following equation shows how the Hamilton Product is calculated:
 \begin{equation*}
@@ -379,6 +380,6 @@ The implementation in CUDA is done by storing the pixel coordinates of the uncor
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{Storing the final calibration values into an array keeps the CUDA-Kernel simple.}
+    \caption{Storing the final calibration values into an array keeps the implementation in CUDA simple.}
     \label{im:CudaCamCalib}
 \end{figure}
