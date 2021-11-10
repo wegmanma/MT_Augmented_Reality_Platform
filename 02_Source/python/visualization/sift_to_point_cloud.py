@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
+import mpl_toolkits.mplot3d as a3
 import matplotlib.pyplot as plt
 import math
 
@@ -188,5 +189,20 @@ for i in range(4):
     ax4.scatter(points_2_rot[i][0], points_2_rot[i][1], color='#0465A9')
 ax4.set_ylim(-1, 1)
 ax4.set_xlim(-1, 1)
+
+fig2 = plt.figure(figsize=(cm_to_inch(40), cm_to_inch(30)))
+ax21 = fig2.add_subplot(111, projection='3d')
+
+vtx = np.array([[-1.83,-1,-1],[-1.83,1,-1],[-1.83,1,1],[-1.83,-1,1]])
+print(vtx)
+tri = a3.art3d.Poly3DCollection([vtx])
+tri.set_edgecolor('k')
+ax21.add_collection3d(tri)
+
+ax21.scatter(0,0,0, color='#000000')
+for i in range(3):
+    for j in range(4):
+        ax21.scatter(cubefaces[i][j][0],cubefaces[i][j][1],cubefaces[i][j][2], color='#0465A9')
+        ax21.scatter(cubefaces_rot[i][j][0],cubefaces_rot[i][j][1],cubefaces_rot[i][j][2], color='#A41F22')
 
 plt.show()

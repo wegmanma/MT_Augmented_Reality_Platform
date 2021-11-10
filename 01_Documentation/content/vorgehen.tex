@@ -162,7 +162,7 @@ The PiEye Nimbus ToF camera generates three different image channels for each pi
 The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends, which are then brute force matched with the features of the prior image, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \includegraphics[width=1.0\textwidth]{images/feature_matching_bruteforce.pdf}
     \caption{First step of ToF motion estimation: Extract SIFT features and brute-force match with prior image.}
     \label{im:SiftExtraction}
 \end{figure}
@@ -176,7 +176,7 @@ TODO: Formel!
 \end{figure}
 
 \subsection{ToF Camera: 3D ransac}
-\label{sec:ToFPosition_SIFT}
+\label{sec:ToFPosition_RANSAC}
 The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} 
 
 
