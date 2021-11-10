@@ -154,10 +154,33 @@ The coordinates can be transformed by the following formula, knowing the current
 Section \ref{sec:RotationQuaternion} describes how to carry out the mathematics of this quaternion multiplication. 
 \subsection{Gyroscope and Accelerometer}
 \label{sec:GyroPosition}
-The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements via an I²C connection, which is extended by a Silicon Labs CP2112 USB to I²C bridge. 
-\subsection{SIFT features movement detection}
-\label{sec:SIFTPosition}
-TODO: Position estimate slow
+The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements via an I²C connection, extended by a Silicon Labs CP2112 USB-to-I²C bridge. The IMU generates measurements regarding acceleration in the directions $a$, $b$, and $c$, and measurements regarding rotation speed around these axes.\\
+The IMU shows a hysteresis that lies within the specification of the datasheet; therefore, a simple offset correction does not yield the best results. A moving average – that gets updated whenever no motion of the camera head is detected – helps deal with the hysteresis by subtraction from the measurement value.
+\subsection{ToF Camera: SIFT feature extraction}
+\label{sec:ToFPosition_SIFT}
+The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:RadialCorrection}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
+The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends, which are then brute force matched with the features of the prior image, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \caption{First step of ToF motion estimation: Extract SIFT features and brute-force match with prior image.}
+    \label{im:SiftExtraction}
+\end{figure}
+Each feature coordinate on the picture gets mapped to the 3D space to generate the point cloud. The lens projects objects within the space of a pyramid onto the sensor, which leads to the following coordinate mapping. The coordinate transformation is visualized in image \ref{im:SiftCoordTransform}. Please note the coordinate convention described in section \ref{sec:ABC_XYZ_coords}.\\
+TODO: Formel!
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \caption{Second step of ToF motion estimation: Map features into 3D space}
+    \label{im:SiftCoordTransform}
+\end{figure}
+
+\subsection{ToF Camera: 3D ransac}
+\label{sec:ToFPosition_SIFT}
+The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} 
+
+
+
 \subsection{Sensor Fusion with Kalman Filter}
 \label{sec:SensorFusion}
 TODO: Position estimate slow
