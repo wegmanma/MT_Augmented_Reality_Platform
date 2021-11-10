@@ -159,25 +159,110 @@ The IMU shows a hysteresis that lies within the specification of the datasheet; 
 \subsection{ToF Camera: SIFT feature extraction}
 \label{sec:ToFPosition_SIFT}
 The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:RadialCorrection}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
-The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends, which are then brute force matched with the features of the prior image, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
+The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends, which are then brute-force matched with the features of the prior image, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/feature_matching_bruteforce.pdf}
-    \caption{First step of ToF motion estimation: Extract SIFT features and brute-force match with prior image.}
+    \caption{First step of ToF motion estimation: Extract SIFT features and brute-force match with prior image. Note that the brute-force matcher also generates false matches.}
     \label{im:SiftExtraction}
 \end{figure}
-Each feature coordinate on the picture gets mapped to the 3D space to generate the point cloud. The lens projects objects within the space of a pyramid onto the sensor, which leads to the following coordinate mapping. The coordinate transformation is visualized in image \ref{im:SiftCoordTransform}. Please note the coordinate convention described in section \ref{sec:ABC_XYZ_coords}.\\
-TODO: Formel!
+Each feature coordinate on the picture gets mapped to the 3D space to generate the point cloud. The lens projects objects within the space of a pyramid onto the sensor, which leads to the following coordinate mapping. The coordinate transformation is visualized in image \ref{im:SiftCoordTransform}. Please note the coordinate convention described in section \ref{sec:ABC_XYZ_coords}. $a$, $b$ and $c$ being the 3D coordinates, $u$ and $v$ being the coordinates on the image and $d$ being the value of the ToF depth image on position $(u,v)$. $f$ denotes a virtual focal length, merging the camera's field of view (viewing angle $\alpha$) and the image resolution in one number.
+\begin{equation*}
+    a = d \qquad b = \frac{v}{f}\cdot x \qquad c = \frac{u}{f}\cdot x \qquad f=\frac{\tfrac{u_{max}}{2}}{tan(\tfrac{\alpha}{2})}
+\end{equation*}
+The PiEye Nimbus ToF camera has an advertised viewing angle of $1.152rad$ horizontally and $0.942rad$ vertically. Combined with an image resolution of $352 x 288px$, the formula for $f$ outputs $271$ for the horizontal and $282$ for the vertical case. The chosen value is: $f = 280$.
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/todo.png}
     \caption{Second step of ToF motion estimation: Map features into 3D space}
     \label{im:SiftCoordTransform}
 \end{figure}
+\subsection{ToF Camera: Find rotation and translation}
+\label{sec:ToFPosition_SVD}
+Calculating the rotation and translation of one point cloud $p_{k-1}$ to another point cloud $p_{k}$ is possible with three correctly matched point pairs, named $a$, $b$ and $c$ in the example. Following the recipe from a note from the ETH Zurich, also containing the proof, the three points must be centered. The method described in the ETH note also adds the possibility to add weights to individual data points. 
+The centroids for both point groups are:
+\begin{equation*}
+    \vec{c}_{k}=\frac{\vec{p}_{a,k}+\vec{p}_{b,k}+\vec{p}_{c,k}}{3} \qquad 
+    \vec{c}_{k-1}=\frac{\vec{p}_{a,k-1}+\vec{p}_{b,k-1}+\vec{p}_{c,k-1}}{3}
+\end{equation*}
+For example visualized in image \ref{im:SVD_step_by_step} and with the following calculation:
+\begin{equation*}
+    \vec{c}_{k}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    =\frac{1}{3}\cdot\left(
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    +
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    +
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \right)
+\end{equation*}
+\begin{equation*}
+    \vec{c}_{k-1}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    =\frac{1}{3}\cdot\left(
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    +
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    +
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \right)
+\end{equation*}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \caption{Rotation and Translation step by step.}
+    \label{im:SVD_step_by_step}
+\end{figure}
+Subtraction of the centroid vectors from the three points in the respective point cloud generates the centered point clouds. In an ideal case, a rotation matrix alone can transform one centered point cloud into the other. 
+FORMEL und BEISPIEL
+A matrix-multiplication of the point groups $p_{c,k}$ and $p_{c,k-1}$  generates the 3x3 covariance matrix $S$ as shown in the following formula. 
+FORMEL und BEISPIEL
+The singular value decomposition (SVD), briefly explained in section XY, splits the 3x3 covariance $S$ matrix into three separate 3x3 matrices $U$, $\Sigma$, and $V$.
+FORMEL
+The wanted rotation matrix then follows by calculating:
+FORMEL
+The wanted translation is computed by applying the rotation to the centroid vectors. 
+FORMEL und BEISPIEL
+
 
 \subsection{ToF Camera: 3D ransac}
 \label{sec:ToFPosition_RANSAC}
-The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} 
+The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} Low matching accuracy is a known problem in other fields of image processing - like panorama stitching - and is there often solved with an algorithm named RANSAC (random sample consensus).\\
+These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.
+
 
 
 
