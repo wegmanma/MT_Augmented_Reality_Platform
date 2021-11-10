@@ -1932,8 +1932,8 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].conf = conf[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
     data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;
     data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].y_3d = (data[idx].xpos+128)/220*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].z_3d = (data[idx].ypos+102.5)/220*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].y_3d = (data[idx].xpos+128)/280*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].z_3d = (data[idx].ypos+102.5)/280*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
     // printf("distance = x_3d = %f, y_3d = %f, z_3d = %f, xpos = %f, ypos = %f\n", data[idx].x_3d, data[idx].y_3d, data[idx].z_3d, data[idx].xpos, data[idx].ypos);
   }
 }
