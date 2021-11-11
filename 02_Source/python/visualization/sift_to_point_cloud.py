@@ -107,6 +107,9 @@ points_0_rot_prev2 = cubeface_to_poly(cubefaces_rot_prev2[0])
 points_1_rot_prev2 = cubeface_to_poly(cubefaces_rot_prev2[1])
 points_2_rot_prev2 = cubeface_to_poly(cubefaces_rot_prev2[2])
 
+print(cubefaces[2])
+print(cubefaces_rot[2])
+
 fig = plt.figure(figsize=(cm_to_inch(40), cm_to_inch(30)))
 ax1 = fig.add_subplot(221)
 ax2 = fig.add_subplot(222)
@@ -194,7 +197,6 @@ fig2 = plt.figure(figsize=(cm_to_inch(40), cm_to_inch(30)))
 ax21 = fig2.add_subplot(111, projection='3d')
 
 vtx = np.array([[-1.83,-1,-1],[-1.83,1,-1],[-1.83,1,1],[-1.83,-1,1]])
-print(vtx)
 tri = a3.art3d.Poly3DCollection([vtx])
 tri.set_edgecolor('k')
 ax21.add_collection3d(tri)

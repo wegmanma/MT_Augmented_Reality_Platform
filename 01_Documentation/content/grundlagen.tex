@@ -332,8 +332,6 @@ Turning or moving the camera head influences the image of an object differently,
 The singular value decomposition is a linear algebra method that allows finding the optimal rotation matrix between two matching point clouds. Adding additional algebraic steps makes it possible to find the optimal translation vector in addition.\cite{SVD_ETH}\\
 For demonstration purposes, the recipe is carried out in a 2D example in the following.
 
-
-
 \section{Camera Calibration}
 \label{sec:FundCamCalibration}
 An uncalibrated camera image often has lens distortion, warping a rectangle into a pillow or barrel shape and making areas appear closer in certain parts of the image. These distortions are named radial and tangential distortion and are induced by the camera lens.\\
@@ -351,9 +349,9 @@ In these equations, $r$ is the euclidian distance between the distorted image po
 \begin{equation*}
     r=\sqrt{(x_{distorted}-x_{center})^{2}+(y_{distorted}-y_{center})^{2}}
 \end{equation*}
-Therefore, for the lens distortions, the five coefficients $k_{1}$, $k_{2}$, $k_{3}$, $p_{1}$ and $p_{2}$ are needed. In addition, the effect of the focal length $f$ and the optical center $f$ get expressed as a 3x3 matrix.\cite{openCVCamCalib}
+Therefore, for the lens distortions, the five coefficients $k_{1}$, $k_{2}$, $k_{3}$, $p_{1}$ and $p_{2}$ are needed. In addition, the effect of the focal length $f$ and the optical center $c$ get expressed as a 3x3 matrix.\cite{openCVCamCalib}
 \begin{equation*}
-    A_{Camera}
+    A_{Camera}=
     \begin{bmatrix}
         f_{x} & 0 & c_{x} \\
         0 & f_{y} & c_{y} \\

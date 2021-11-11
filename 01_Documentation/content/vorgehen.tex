@@ -159,7 +159,7 @@ The IMU shows a hysteresis that lies within the specification of the datasheet; 
 \subsection{ToF Camera: SIFT feature extraction}
 \label{sec:ToFPosition_SIFT}
 The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:RadialCorrection}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
-The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends, which are then brute-force matched with the features of the prior image, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
+The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends $k$, which are then brute-force matched with the features of the prior image $k-1$, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/feature_matching_bruteforce.pdf}
@@ -179,13 +179,14 @@ The PiEye Nimbus ToF camera has an advertised viewing angle of $1.152rad$ horizo
 \end{figure}
 \subsection{ToF Camera: Find rotation and translation}
 \label{sec:ToFPosition_SVD}
-Calculating the rotation and translation of one point cloud $p_{k-1}$ to another point cloud $p_{k}$ is possible with three correctly matched point pairs, named $a$, $b$ and $c$ in the example. Following the recipe from a note from the ETH Zurich, also containing the proof, the three points must be centered. The method described in the ETH note also adds the possibility to add weights to individual data points. 
+Calculating the rotation and translation of one point cloud $P_{k-1}$ to another point cloud $P_{k}$ is possible with at least three correctly matched point pairs. Following the recipe from a note from the ETH Zurich, also containing the proof, the three points must be centered. The method described in the ETH note also adds the possibility to add weights to individual data points. Upper case $P$ denotes a point cloud, lower case $p$ denotes a single point in that cloud. The number of matched point pairs in the following formulae is $n$, in the example $n = 3$, $i$ is the index of the single point in the point cloud and $k$ is the image frame number from which the point cloud got extracted.
 The centroids for both point groups are:
 \begin{equation*}
-    \vec{c}_{k}=\frac{\vec{p}_{a,k}+\vec{p}_{b,k}+\vec{p}_{c,k}}{3} \qquad 
-    \vec{c}_{k-1}=\frac{\vec{p}_{a,k-1}+\vec{p}_{b,k-1}+\vec{p}_{c,k-1}}{3}
+    \vec{c}_{k}=\frac{\sum_{i=1}^n \vec{p}_{i,k}}{n} \qquad 
+    \vec{c}_{k-1}=\frac{\sum_{i=1}^n \vec{p}_{i,k-1}}{n}
 \end{equation*}
 For example visualized in image \ref{im:SVD_step_by_step} and with the following calculation:
+
 \begin{equation*}
     \vec{c}_{k}=
     \begin{pmatrix}
@@ -246,22 +247,149 @@ For example visualized in image \ref{im:SVD_step_by_step} and with the following
     \caption{Rotation and Translation step by step.}
     \label{im:SVD_step_by_step}
 \end{figure}
-Subtraction of the centroid vectors from the three points in the respective point cloud generates the centered point clouds. In an ideal case, a rotation matrix alone can transform one centered point cloud into the other. 
-FORMEL und BEISPIEL
-A matrix-multiplication of the point groups $p_{c,k}$ and $p_{c,k-1}$  generates the 3x3 covariance matrix $S$ as shown in the following formula. 
-FORMEL und BEISPIEL
-The singular value decomposition (SVD), briefly explained in section XY, splits the 3x3 covariance $S$ matrix into three separate 3x3 matrices $U$, $\Sigma$, and $V$.
-FORMEL
+Subtraction of the centroid vectors from the individual points in the respective point cloud $P$ generates the centered point clouds $Q$. In an ideal case, a rotation matrix alone can transform one centered point cloud into the other. 
+\begin{equation*}
+    \vec{q}_{i,k}=\vec{p}_{i,k}+\vec{c}_{k} \qquad 
+    \vec{q}_{i,k-1}=\vec{p}_{i,k-1}+\vec{c}_{k-1} 
+\end{equation*}
+In the example, the results are:
+\begin{equation*}
+    \vec{q}_{1,k}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \qquad 
+    \vec{q}_{2,k}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \qquad     \vec{q}_{3,k}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+\end{equation*}
+\begin{equation*}
+    \vec{q}_{1,k-1}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \qquad 
+    \vec{q}_{2,k-1}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+    \qquad     \vec{q}_{3,k-1}=
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+\end{equation*}
+A matrix-multiplication of the point groups $Q_{k}$ and $Q_{k-1}$ generates the $3\times3$ covariance matrix $S$ as shown in the following formula. The point groups are packed in matrix form, in the three point example, the point group matrices are of dimension $3\times3$. When using $n$ points, the point group matrices are of dimension $n\times3$, whose covariance matrix remains of dimension $3\times3$.
+\begin{equation*}
+    S= Q_{k}Q_{k-1}^{T}
+\end{equation*}
+In the example:
+\begin{equation*}
+    Q_{k}=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix} \quad
+    Q_{k-1}=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix}
+\end{equation*}
+\begin{equation*}
+    S= 
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix}
+\end{equation*}
+The singular value decomposition (SVD), briefly explained in section \ref{sec:SVD}, splits the covariance matrix $S$ into three separate $3\times3$ matrices $U$, $\Sigma$, and $V$. As the SVD in this use case is always applied to matrices of dimension $3\times3$, the optimized variant\cite{Gao:2018:GPU_MPM} from GitHub\cite{Github_SVD_CUDA} can be utilized.
+\begin{equation*}
+    S= U\Sigma V^{T}
+\end{equation*}
+In the example:
+\begin{equation*}
+    U=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix} \quad
+    \Sigma=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix} \quad
+    V=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix}
+\end{equation*}
 The wanted rotation matrix then follows by calculating:
-FORMEL
+\begin{equation*}
+    R=V
+    \begin{bmatrix}
+        1 & 0 & 0 \\
+        0 & 1 & 0 \\
+        0 & 0 & det(VU^{T})
+    \end{bmatrix}U^{T} \quad
+\end{equation*}
+In the example:
+\begin{equation*}
+    R=
+    \begin{bmatrix}
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM \\
+        NUM & NUM & NUM
+    \end{bmatrix} \quad
+\end{equation*}
 The wanted translation is computed by applying the rotation to the centroid vectors. 
-FORMEL und BEISPIEL
+\begin{equation*}
+    \vec{t} = \vec{c}_{k}-R\cdot\vec{c}_{k-1}
+\end{equation*}
+In the example:
+\begin{equation*}
+    \vec{t} = 
+    \begin{pmatrix}
+        NUM \\
+        NUM \\
+        NUM
+    \end{pmatrix}
+\end{equation*}
 
 
 \subsection{ToF Camera: 3D ransac}
 \label{sec:ToFPosition_RANSAC}
 The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} Low matching accuracy is a known problem in other fields of image processing - like panorama stitching - and is there often solved with an algorithm named RANSAC (random sample consensus).\\
-These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.
+These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.\\
+The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section XY, the corresponding rotations and translations are calculated on these groups of three feature pairs.\\
+Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.\\
+Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.\\
+Finally, the optimal rotation matrix and translation vector are calculated using the method described in section XY, this time not with only three points but all accepted matches.
+
+
 
 
 
