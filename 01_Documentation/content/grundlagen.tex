@@ -329,8 +329,13 @@ Turning or moving the camera head influences the image of an object differently,
 \end{figure}
 \subsection{Singular Value Decomposition (SVD)}
 \label{sec:SVD}
-The singular value decomposition is a linear algebra method that allows finding the optimal rotation matrix between two matching point clouds. Adding additional algebraic steps makes it possible to find the optimal translation vector in addition.\cite{SVD_ETH}\\
-For demonstration purposes, the recipe is carried out in a 2D example in the following.
+The singular value decomposition is a linear algebra method that allows finding the optimal rotation matrix between two matching point clouds. Adding additional algebraic steps makes it possible to find the optimal translation vector in addition.\cite{SVD_ETH}
+For demonstration purposes, the recipe is carried out in a 3D example in section \ref{sec:ToFPosition_SVD} in the Implementation chapter.\\
+The SVD decomposes any given matrix $M$ of the dimension $n\times m$ into three matrices $U$ of dimension $n\times n$, $\Sigma$ of dimension $n\times m$, and $V$ of dimension $m\times m$.\cite{SVD_MIT} If $M$ is real, $U$ and $V$ are guaranteed to be orthogonal, while $\Sigma$ is a diagonal matrix. The matrices fulfill the following equation: 
+\begin{equation*}
+    S= U\Sigma V^{T}
+\end{equation*}
+
 
 \section{Camera Calibration}
 \label{sec:FundCamCalibration}

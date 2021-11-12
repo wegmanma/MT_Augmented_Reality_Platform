@@ -356,7 +356,8 @@ The wanted rotation matrix then follows by calculating:
         0 & 0 & det(VU^{T})
     \end{bmatrix}U^{T} \quad
 \end{equation*}
-In the example:
+Without the correction of the calculation, using the term $det(VU^{T})$ in the intermediate matrix, the SVD could generate a reflection instead of a rotation. This is numerically sound, but would not reflect the real world scenario. The determinant $det(VU^{T})$ equals -1 in the case of a reflection, which can be used to flip the signs of the 3rd column of the rotation matrix. If the SVD directly generates a rotation, $det(VU^{T})$ equals to 1, which transforms the intermediate matrix into the identity.\\
+In the example the resulting rotation matrix $R$ equals:
 \begin{equation*}
     R=
     \begin{bmatrix}
@@ -387,7 +388,8 @@ These applications of the RANSAC algorithm work on two-dimensional images and ar
 The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section XY, the corresponding rotations and translations are calculated on these groups of three feature pairs.\\
 Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.\\
 Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.\\
-Finally, the optimal rotation matrix and translation vector are calculated using the method described in section XY, this time not with only three points but all accepted matches.
+Finally, the optimal rotation matrix and translation vector are calculated using the method described in section XY, this time not with only three points but all accepted matches. With more than three points, the calculated rotation and translation is not the exact result, but the result that yields the least square error.\cite{SVD_ETH}\\
+The whole methodology relies on finding the correct rotation and translation from randomized 
 
 
 
