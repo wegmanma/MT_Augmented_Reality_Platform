@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 32
+#define MIN_THRESH_RANSAC 64
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -1040,7 +1040,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
       }
     }
   }
-  if (idx0 == 2)
+  // if (idx0 == 2)
   // printf("rot\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n",
   //      rot[0][0], rot[1][0], rot[2][0], t[0],  // matrix 1st row
   //      rot[0][1], rot[1][1], rot[2][1], t[1],  // matrix 2nd row
@@ -1932,7 +1932,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
     data[idx].conf = conf[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
     data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;
     data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].y_3d = (data[idx].xpos+128)/280*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].y_3d = -(data[idx].xpos+128)/280*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
     data[idx].z_3d = (data[idx].ypos+102.5)/280*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
     // printf("distance = x_3d = %f, y_3d = %f, z_3d = %f, xpos = %f, ypos = %f\n", data[idx].x_3d, data[idx].y_3d, data[idx].z_3d, data[idx].xpos, data[idx].ypos);
   }
