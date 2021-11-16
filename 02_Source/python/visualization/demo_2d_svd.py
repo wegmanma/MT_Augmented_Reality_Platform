@@ -5,7 +5,7 @@ def cm_to_inch(value):
     return value/2.54
 
 # define circle of single data points
-n = 64
+n = 200
 x = np.zeros((n,2))
 for i in range(n):
     phi = i*(3.141592*2)/n
@@ -15,15 +15,24 @@ for i in range(n):
 phi1 = 0.8
 phi2 = (3.1415926*2)/128*53
 U = np.array([[np.cos(phi1),-1.0*np.sin(phi1)],[np.sin(phi1),np.cos(phi1)]])
-S = np.array([[1.4,0],[0,0.6]])
+S = np.array([[1,0],[0,1]])
 V = np.array([[np.cos(phi2),-1.0*np.sin(phi2)],[np.sin(phi2),np.cos(phi2)]])
 Vt = np.transpose(V)
 
 M = np.matmul(U,np.matmul(S,Vt))
 
+# M[0][0] = 0.6
+# M[1][0] = 1.1
+# M[0][1] = 0.9
+# M[1][1] = 0.2
+
+
 Us, Ss, VTs = np.linalg.svd(M)
-
-
+print(Us)
+print(Ss)
+print(VTs)
+print(np.linalg.det(Us))
+print(np.linalg.det(VTs))
 print("Results")
 A_remake = (Us @ np.diag(Ss) @ VTs)
 print(A_remake)
@@ -118,6 +127,10 @@ print(R)
 S_det[1][1] = np.linalg.det(np.matmul(np.transpose(VTp),np.transpose(Up)))
 Rp = np.matmul(np.transpose(VTp),np.matmul(S_det,np.transpose(Up)))
 print(Rp)
+print("Results2")
+print(Up)
+print(Sp)
+print(VTp)
 
 
 
