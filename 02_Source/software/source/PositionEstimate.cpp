@@ -341,7 +341,16 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 H_k[14][1] = 1;
                 H_k[15][2] = 1;
                 H_k[16][3] = 1;
-                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+                // if (newdata == 2) {
+                //     ToFQuaterion[0] = 0.0;
+                //     ToFQuaterion[1] = 0.0;
+                //     ToFQuaterion[2] = 0.0;
+                //     ToFQuaterion[3] = 1.0;
+                //     kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+                // }
+                // else {
+                    kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+                // }
             }
             // compute orientation as seen by quat_integrated
             {
@@ -473,15 +482,15 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
 
             // print_quat("ToFquaternion", ToFQuaterion);
-            print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
-            print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
+            // print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
+            // print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
             // print_vec17("X3", x, true);
             //    print_quat("quat_integrated", quat_integrated);
             //    // std::cout << "------------------------------------------------------------------" << cycle_count << "--------------------------------------------------" << std::endl;
             cycle_count++;
             if (cycle_count > 3000)
                 cycle_count = 5;
-            std::cout << vec_len_i << ";" << meas_cnt_i << ";";
+            // std::cout << vec_len_i << ";" << meas_cnt_i << ";";
             // print_quat("quat_integrated", quat_integrated, true, true);
             // print_quat("quat_gyro", quat_gyro, true, true);
             // print_quat("ToFquaternion", ToFQuaterion, true, true);
@@ -512,9 +521,9 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
 
             quat kalman_rot_speed = {x[14], x[15], x[16], x[13]};
 
-            print_quat("kalman_translation", kalman_translation, true, true);
-            print_quat("kalman_velocity", kalman_velocity, true, true);
-            print_quat("kalman_acceleration", kalman_acceleration, true);
+            // print_quat("kalman_translation", kalman_translation, true, true);
+            // print_quat("kalman_velocity", kalman_velocity, true, true);
+            // print_quat("kalman_acceleration", kalman_acceleration, true);
             // print_quat("kalman_rot_speed", kalman_rot_speed, true);
         }
     }

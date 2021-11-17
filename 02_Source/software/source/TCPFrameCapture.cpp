@@ -251,7 +251,11 @@ void TCPFrameCapture::unlockMutex(int mtx_nr)
 void TCPFrameCapture::run()
 {
     cudaStream_t tcpCaptureStream;
-    cudaStreamCreate(&tcpCaptureStream);
+        int least, greatest;
+    cudaDeviceGetStreamPriorityRange(&least, &greatest);
+    // std::cout << "cuda priorities - least: " << least << " greatest: " << greatest << std::endl; 
+    cudaStreamCreateWithPriority(&tcpCaptureStream, 0, greatest);
+
     int sock;
     struct sockaddr_in server;
     char server_data[FRAME_LENGTH + 4];
