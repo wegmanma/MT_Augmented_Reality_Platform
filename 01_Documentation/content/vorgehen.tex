@@ -87,12 +87,11 @@ Pixel by pixel multiplication of any other image $I_{Any}$ with $I_{cos}$ will c
     \label{im:ToFCorrected}
 \end{figure}
 To apply this calibration in CUDA, a file has been generated which holds the $I_{Cos}$ values for each pixel. The application reads the file at initialization and keeps it stored in a Cuda allocated memory area. 
-
-
-TODO: Distance measurement calibration!
 \subsection{Raspberry Pi Camera calibration}
 \label{sec:RBPiCalibration}
-TODO: Cam calibration
+The Raspberry Pi camera only provides images for enhancing the system's video output cosmetically; the lens calibration serves no algorithmic purpose. The lens was calibrated solely to map the image into the undistorted Vulkan 3D space, so the virtual rectangle fits the real world's picture.\\
+The camera streams in 720p to use the entire sensor with pixel binning. In 1080p, the sensor uses only a portion of the image sensor, which narrows down the field of view. Like with the ToF camera, a lookup table calibrates the Raspberry Pi camera, which reduces the image size to a resolution of 1273 times 709 pixels.
+
 \section{Gyroscope and Accelerometer Calibration}
 \label{sec:GyroCal}
 The used inertial movement unit (IMU) is a Bosch BMI160, that is sold soldered on a PCB by DFRobot.\\
@@ -183,62 +182,62 @@ Calculating the rotation and translation of one point cloud $P_{k-1}$ to another
 The centroids for both point groups are:
 \begin{equation*}
     \vec{c}_{k}=\frac{\sum_{i=1}^n \vec{p}_{i,k}}{n} \qquad 
-    \vec{c}_{k-1}=\frac{\sum_{i=1}^n \vec{p}_{i,k-1}}{n}
+    \vec{c}_{k-1}=\frac{\sum_{i=1}^n \vec{p}_{i,k-1}}{n} 
 \end{equation*}
 For example visualized in image \ref{im:SVD_step_by_step} and with the following calculation:
 
 \begin{equation*}
     \vec{c}_{k}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        4.421 \\
+        -0.154 \\
+        0.223
     \end{pmatrix}
     =\frac{1}{3}\cdot\left(
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        3.314 \\
+        0.043 \\
+        -0.037
     \end{pmatrix}
     +
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        4.852 \\
+        1.198 \\
+        -0.586
     \end{pmatrix}
     +
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        5.098 \\
+        -1.704 \\
+        1.291
     \end{pmatrix}
     \right)
 \end{equation*}
 \begin{equation*}
     \vec{c}_{k-1}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        4.433 \\
+        0.059 \\
+        -0.090
     \end{pmatrix}
     =\frac{1}{3}\cdot\left(
-    \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
-    \end{pmatrix}
-    +
-    \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
-    \end{pmatrix}
-    +
-    \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
-    \end{pmatrix}
+        \begin{pmatrix}
+            3.298 \\
+            0.177 \\
+            -0.271
+        \end{pmatrix}
+        +
+        \begin{pmatrix}
+            4.709 \\
+            1.436 \\
+            -0.924
+        \end{pmatrix}
+        +
+        \begin{pmatrix}
+            5.291 \\
+            -1.436 \\
+            0.924
+        \end{pmatrix}
     \right)
 \end{equation*}
 \begin{figure}[H]
@@ -249,77 +248,77 @@ For example visualized in image \ref{im:SVD_step_by_step} and with the following
 \end{figure}
 Subtraction of the centroid vectors from the individual points in the respective point cloud $P$ generates the centered point clouds $Q$. In an ideal case, a rotation matrix alone can transform one centered point cloud into the other. 
 \begin{equation*}
-    \vec{q}_{i,k}=\vec{p}_{i,k}+\vec{c}_{k} \qquad 
-    \vec{q}_{i,k-1}=\vec{p}_{i,k-1}+\vec{c}_{k-1} 
+    \vec{q}_{i,k}=\vec{p}_{i,k}-\vec{c}_{k} \qquad 
+    \vec{q}_{i,k-1}=\vec{p}_{i,k-1}-\vec{c}_{k-1} \qquad i = 1, 2, 3, ... , n
 \end{equation*}
 In the example, the results are:
 \begin{equation*}
     \vec{q}_{1,k}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        -1.108 \\
+        0.197 \\
+        -0.260
     \end{pmatrix}
     \qquad 
     \vec{q}_{2,k}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        0.431 \\
+        1.352 \\
+        -0.808
     \end{pmatrix}
     \qquad     \vec{q}_{3,k}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        0.677 \\
+        -1.549 \\
+        1.068
     \end{pmatrix}
 \end{equation*}
 \begin{equation*}
     \vec{q}_{1,k-1}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        -1.134 \\
+        0.118 \\
+        -0.181
     \end{pmatrix}
     \qquad 
     \vec{q}_{2,k-1}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        0.276 \\
+        1.377 \\
+        -0.833
     \end{pmatrix}
     \qquad     \vec{q}_{3,k-1}=
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        0.858 \\
+        -1.495 \\
+        1.014
     \end{pmatrix}
 \end{equation*}
 A matrix-multiplication of the point groups $Q_{k}$ and $Q_{k-1}$ generates the $3\times3$ covariance matrix $S$ as shown in the following formula. The point groups are packed in matrix form, in the three point example, the point group matrices are of dimension $3\times3$. When using $n$ points, the point group matrices are of dimension $n\times3$, whose covariance matrix remains of dimension $3\times3$.
 \begin{equation*}
-    S= Q_{k}Q_{k-1}^{T}
+    S= Q_{k-1}Q_{k}^{T}
 \end{equation*}
 In the example:
 \begin{equation*}
     Q_{k}=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        -1.108 & 0.431  & 0.677  \\
+        0.197  & 1.352  & -1.549 \\
+        -0.260 & -0.808 & 1.068
     \end{bmatrix} \quad
     Q_{k-1}=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        -1.134 & 0.276  & 0.858  \\
+        0.118  & 1.377  & -1.495 \\
+        -0.181 & -0.833 & 1.014
     \end{bmatrix}
 \end{equation*}
 \begin{equation*}
     S= 
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        1.956 & -1.180 & 0.989 \\
+        -0.549 & 4.201 & -2.741 \\
+        0.528 & -2.734 & 1.805
     \end{bmatrix}
 \end{equation*}
 The singular value decomposition (SVD), briefly explained in section \ref{sec:SVD}, splits the covariance matrix $S$ into three separate $3\times3$ matrices $U$, $\Sigma$, and $V$. As the SVD in this use case is always applied to matrices of dimension $3\times3$, the optimized variant\cite{Gao:2018:GPU_MPM} from GitHub\cite{Github_SVD_CUDA} can be utilized.
@@ -330,21 +329,21 @@ In the example:
 \begin{equation*}
     U=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        -0.301 & -0.950 & -0.080 \\
+        0.796 & -0.297 & 0.528 \\
+        -0.525 & 0.096 & 0.846
     \end{bmatrix} \quad
     \Sigma=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        6.309 & 0 & 0 \\
+        0 & 1.690 & 0 \\
+        0 & 0 & 0
     \end{bmatrix} \quad
     V=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        -0.207 & -0.973 & 0.102 \\
+        0.814 & -0.229 & -0.534 \\
+        -0.543 & 0.028 & -0.839
     \end{bmatrix}
 \end{equation*}
 The wanted rotation matrix then follows by calculating:
@@ -361,9 +360,9 @@ In the example the resulting rotation matrix $R$ equals:
 \begin{equation*}
     R=
     \begin{bmatrix}
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM \\
-        NUM & NUM & NUM
+        0.995 & 0.071  & -0.071 \\
+        -0.071 & 0.998  & 0.002 \\
+        0.071& 0.002 & 0.998
     \end{bmatrix} \quad
 \end{equation*}
 The wanted translation is computed by applying the rotation to the centroid vectors. 
@@ -374,31 +373,30 @@ In the example:
 \begin{equation*}
     \vec{t} = 
     \begin{pmatrix}
-        NUM \\
-        NUM \\
-        NUM
+        0 \\
+        0.1 \\
+        0
     \end{pmatrix}
 \end{equation*}
+The rotation matrix $R$ and the translation vector $\vec{t}$ fulfill the following equation, in which $p$ are individual points of the point clouds $P$. If the number of points is $n=3$, the calculation is exact, for point clouds with $n>3$ points, the error $E$ is the least-square error\cite{SVD_ETH}.
+\begin{equation*}
+    \vec{p}_{i,k} = R\cdot\vec{p}_{i,k-1}+\vec{t}+E
+\end{equation*}
 
-
-\subsection{ToF Camera: 3D ransac}
+\subsection{ToF Camera: 3D RANSAC}
 \label{sec:ToFPosition_RANSAC}
 The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} Low matching accuracy is a known problem in other fields of image processing - like panorama stitching - and is there often solved with an algorithm named RANSAC (random sample consensus).\\
 These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.\\
-The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section XY, the corresponding rotations and translations are calculated on these groups of three feature pairs.\\
-Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.\\
+The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section \ref{sec:ToFPosition_SVD}, the corresponding rotations and translations are calculated on these groups of three feature pairs.\\
+Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.\\ In a third step, this matrix-vector-pair is recalculated using all brute-force matches within a certain proximity to the calculated point.\\
 Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.\\
-Finally, the optimal rotation matrix and translation vector are calculated using the method described in section XY, this time not with only three points but all accepted matches. With more than three points, the calculated rotation and translation is not the exact result, but the result that yields the least square error.\cite{SVD_ETH}\\
-The whole methodology relies on finding the correct rotation and translation from randomized 
-
-
-
-
-
+Finally, the optimal rotation matrix and translation vector are calculated using the method described in section \ref{sec:ToFPosition_SVD}, this time not with only three points but all accepted matches. With more than three points, the calculated rotation and translation is not the exact result, but the result that yields the least square error.\cite{SVD_ETH}\\
+The whole methodology relies on finding the correct rotation and translation from randomly grouped matches. 
 
 \subsection{Sensor Fusion with Kalman Filter}
 \label{sec:SensorFusion}
-TODO: Position estimate slow
+The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same motion. Both sensors have noise and inaccuracies that need to be taken into account to calculate the system state, that includes the current position, velocity, acceleration, the angular orientation and the angular velocity.\\
+A method to estimate the system state is the Kalman filter that allows modeling the system with combining the uncertenties of the sensors and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state. The sensor data corrects the system state prediction.
 \section{Video display}
 \label{sec:VideoDisplay}
 TODO: Vulkan Output

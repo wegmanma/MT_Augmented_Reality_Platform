@@ -12,7 +12,7 @@ A LiDaR sensor is often referred to work together with a moving laser, that scan
     \caption{Projected dots from the LiDaR scanner of an Apple iPad Pro 2020, made visible with an infrared camera. Image source: iFixit.com}
     \label{im:iPadLidar}
 \end{figure}
-Another method for 3d mapping is, using one wide area infrared flash and measuring the time of flight on each individual sensor pixel. This approach in contrast is often referred to be a ToF camera. ToF cameras are used by different manufacturers of Android powered smart phones.\\
+Another method for 3D mapping is, using one wide area infrared flash and measuring the time of flight on each individual sensor pixel. This approach in contrast is often referred to be a ToF camera. ToF cameras are used by different manufacturers of Android powered smart phones.\\
 While the measurement principle in both technologies is the same, the LiDaR scanner generates a point cloud, while the ToF camera outputs a depth map image. With mathematical transformations, both outputs are equivalent. Another difference is that a ToF camera can double as a grayscale infrared camera, providing an image by itself. \\
 The sensor used for this thesis follows the principle of a ToF camera. The measured radial distance from the sensor for each pixel allows the three dimensional reconstruction of the scene. 
 \subsection{Radial information from ToF cameras}
@@ -122,9 +122,9 @@ To combine the rotation matrix with the translation matrix, the 3x3 rotation mat
     \end{pmatrix}
     =
     \begin{bmatrix}
-        a_{0,0} & a_{0,1} & a_{0,2} & 0 \\
-        a_{1,0} & a_{1,1} & a_{1,2} & 0 \\
-        a_{2,0} & a_{2,1} & a_{2,2} & 0 \\
+        a_{0,0} & a_{0,1} & a_{0,2} & \Delta X \\
+        a_{1,0} & a_{1,1} & a_{1,2} & \Delta Y \\
+        a_{2,0} & a_{2,1} & a_{2,2} & \Delta Z \\
         0       & 0       & 0       & 1
     \end{bmatrix}
     \cdot
@@ -135,7 +135,7 @@ To combine the rotation matrix with the translation matrix, the 3x3 rotation mat
         1
     \end{pmatrix}
 \end{equation*}
-The dependency on the order of the rotations poses a problem visualized in image \ref{im:EulerRotation}: The values returned by a gyroscope would need to be applied all at once and not one after another.
+The dependency on the order of the rotations poses a problem visualized in image \ref{im:EulerRotation}: The values returned by a gyroscope would need to be applied all at once and not one after another. Replacing rotation matrices by quaternions - described in section \ref{sec:RotationQuaternion} - solves this problem.
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/euler_rotation.png}
@@ -143,6 +143,7 @@ The dependency on the order of the rotations poses a problem visualized in image
     \label{im:EulerRotation}
 \end{figure}
 \subsection{Standard Vulkan Coordinate System}
+\label{sec:VulkanCoords}
 In Vulkan, every vertex coordinate of a 3D rendered object gets mapped to the nearest pixel in the viewport window. This vertex mapping is done in multiple steps from "view coordinates" via "clip coordinates" towards "normalized device coordinates" to the "pixel coordinates".\\
 A 3D object is a cloud of vertex coordinates described by a list three-dimensional vectors $\overrightarrow{v_{v}} = (x_{v},y_{v},z_{v})$ (the subscript $v$ denotes the "view coordinates"). These coordinates usually do not contain data regarding the whole object's scale, position, and rotation in 3D space - this information is added with matrices in the shader step.\\
 Vulkan expects the output of the shader step to be in clip coordinates. Clip coordinates are four-dimensional vectors $\overrightarrow{v_{c}} = (x_{c},y_{c},z_{c},w_{c})$ (the subscript $c$ denotes the "clip coordinates") and the result of a matrix multiplication operation.\\
