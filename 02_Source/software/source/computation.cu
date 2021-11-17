@@ -916,6 +916,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
           v[0][0], v[1][0], v[2][0],
           v[0][1], v[1][1], v[2][1],
           v[0][2], v[1][2], v[2][2]);
+      
       mat4x4 u_t;
       // if (idx0 == 0)
       // printf("IDX0: %d, IDX1: %d, IDX2: %d, S[0][0] = %f, S[1][1] = %f, S[2][2] = %f\n",idx0,idx1, idx2, s[0][0], s[1][1], s[2][2]);
@@ -1038,6 +1039,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
         else
           inliners_metric = inliners_metric / ((float)num_inliners);
       }
+      // printf("Diagonal values of S: (%f, %f, %f), inliners metric: %f\n",s[0][0], s[1][1], s[2][2], inliners_metric);
     }
   }
   // if (idx0 == 2)
