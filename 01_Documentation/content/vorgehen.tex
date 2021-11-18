@@ -395,8 +395,74 @@ The whole methodology relies on finding the correct rotation and translation fro
 
 \subsection{Sensor Fusion with Kalman Filter}
 \label{sec:SensorFusion}
-The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same motion. Both sensors have noise and inaccuracies that need to be taken into account to calculate the system state, that includes the current position, velocity, acceleration, the angular orientation and the angular velocity.\\
-A method to estimate the system state is the Kalman filter that allows modeling the system with combining the uncertenties of the sensors and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state. The sensor data corrects the system state prediction.
+The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same movement. Both sensors have noise and inaccuracies that need to be considered to calculate the system state $\vec{x}$, which includes the current position, velocity, acceleration, angular orientation, and angular velocity.\\
+A method to estimate the system state is the Kalman filter that allows modeling the system by combining the sensors' uncertainties and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state using the previous system state $\vec{x}_{k-1}$. The sensor data corrects the system state prediction $\vec{x}_{k|k-1}$ which results in the corrected system state $\vec{x}$.\\
+With the translational information being present in all three directions and the rotation being inserted in quaternion form, the system state vector $\vec{x}$ has 17 entries. $x$, $y$ and $z$ describe the position in space, and $r_{a}$, $r_{b}$, $r_{c}$, and $r_{d}$ being the components of the orientation quaternion $R = (a, b\textbf{i}, c\textbf{j}, d\textbf{k})$. The time-derivatives of these values are denoted with dots.
+\begin{equation*}
+    \vec{x}^{T} = (
+        x, \dot{x}, \ddot{x}, y, \dot{y}, \ddot{y}, z, \dot{z}, \ddot{z}, r_{a}, r_{b}, r_{c}, r_{d}, \dot{r}_{a}, \dot{r}_{b}, \dot{r}_{c}, \dot{r}_{d})
+\end{equation*}
+The model $F$ that predicts the intermediate state $\vec{x}_{k|k-1}$ brings the individual entries of the system state into a relationship. The velocities and accelerations both alter the position, while the accelerations alter the velocities. For the rotation, the quaternion containing the angular rotation already contains the sampling rate and gets added by a quaternion multiplication. 
+\begin{equation*}
+    \begin{pmatrix}
+        x_{k|k-1}\\
+        \dot{x}_{k|k-1}\\
+        \ddot{x}_{k|k-1}\\
+        y_{k|k-1}\\
+        \dot{y}_{k|k-1}\\
+        \ddot{y}_{k|k-1}\\
+        z_{k|k-1}\\
+        \dot{z}_{k|k-1}\\
+        \ddot{z}_{k|k-1}\\
+        r_{a,k|k-1}\\
+        r_{b,k|k-1}\\
+        r_{c,k|k-1}\\
+        r_{d,k|k-1}\\
+        \dot{r}_{a,k|k-1}\\
+        \dot{r}_{b,k|k-1}\\
+        \dot{r}_{c,k|k-1}\\
+        \dot{r}_{d,k|k-1}
+    \end{pmatrix} = 
+    \begin{bmatrix}
+        1 & \Delta t & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 1 & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 1 & \Delta t & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 1 & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 1 & \Delta t & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \dot{r}_{a} & -\dot{r}_{b} & -\dot{r}_{c} & -\dot{r}_{d} & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \dot{r}_{b} &  \dot{r}_{a} &  \dot{r}_{d} & -\dot{r}_{c} & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \dot{r}_{c} & -\dot{r}_{d} &  \dot{r}_{a} &  \dot{r}_{b} & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \dot{r}_{d} &  \dot{r}_{c} & -\dot{r}_{b} &  \dot{r}_{a} & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1
+    \end{bmatrix} 
+    \cdot 
+    \begin{pmatrix}
+        x_{k-1}\\
+        \dot{x}_{k-1}\\
+        \ddot{x}_{k-1}\\
+        y_{k-1}\\
+        \dot{y}_{k-1}\\
+        \ddot{y}_{k-1}\\
+        z_{k-1}\\
+        \dot{z}_{k-1}\\
+        \ddot{z}_{k-1}\\
+        r_{a,k-1}\\
+        r_{b,k-1}\\
+        r_{c,k-1}\\
+        r_{d,k-1}\\
+        \dot{r}_{a,k-1}\\
+        \dot{r}_{b,k-1}\\
+        \dot{r}_{c,k-1}\\
+        \dot{r}_{d,k-1}
+    \end{pmatrix}
+\end{equation*}
 \section{Video display}
 \label{sec:VideoDisplay}
 TODO: Vulkan Output
