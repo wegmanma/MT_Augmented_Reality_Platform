@@ -397,12 +397,20 @@ The whole methodology relies on finding the correct rotation and translation fro
 \label{sec:SensorFusion}
 The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same movement. Both sensors have noise and inaccuracies that need to be considered to calculate the system state $\vec{x}$, which includes the current position, velocity, acceleration, angular orientation, and angular velocity.\\
 A method to estimate the system state is the Kalman filter that allows modeling the system by combining the sensors' uncertainties and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state using the previous system state $\vec{x}_{k-1}$. The sensor data corrects the system state prediction $\vec{x}_{k|k-1}$ which results in the corrected system state $\vec{x}$.\\
+The system requires equal sampling rates for the individual sensors; therefore, the IMU data is downsampled to match the ToF camera's framerate.
 With the translational information being present in all three directions and the rotation being inserted in quaternion form, the system state vector $\vec{x}$ has 17 entries. $x$, $y$ and $z$ describe the position in space, and $r_{a}$, $r_{b}$, $r_{c}$, and $r_{d}$ being the components of the orientation quaternion $R = (a, b\textbf{i}, c\textbf{j}, d\textbf{k})$. The time-derivatives of these values are denoted with dots.
 \begin{equation*}
     \vec{x}^{T} = (
         x, \dot{x}, \ddot{x}, y, \dot{y}, \ddot{y}, z, \dot{z}, \ddot{z}, r_{a}, r_{b}, r_{c}, r_{d}, \dot{r}_{a}, \dot{r}_{b}, \dot{r}_{c}, \dot{r}_{d})
 \end{equation*}
 The model $F$ that predicts the intermediate state $\vec{x}_{k|k-1}$ brings the individual entries of the system state into a relationship. The velocities and accelerations both alter the position, while the accelerations alter the velocities. For the rotation, the quaternion containing the angular rotation already contains the sampling rate and gets added by a quaternion multiplication. 
+\begin{equation*}
+    \vec{x}_{k|k-1} = 
+    F
+    \cdot
+    \vec{x}_{k-1}
+\end{equation*}
+The $\dot{r}$-values in the matrix are from $\vec{x}_{k-1}$ and $\Delta t$ is the sampling rate.
 \begin{equation*}
     \begin{pmatrix}
         x_{k|k-1}\\
@@ -463,6 +471,19 @@ The model $F$ that predicts the intermediate state $\vec{x}_{k|k-1}$ brings the 
         \dot{r}_{d,k-1}
     \end{pmatrix}
 \end{equation*}
+If there were a known active influence on the system, for example, an RC car to which the camera head could be mounted, the motor input and the steering could be modeled in a different matrix $B$ with the input vector $\vec{u}$.
+\begin{equation*}
+    \vec{x}_{k|k-1} = 
+    F
+    \cdot
+    \vec{x}_{k-1}
+    +
+    B
+    \cdot
+    \vec{u}
+\end{equation*}
+As there are no known active inputs to the system, both $B$, and $\vec{u}$ are omitted.\\
+The Kalman filter relies on knowing the uncertainties of the model. If a system has rigid constraints by design, the sensor data will naturally be interpreted to support the model. The model of the camera head has loose restrictions, as the camera head is free to move in any direction and rotation; therefore, the output heavily relies on the sensor data. 
 \section{Video display}
 \label{sec:VideoDisplay}
 TODO: Vulkan Output
