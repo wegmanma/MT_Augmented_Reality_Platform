@@ -57,15 +57,28 @@ An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rende
     \label{fig:anyvision}
 \end{figure}
 A TCP/IP server application on the Raspberry Pi powering the PiEye ToF camera, to which the processing system connects, serves the necessary ToF camera data in a frame-based protocol. The USB to I²C bridge gets loaded as a standard I²C device by the Linux on the processing system. The IMU is then directly configured and polled by the userspace software on the processing system without an additional driver. The Raspberry Pi camera is attached via FPDLink and integrated as a video4linux2 device. The capturing is done with FFMPEG and the debayering in CUDA.
-\section{Video inputs}
+\subsection{Video inputs}
 \label{sec:videoInputs}
 The system utilizes two cameras, a Raspberry Pi Camera v2 and a PiEye ToF camera that doubles as an infrared camera. The Sony IMX 219 based Raspberry Pi Camera v2 features a color image with an 8 megapixel resolution for single images, 1080p with 30 frames per second, 720p with 60 frames per second or 480p with 90 frames per second.\cite{raspiCamSpec} The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.\\
 The PiEye ToF camera is based on the Infineon REAL3 IRS1125A sensor which has a resolution of 352 x 288 pixels\cite{piEyeShop}. The ToF Camera is paired with infrared LED flashes to measure the time of flight of the light emitted and has an intended measurement range from 10 centimeters up to five meters. The entire ToF software stack runs on a Raspberry Pi that sends its video data via Ethernet to the augmented reality system.\\
+\subsection{Unified Memory}
+\label{sec:unifiedMemory}
+In a standard desktop computer, the GPU and the CPU have separate memory. It is possible to expose GPU memory to the host CPU, but this has numerous downsides. State-of-the-art desktop GPUs connect via PCIe 4.0 to the host system, which induces latency. The measured round-trip latency of PCIe 3.0 is around 900ns\cite{PCIe_performance}, which also varies with traffic on the system. In comparison, a DDR4 SDRAM access has a latency of around 10-15ns\cite{Wiki_CAS}. Disabling the caching on the memory - as required for concurrent memory access - worsens the latency problem. Therefore, the optimal way to share data between the CPU and the GPU in a standard desktop computer is to copy the memory from the host to the device and vice versa.\\
+On a system with unified memory - like the used Nvidia Jetson AGX Xavier - both the CPU and the GPU have direct access to the same memory. Latency information for the LPDDR4 SDRAM on the Xavier is unavailable, but it is likely in the same range as DDR4 SDRAM. CUDA offers functions to allocate memory available for both CPU and GPU with individual memory pointers. This allocation method disables caching; memory only used by either the GPU or the CPU should be allocated traditionally.\\
+To avoid the overhead for allocating and freeing memory, multiple cached and uncached - but shared - memory zones get allocated at the start of the application.
+
+\section{Software}
+\label{sec:Software}
+A single application needs to gather the data from the different sensors and cameras, apply the processing and render the result to an attached monitor. Within this application, various subsystems run in separate threads at different speeds. The Vulkan framework, developed for a former thesis, is the skeleton of this application, to which additional C++ and CUDA modules got attached. Vulkan itself renders the 3D object – a rectangle – into the 2D viewfinder image. The image- and data processing is mainly performed in parallel on the GPU using CUDA. Using the unified memory architecture of the Nvidia Jetson AGX Xavier – the GPU and the CPU have access to the same RAM – the time-consuming copying of memory is not necessary. Therefore, the GPU can also perform smaller tasks without generating a significant copying overhead. Section \ref{sec:unifiedMemory} explains the use of the unified memory further. \\
+Due to the multithreaded nature of the system, and as several threads access the GPU simultaneously, the GPU access got grouped into different CUDA streams. \\
+A separate application runs on the Raspberry Pi, serving a TCP/IP connection for streaming the ToF data. 
+
+
 
 \subsection{ToF Camera calibration}
 \label{sec:ToFCalibration}
 On the ToF Camera, two parts need to be calibrated: The optics, as described in section \ref{sec:FundCamCalibration}, and the distance measurement. The ToF camera has a barrel type distortion that is corrected by the camera calibration algorithm implemented in OpenCV\cite{openCVCamCalib} and shown in image \ref{fig.camCalib}. As the process of lens correction cuts off parts of the image, the image size gets lowered to 265 x 205 pixels.\\
-For the distance measurement, first the radial distances need to be flattened as described in section \ref{sec:RadialCorrection}. As the angle $\alpha$ is not known for each pixel, a reference measurement provides the necessary information. To reduce noise, 19 images of the same flat wall has been taken, smoothed by a gaussian and averaged onto one reference image $I_{Ref}$. The wireframe image in figure \ref{im:ToFRaw} shows the curvature of the reference image. The rounding at the edges is an arfifact of the gaussian smoothing.\\
+For the distance measurement, first the radial distances need to be flattened as described in the last part of section \ref{sec:ToFCamera}. As the angle $\alpha$ is not known for each pixel, a reference measurement provides the necessary information. To reduce noise, 19 images of the same flat wall has been taken, smoothed by a gaussian and averaged onto one reference image $I_{Ref}$. The wireframe image in figure \ref{im:ToFRaw} shows the curvature of the reference image. The rounding at the edges is an arfifact of the gaussian smoothing.\\
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.4\textwidth]{images/raw_tof_radial.png}
@@ -157,7 +170,7 @@ The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements vi
 The IMU shows a hysteresis that lies within the specification of the datasheet; therefore, a simple offset correction does not yield the best results. A moving average – that gets updated whenever no motion of the camera head is detected – helps deal with the hysteresis by subtraction from the measurement value.
 \subsection{ToF Camera: SIFT feature extraction}
 \label{sec:ToFPosition_SIFT}
-The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:RadialCorrection}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
+The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:ToFCamera}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
 The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends $k$, which are then brute-force matched with the features of the prior image $k-1$, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
 \begin{figure}[H]
     \centering
@@ -184,7 +197,7 @@ The centroids for both point groups are:
     \vec{c}_{k}=\frac{\sum_{i=1}^n \vec{p}_{i,k}}{n} \qquad 
     \vec{c}_{k-1}=\frac{\sum_{i=1}^n \vec{p}_{i,k-1}}{n} 
 \end{equation*}
-For example visualized in image \ref{im:SVD_step_by_step} and with the following calculation:
+For example visualized in image \ref{im:ransac1} and with the following calculation:
 
 \begin{equation*}
     \vec{c}_{k}=
@@ -240,12 +253,6 @@ For example visualized in image \ref{im:SVD_step_by_step} and with the following
         \end{pmatrix}
     \right)
 \end{equation*}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{Rotation and Translation step by step.}
-    \label{im:SVD_step_by_step}
-\end{figure}
 Subtraction of the centroid vectors from the individual points in the respective point cloud $P$ generates the centered point clouds $Q$. In an ideal case, a rotation matrix alone can transform one centered point cloud into the other. 
 \begin{equation*}
     \vec{q}_{i,k}=\vec{p}_{i,k}-\vec{c}_{k} \qquad 
@@ -387,9 +394,28 @@ The rotation matrix $R$ and the translation vector $\vec{t}$ fulfill the followi
 \label{sec:ToFPosition_RANSAC}
 The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} Low matching accuracy is a known problem in other fields of image processing - like panorama stitching - and is there often solved with an algorithm named RANSAC (random sample consensus).\\
 These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.\\
-The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section \ref{sec:ToFPosition_SVD}, the corresponding rotations and translations are calculated on these groups of three feature pairs.\\
-Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.\\ In a third step, this matrix-vector-pair is recalculated using all brute-force matches within a certain proximity to the calculated point.\\
-Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.\\
+The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section \ref{sec:ToFPosition_SVD}, the corresponding rotations and translations are calculated on these groups of three feature pairs as visualized in image \ref{im:ransac1}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step1.pdf}
+    \caption{First step of the 3D RANSAC: The SVD method calculates the rotation and translation from three randomly assigned points. This step is performed in parallel on multiple groups of three. Each group $P_{i}$ generates the rotation $R_{i}$ and translation $\vec{t}_{i}$.}
+    \label{im:ransac1}
+\end{figure}
+Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the distance of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step2.pdf}
+    \caption{Second step of the 3D RANSAC: The calculated rotations and translations get evaluated against the whole dataset. In the example, the fourth matching point fulfills the criterion. As this group is the best possible in the example, an improved rotation $R_{improved}$ and translation $\vec{t}_{improved}$ is calculated from these.}
+    \label{im:ransac2}
+\end{figure}
+ In a third step, this matrix-vector-pair - $R_{i}$ and $\vec{t}_{i}$ - is recalculated using all brute-force matches within a certain proximity to the calculated point, resulting in $R_{improved}$ and $\vec{t}_{improved}$.\\
+Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step3.pdf}
+    \caption{Third step of the 3D RANSAC: With $R_{improved}$ and $\vec{t}_{improved}$ being present, the brute-force matches get discarded. Applying the currently available rotation- and translation-information the the point clouds allows re-matching based alone on the position. Theoptimal rotation $R_{opt}$ and translation $_vec{t}_{opt}$ result from these feature pairs.}
+    \label{im:ransac3}
+\end{figure}
 Finally, the optimal rotation matrix and translation vector are calculated using the method described in section \ref{sec:ToFPosition_SVD}, this time not with only three points but all accepted matches. With more than three points, the calculated rotation and translation is not the exact result, but the result that yields the least square error.\cite{SVD_ETH}\\
 The whole methodology relies on finding the correct rotation and translation from randomly grouped matches. 
 
