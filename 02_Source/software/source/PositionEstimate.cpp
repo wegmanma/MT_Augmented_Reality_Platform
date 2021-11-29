@@ -332,9 +332,10 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 H_k[15][2] = 1;
                 H_k[16][3] = 1;
                 kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, quat_gyro, 0.0001);
+                print_quat("quat_gyro", quat_gyro,true, true);
             }
-            mat17x17_dup(P_apriori, P_aposteriori);
-            vec17_dup(x_apriori, x);
+            // mat17x17_dup(P_apriori, P_aposteriori);
+            // vec17_dup(x_apriori, x);
             {
                 mat4x17 H_k = {0};
                 H_k[13][0] = 1;
@@ -342,14 +343,15 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 H_k[15][2] = 1;
                 H_k[16][3] = 1;
                 // if (newdata == 2) {
-                //     ToFQuaterion[0] = 0.0;
-                //     ToFQuaterion[1] = 0.0;
-                //     ToFQuaterion[2] = 0.0;
-                //     ToFQuaterion[3] = 1.0;
-                //     kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+                ToFQuaterion[0] = -ToFQuaterion[0];
+                ToFQuaterion[1] = -ToFQuaterion[1];
+                ToFQuaterion[2] = ToFQuaterion[2];
+                ToFQuaterion[3] = ToFQuaterion[3];
+                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
                 // }
                 // else {
                     kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, ToFQuaterion, 0.1);
+                    print_quat("ToFQuaterion", ToFQuaterion,true);
                 // }
             }
             // compute orientation as seen by quat_integrated
@@ -384,7 +386,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                     H_k[15][2] = 1;
                     H_k[16][3] = 1;
                     // print_quat("quat_correction", quat_correction);
-                    kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, quat_correction, 0.001);
+                    // kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, quat_correction, 0.001);
                 }
                 // as the orientation is now changed, update the current orientation
                 {
