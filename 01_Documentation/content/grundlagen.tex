@@ -442,7 +442,7 @@ The implementation in CUDA is done by storing the pixel coordinates of the uncor
 \label{sec:Kalmanfilter}
 The Kalman filter is an adaptive filter realized with a predictor-corrector algorithm that uses a model and known gaussian uncertainties of different sensors to estimate a value. Additionally to sensor data, the Kalman filter can adjust the estimate based on known forces– for example, the rotor speed of an RC drone. In an RC drone, a GPS position sensor, an accelerometer, and proximity sensors are fused with the rotor speeds to estimate the current motion with increased accuracy.\\
 In this thesis, motion without a known input needs to be measured, having sensors for acceleration, velocity, and rotation. The following example demonstrates the position, velocity, and acceleration in one dimension. A fifth-order spline is used for the position data from which velocity and acceleration are derived to simulate the sensor data. Adding Gaussian noise to the simulated velocity and acceleration data reflects reality and allows demonstrating the Kalman filter.\\
-For each new data point, the Kalman filter predicts the next system state based on old data using the model matrix $F$. If a known input $\vec{u}$ would act on the system, the input matrix $B$ would model that. The system state $\vec{x}$ transitions from the prior state $k-1$ to the prediction $k|k-1$.\\
+For each new data point, the Kalman filter predicts the next system state based on old data using the model matrix $F$. If a known input $\vec{u}$ would act on the system, the input matrix $B$ would model that. Without a known input, $B$ and $\vec{u}$ are omitted.The system state $\vec{x}$ transitions from the prior state $k-1$ to the prediction $k|k-1$. \\
 \begin{equation*}
     \vec{x}_{k|k-1} = 
     F
@@ -451,6 +451,35 @@ For each new data point, the Kalman filter predicts the next system state based 
     +
     B
     \cdot
-    \vec{u}
+    \vec{u} \qquad ; \qquad
+    \begin{pmatrix}
+        p  \\
+        v  \\
+        a 
+    \end{pmatrix}_{k|k-1} = 
+    \begin{bmatrix}
+        1 & \Delta t & \frac{\Delta t^{2}}{2} \\
+        0 & 1 & \Delta t \\
+        0 & 0 & 1
+    \end{bmatrix}
+    \cdot
+    \begin{pmatrix}
+        p  \\
+        v  \\
+        a 
+    \end{pmatrix}_{k-1}    
 \end{equation*}
-In addition, the following formula predicts the covariance matrix of the errors:
+In the example, the system matrix $F$ reflects the derivations of the position $p$. The first time-derivative of $p$ is the velocity $v$ and the second time-derivative is the acceleration $a$.\\
+In addition, the following formula predicts the covariance matrix of the errors $P$ with the model matrix $F$ and the gaussian process noise $Q$:
+\begin{equation*}
+    P_{k|k-1} = 
+    F
+    \cdot
+    P_{k-1}
+    \cdot
+    F^{T}
+    +
+    Q
+\end{equation*}
+The process noise matrix $Q$ contains information on the rigidity of the model. Setting $Q=0$ would result in a stiff model; therefore, the Kalman filter would ignore sensor data showing motion. The Kalman filter is suitable for systems with known constraints - for example, a car is more likely to roll forward than slide sideways. In this thesis, the camera head is supposed to move freely in any direction and rotation; therefore, the system cannot be custom-tailored to a specific type of motion. The process noise matrix controls thus the weighting between the different sensor inputs.\\
+The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a linear growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift. On the other values - where sensors are present - the covariance matrix of errors $P$ shows a constant error.\\
