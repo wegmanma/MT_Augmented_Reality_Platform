@@ -481,5 +481,40 @@ In addition, the following formula predicts the covariance matrix of the errors 
     +
     Q
 \end{equation*}
-The process noise matrix $Q$ contains information on the rigidity of the model. Setting $Q=0$ would result in a stiff model; therefore, the Kalman filter would ignore sensor data showing motion. The Kalman filter is suitable for systems with known constraints - for example, a car is more likely to roll forward than slide sideways. In this thesis, the camera head is supposed to move freely in any direction and rotation; therefore, the system cannot be custom-tailored to a specific type of motion. The process noise matrix controls thus the weighting between the different sensor inputs.\\
-The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a linear growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift. On the other values - where sensors are present - the covariance matrix of errors $P$ shows a constant error.\\
+Assuming that an external force $\vec{f}$ acts on the example system, constant during the sampling intervals $\Delta t$.  The external force influences the acceleration, the velocity, and ultimately the position proportional to the input vector $G$.\\ 
+The process noise matrix $Q$ combines the input vector $G$ and the standard deviation of the external force $\sigma_{f}$. The standard deviation of the external force $\sigma_{f}$ is set to 1, as expected accelerations are much smaller than the gravitational acceleration. The process noise model is named the “piecewise white noise model.”
+\begin{equation*}
+    G = 
+    \begin{pmatrix}
+        \frac{\Delta t^{2}}{2}  \\
+        \Delta t  \\
+        1 
+    \end{pmatrix}
+    \qquad ; \qquad
+    Q = G\cdot G^{T}\cdot \sigma_{f} =
+    \begin{bmatrix}
+        \frac{\Delta t^{4}}{4} & \frac{\Delta t^{3}}{2} & \frac{\Delta t^{2}}{2} \\
+        \frac{\Delta t^{3}}{2} & \Delta t^{2} & \Delta t \\
+        \frac{\Delta t^{2}}{2} & \Delta t & 1
+    \end{bmatrix}
+    \cdot 1
+\end{equation*}
+The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error explodes. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.\\
+With the system state $\vec{x}_{k|k-1}$ and the covariance matrix $P_{k|k-1}$ being predicted, the following steps describe the correction part of the Kalman iteration. The observation matrix $H$ determines which sensor will influence which entry of the system state vector $\vec{x}$. For each correction step, a Kalman Gain matrix $K_{k}$ determines the optimal correction based on the current covariance of errors $P$ and the measurement noise $R$.
+\begin{equation*}
+    K_{k} = P_{k|k-1}\cdot H^{T}(H\cdot P_{k|k-1}\cdot H^{T}+R)^{-1}
+    \qquad ; \qquad
+    H=
+    \begin{bmatrix}
+        0 & 1 & 0 \\
+        0 & 0 & 1
+    \end{bmatrix}
+\end{equation*}
+In the example, $H$ is a $2\times 3$ matrix, because there are only two measurements versus the three dimensional system state. Therfore, the matrix inversion for the bracket in the formula above is only of dimension $2\times 2$.\\
+With the Kalman gain present, the system is ready to correct both the system state vector $\vec{x}$ and the covariance matrix of errors $P$. The vector $\vec{z}_{k}$ contains the new measurement - in the Kalman filter often named, the new observation.
+\begin{equation*}
+    x_{k} = \vec{x}_{k|k-1}+K_{k}(\vec{z}_{k}-H\cdot \vec{x}_{k|k-1})
+    \qquad ; \qquad
+    P_{k}= (I-K_{k}\cdot H)P_{k|k-1}
+\end{equation*}
+For multiple sensors influencing the same entry of the system state vector $\vec{x}$, multiple correction steps may be chained after each other.

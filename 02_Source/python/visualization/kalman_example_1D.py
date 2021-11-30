@@ -65,11 +65,15 @@ p_kalman = p.copy()
 v_kalman = v.copy()
 a_kalman = a.copy()
 
+p_kalman_pred = p.copy()
+v_kalman_pred = v.copy()
+a_kalman_pred = a.copy()
+
 F = np.array([[1, ns, (ns**2)/2],[0, 1, ns],[0, 0, 1]])
 Q = np.array([[(ns**4)/4, (ns**3)/2, (ns**2)/2],[(ns**3)/2, ns**2, ns],[(ns**2)/2, ns, 1]])
 # initial condition, x_0 = 0
-P_k = np.array(([[1, 0, 0],[0, 1, 0],[0, 0, 1]]))
-P_k_k1 = np.array(([[1, 0, 0],[0, 1, 0],[0, 0, 1]]))
+P_k = np.array(([[0.1, 0, 0],[0, 0.1, 0],[0, 0, 0.1]]))
+P_k_k1 = np.array(([[0, 0, 0],[0, 0, 0],[0, 0, 0]]))
 x_k = np.array([0, 0, 0])
 x_k_k1 = np.array([0, 0, 0])
 K = np.array([[0, 0],[0, 0],[0, 0]])
@@ -78,6 +82,7 @@ H = np.array([[0, 1, 0],[0, 0, 1]])
 matrix1_kalman = p.copy()
 matrix2_kalman = p.copy()
 matrix3_kalman = p.copy()
+
 p_manual = p.copy()
 for i in range(n-1):
     # prediction
@@ -89,6 +94,9 @@ for i in range(n-1):
     tmp[0] = 0.0
     x_k = x_k_k1+np.matmul(K,(np.array([vn[i], an[i]])- np.matmul(H,x_k_k1)))
     P_k = np.matmul((np.identity(3)-np.matmul(K,H)),P_k_k1)
+    p_kalman_pred[i] = x_k_k1[0]
+    v_kalman_pred[i] = x_k_k1[1]
+    a_kalman_pred[i] = x_k_k1[2]
     p_kalman[i] = x_k[0]
     v_kalman[i] = x_k[1]
     a_kalman[i] = x_k[2]
@@ -97,13 +105,26 @@ for i in range(n-1):
     matrix3_kalman[i] = P_k[1][1]
     p_manual[i] = np.matmul(K,(np.array([vn[i], an[i]])- np.matmul(H,x_k_k1)))[0]
 
-
-
+print(H)
 fig2 = plt.figure(figsize=(15, 12))
-ax21 = fig2.add_subplot(111)
-ax21.plot(t, p_manual, color='#0465A9')
-# ax21.plot(t, matrix2_kalman, color='#544265')
-# ax21.plot(t, matrix3_kalman, color='#A41F22')
+ax21 = fig2.add_subplot(121)
+ax22 = fig2.add_subplot(122)
+ax21.plot(t, matrix1_kalman, color='#544265')
+ax21.plot(t, matrix2_kalman, color='#544265')
+ax21.plot(t, matrix3_kalman, color='#A41F22')
+ax21.set_ylim(0, 1.5)
+ax21.set_xlim(0, 20)
+
+print("t")
+print(t[40:50])
+print("x")
+print(v_kalman[40:50])
+ax22.plot(t[39:46], v_kalman[39:46], color='#544265')
+ax22.plot(t[39:47], v[39:47], color='#A41F22')
+ax22.scatter(t[46], v_kalman_pred[46], color='#544265')
+ax22.scatter(t[46], v_kalman[46], color='#A41F22')
+ax22.set_ylim(0, 0.2)
+ax22.set_xlim(1, 1.2)
 
 
 fig = plt.figure(figsize=(15, 12))
@@ -111,7 +132,6 @@ ax1 = fig.add_subplot(221)
 ax2 = fig.add_subplot(222)
 ax3 = fig.add_subplot(223)
 ax4 = fig.add_subplot(224)
-
 
 
 ax1.plot(t, a, color='#0465A9')
@@ -123,11 +143,9 @@ ax2.plot(t, vn, color='#544265')
 ax2.plot(t, pvn, color='#A41F22')
 
 
-
 ax3.plot(t, an, color='#0465A9')
 ax3.plot(t, van, color='#544265')
 ax3.plot(t, pan, color='#A41F22')
-
 
 
 ax4.plot(t, a_kalman, color='#0465A9')
