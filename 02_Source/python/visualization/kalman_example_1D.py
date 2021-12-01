@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import math
 
 # example motion, time series: n points
-n = 1000
+n = 250
 
 t = np.linspace(0, 25, n)
 ns = 25/n
@@ -38,7 +38,7 @@ for i in range(len(a)):
 # add noise to a and v "measurement" and recalculate results from these inputs
 an = a.copy()
 vn = v.copy()
-a_noise = np.random.normal(0, 0.01, n)
+a_noise = np.random.normal(0, 0.05, n)
 v_noise = np.random.normal(0, 0.1, n)
 for i in range(len(an)):
     an[i] += a_noise[i]
@@ -89,7 +89,7 @@ for i in range(n-1):
     x_k_k1 = np.matmul(F, x_k)
     P_k_k1 = np.matmul(F, np.matmul(P_k, np.transpose(F)))+Q
     #correction
-    K = np.matmul(P_k_k1,np.matmul(np.transpose(H),(np.linalg.inv(np.matmul(H,np.matmul(P_k_k1,np.transpose(H)))+np.array([[300,0],[0,0.1]])))))
+    K = np.matmul(P_k_k1,np.matmul(np.transpose(H),(np.linalg.inv(np.matmul(H,np.matmul(P_k_k1,np.transpose(H)))+np.array([[0.1,0],[0,0.05]])))))
     tmp = np.matmul(K,(np.array([vn[i], an[i]])- np.matmul(H,x_k_k1)))
     tmp[0] = 0.0
     x_k = x_k_k1+np.matmul(K,(np.array([vn[i], an[i]])- np.matmul(H,x_k_k1)))
@@ -105,6 +105,13 @@ for i in range(n-1):
     matrix3_kalman[i] = P_k[1][1]
     p_manual[i] = np.matmul(K,(np.array([vn[i], an[i]])- np.matmul(H,x_k_k1)))[0]
 
+p_vkalman = p.copy()
+for i in range(len(pvn)):
+    if i > 0:
+        p_vkalman[i] = p_vkalman[i-1]+v_kalman[i]*ns
+    else:
+        p_vkalman[i] = 0
+
 print(H)
 fig2 = plt.figure(figsize=(15, 12))
 ax21 = fig2.add_subplot(121)
@@ -115,16 +122,19 @@ ax21.plot(t, matrix3_kalman, color='#A41F22')
 ax21.set_ylim(0, 1.5)
 ax21.set_xlim(0, 20)
 
-print("t")
-print(t[40:50])
-print("x")
-print(v_kalman[40:50])
-ax22.plot(t[39:46], v_kalman[39:46], color='#544265')
-ax22.plot(t[39:47], v[39:47], color='#A41F22')
-ax22.scatter(t[46], v_kalman_pred[46], color='#544265')
-ax22.scatter(t[46], v_kalman[46], color='#A41F22')
-ax22.set_ylim(0, 0.2)
-ax22.set_xlim(1, 1.2)
+index = 0
+for i in range(n):
+    if t[i] > 1.1:
+        index = i
+        break
+
+ax22.plot(t[0:index], v_kalman[0:index], color='#544265')
+ax22.plot(t[0:index+1], v[0:index+1], color='#000000')
+ax22.scatter(t[0:index+1], v_kalman_pred[0:index+1], color='#A41F22')
+ax22.scatter(t[index], v_kalman[index], color='#544265')
+ax22.scatter(t[0:index+1], vn[0:index+1], color='#0465A9')
+ax22.set_ylim(-0.05, 0.05)
+ax22.set_xlim(0.8, 1.2)
 
 
 fig = plt.figure(figsize=(15, 12))
@@ -151,6 +161,7 @@ ax3.plot(t, pan, color='#A41F22')
 ax4.plot(t, a_kalman, color='#0465A9')
 ax4.plot(t, v_kalman, color='#544265')
 ax4.plot(t, p_kalman, color='#A41F22')
+ax4.plot(t, p_vkalman, color='#00ff00')
 
 # initial condition, x_0 = 0
 P_k = np.array(([[1, 0, 0],[0, 1, 0],[0, 0, 1]]))
