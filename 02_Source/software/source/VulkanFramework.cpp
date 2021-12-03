@@ -33,7 +33,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define DRAW_RPI_IMAGE
+// #define DRAW_RPI_IMAGE
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;

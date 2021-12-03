@@ -59,8 +59,9 @@ private:
     quat delta_vector_xyz_moving{}; // used for filtering.
     quat delta_tof_vector_moving{};
 
-    quat kalman_rotation;
-    quat kalman_translation;
+    quat kalman_rotation{};
+    quat kalman_translation{};
+    quat kalman_translation_from_velocity{};
 
     mat4x4 quat_matrix{}; // final matrix to hand over to Vulkan
     quat tof_translation_abc{};

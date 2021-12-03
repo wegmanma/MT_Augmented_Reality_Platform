@@ -302,6 +302,7 @@ void TCPFrameCapture::run()
     float lowestScale = 0.0f;
     newdata = false;
     standing_still = false;
+    int frame_counter = -5;
     while (running)
     {
         // std::cout << "Start of loop" << std::endl;
@@ -340,6 +341,9 @@ void TCPFrameCapture::run()
 
         // std::cout << "start undistorting" << std::endl;
         cudaStreamSynchronize(tcpCaptureStream);
+        std::cout << frame_counter << ";";
+        frame_counter++;
+
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1], radial_d, image_x_d, image_y_d, tcpCaptureStream, cos_alpha_map_d);
         // computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
         computation->tof_medianfilter_3x3(temp_mem_265x205xfloat_0_d[0], temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
@@ -370,6 +374,7 @@ void TCPFrameCapture::run()
             std::cout << "Continuing, too few features found!" << std::endl;
             continue;
         }
+        std::cout << siftData[write_buf_id].numPts << ";";
         // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
         computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
         cudaStreamSynchronize(tcpCaptureStream);

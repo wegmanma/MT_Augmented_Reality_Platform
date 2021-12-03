@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 64
+#define MIN_THRESH_RANSAC 8
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -1028,7 +1028,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
             ssd_local += (temp_vec_old_rot[2] - temp_vec_new[2]) * (temp_vec_old_rot[2] - temp_vec_new[2]);
             if (ssd_local < MIN_THRESH_RANSAC)
             {
-                            inliners_metric += ssd_local;
+              inliners_metric += ssd_local;
               num_inliners++;
               index_list[idx0 * 512 + idx] = true;
             } 
@@ -1068,10 +1068,15 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
   float tmp_inliners;
   float tmp_metric;
   float max_inliners;
-  float min_metric;
+  float min_metric_0, min_metric_1, min_metric_2;
   int max_idx;
-  int min_idx;
-  min_metric = 10000;
+  int min_idx, min_idx1, min_idx2;
+  min_metric_0 = 10000;
+  int inliners0;
+  min_metric_1 = 10000;
+  int inliners1;
+  min_metric_2 = 10000;
+  int inliners2;
   max_inliners = -1.f;
   for (int i = 0; i < numPts; i++)
   {
@@ -1085,17 +1090,57 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
         max_idx = i;
       }
     }
-    if ((tmp_metric < min_metric) && (tmp_inliners > 1.0) && (tmp_metric > 0.0f))
+    if ((tmp_metric < min_metric_0) && (tmp_inliners > 1.0) && (tmp_metric > 0.0f))
     {
       if (tempMemory[6 + i * 15 + 0] > 0.6)
       {
-        min_metric = tmp_metric;
+        min_metric_0 = tmp_metric;
         min_idx = i;
+
       }
-    }
+    }    
+  }
+  for (int i = 0; i < numPts; i++)
+  {
+    tmp_inliners = tempMemory[6 + i * 15 + 12];
+    tmp_metric = tempMemory[6 + i * 15 + 13];
+    if ((tmp_metric < min_metric_1) && (tmp_metric > min_metric_0) && (tmp_inliners > 1.0) && (tmp_metric > 0.0f))
+    {
+      if (tempMemory[6 + i * 15 + 0] > 0.6)
+      {
+        min_metric_1 = tmp_metric;
+        min_idx1 = i;
+
+      }
+    }    
+  }
+  for (int i = 0; i < numPts; i++)
+  {
+    tmp_inliners = tempMemory[6 + i * 15 + 12];
+    tmp_metric = tempMemory[6 + i * 15 + 13];
+    if ((tmp_metric < min_metric_2) && (tmp_metric > min_metric_1) && (tmp_inliners > 1.0) && (tmp_metric > 0.0f))
+    {
+      if (tempMemory[6 + i * 15 + 0] > 0.6)
+      {
+        min_metric_2 = tmp_metric;
+        min_idx2 = i;
+
+      }
+    }    
   }
   // printf("======== BEST ONES: max_idx: %d, max_inliners %f, its matrix[0][0] %f, min_idx, %d, min_metric %f,its matrix[0][0]%f\n",
   //       max_idx, max_inliners, tempMemory[6 + max_idx * 15 + 0], min_idx, min_metric, tempMemory[6 + min_idx * 15 + 0]);
+  inliners0 = tempMemory[6 + min_idx * 15 + 12];
+  inliners1 = tempMemory[6 + min_idx1 * 15 + 12];
+  inliners2 = tempMemory[6 + min_idx2 * 15 + 12];
+
+  if ((inliners1 > inliners0)&&(inliners1 > inliners2)) {
+    min_idx = min_idx1;
+  } 
+  if ((inliners2 > inliners0)&&(inliners2 > inliners1)) {
+    min_idx = min_idx2;
+    };
+
   tempMemory[0] = (float)min_idx;
   tempMemory[1] = (float)max_idx;
 }
@@ -1154,11 +1199,12 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   centroids.match_x_3d /= num_inliners;
   centroids.match_y_3d /= num_inliners;
   centroids.match_z_3d /= num_inliners;
-
+  int number_matches = 0;
   for (int i = 0; i < numPts; i++)
   {
     if (index_list[idx0 * 512 + i] == true)
     {
+      number_matches++;
       h[0][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_x_3d - centroids.match_x_3d);
       h[1][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_y_3d - centroids.match_y_3d);
       h[2][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_z_3d - centroids.match_z_3d);
@@ -1176,6 +1222,7 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
         // point[i].draw = false;
       }
   }
+  printf("%d;",number_matches);
   mat4x4 u;
   mat4x4 s;
   mat4x4 s_det;
@@ -1402,9 +1449,6 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     }
   }
 
-  coords_est[0] = coords_est[0];//
-  coords_est[1] = coords_est[1];//
-  coords_est[2] = coords_est[2];//
   float d_x;
   float d_y;
   float d_z;
@@ -1412,6 +1456,7 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
   float distance_min;
   distance_min = 100000;
   int idx_min = numPts_old+1;
+  
   for (i = 0; i < numPts_old; i++)
   {
     d_x = point_old[i].x_3d - coords_est[0];
@@ -1425,8 +1470,9 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     }
   }
   // printf("idx: %d min distance to matching point: %f\n", idx, distance_min);
-
-  if ((distance_min < 1.0f)&&(idx_min < numPts_old)) {
+  
+  if ((distance_min < MIN_THRESH_RANSAC)&&(idx_min < numPts_old)) {
+    
      point_new[idx].ransac_match = idx_min;
      float ransac_xpos = point_old[idx_min].xpos;
      float ransac_ypos = point_old[idx_min].ypos;
@@ -1469,7 +1515,14 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   mat4x4 h;
   vec4 cent_old;
   vec4 cent_new;
-
+  int number_matches = 0;
+  for (int i = 0; i < numPts; i++) {
+    if (point[i].draw == true) {
+      number_matches++;
+    }
+  }
+  printf("%d;",number_matches);
+  
     int idx;
     for (idx = 0; idx < 6; idx++)
     {
@@ -1491,6 +1544,7 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
         if (point[i].draw == true)
         {
           divisor++;
+          
           if (idx == 0)
             cent_new[0] += point[i].x_3d;
           if (idx == 1)
@@ -1521,6 +1575,7 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
       if (idx == 5)
         cent_old[2] /= divisor;
     }
+      
     // printf("Centroid diff after rematch: %f, %f, %f\n", cent_new[0]-cent_old[0], cent_new[1]-cent_old[1], cent_new[2]-cent_old[2]);
     for (idx = 0; idx < 9; idx++)
     {

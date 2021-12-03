@@ -597,7 +597,7 @@ static inline void print_vec4(std::string name, vec4 e, bool semicolon_separated
     {
         std::cout << e[0] << ";" << e[1] << ";" << e[2] << ";" << e[3];
         if (no_endline)
-            std::cout << ";";
+            std::cout << "\033[32m" <<  ";" << "\033[0m";
         else
             std::cout << std::endl;
     }
