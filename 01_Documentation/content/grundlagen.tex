@@ -563,8 +563,8 @@ OpenCV itself provides a script which estimates these values based on multiple p
 The implementation in CUDA is done by storing the pixel coordinates of the uncorrected image for each pixel in the corrected image. This data is loaded into a CUDA allocated memory area and allows mapping the coordinates for the correction without complex caluclations as visualized in image \ref{im:CudaCamCalib}.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{Storing the final calibration values into an array keeps the implementation in CUDA simple.}
+    \includegraphics[width=1.0\textwidth]{images/undistort_LUT.pdf}
+    \caption{Storing the final calibration values in two lookup tables keeps the implementation in CUDA simple.}
     \label{im:CudaCamCalib}
 \end{figure}
 
@@ -635,11 +635,11 @@ The process noise matrix $Q$ combines the input vector $G$ and the standard devi
     \end{bmatrix}
     \cdot 1
 \end{equation*}
-The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error explodes. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.
+The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error increases over time. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/Kalman_example_1d_error.eps}
-    \caption{On the left, the diagonal values of the covariance matrix of the errors are visualized against each other. The errors for velocity and acceleration converge towards a low value, while the error for the position explodes.\\
+    \caption{On the left, the diagonal values of the covariance matrix of the errors are visualized against each other. The errors for velocity and acceleration converge towards a low value, while the error for the position increases.\\
     On the right, a close-up of the internal workings of the Kalman filter. The blue dots are the raw measurements, the red dots are the corresponding predictions and plotted in green is the output value of the Kalman filter. In contrast, the true velocity is plotted in grey.}
     \label{im:KalmanError}
 \end{figure}

@@ -38,16 +38,16 @@ All is held together by a plywood structure glued onto a tripod-baseplate, shown
 \begin{figure}[H]
     \centering
     \begin{minipage}[b]{0.45\textwidth}
-      \includegraphics[scale=0.40]{images/todo.png}
+      \includegraphics[scale=0.20]{images/cam_head_frontside.png}
       \caption{Frontside}
       \label{fig:cameraHeadfront} 
     \end{minipage} % Hier darf keine Leerzeile zwischen den beiden Minipages liegen!
     \begin{minipage}[b]{0.45\textwidth}
-      \includegraphics[scale=0.40]{images/todo.png} 
+      \includegraphics[scale=0.20]{images/cam_head_backside.png} 
       \caption{Backside}
       \label{fig:cameraHeadback} 
     \end{minipage}
-    \caption{The camera head consisting of the ToF camera, the IMU and the Raspberry Pi camera}
+    \caption{The camera head consisting of the ToF camera and the Raspberry Pi camera on the front side, and the IMU, its I²C to USB bridge and the FPDLink III Serializer on the backside.}
     \label{fig:cameraHead}
   \end{figure}
 The IMU could have been attached directly to the Raspberry Pi, but at the time of the implementation, the decision on how to connect the ToF camera was not taken yet. Therefore, it was not certain that a Raspberry Pi would be mounted at the camera head.
@@ -57,18 +57,18 @@ Four individual cables connect to the different components on the camera head: A
 \subsection{Processing System}
 \label{sec:procSystem}
 An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rendering, and data acquisition. An Anyvision baseboard - shown in image \ref{fig:anyvision} - carries the Nvidia Jetson module and allows the direct attachment of the used data cables, thanks to its modular design.\cite{groo:Thesis:2020}\\
-The Nvidia Jetson Xavier AGX 8GB offers a 6-core ARM v8.2 64bit CPU, a GPU with 384 Volta cores and 48 Tensor cores. A 256 bit wide link offers 85GB/s bandwith to the 8GB unified LPDDR4x RAM.  
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{The Nvidia Jetson Xavier AGX on the Anyvision Baseboard.}
-    \label{fig:anyvision}
-\end{figure}
+The Nvidia Jetson Xavier AGX 8GB offers a 6-core ARM v8.2 64bit CPU, a GPU with 384 Volta cores and 48 Tensor cores. A 256 bit wide link offers 85GB/s bandwith to the 8GB unified LPDDR4x RAM.\\
 A TCP/IP server application on the Raspberry Pi powering the PiEye ToF camera, to which the processing system connects, serves the necessary ToF camera data in a frame-based protocol. The USB to I²C bridge gets loaded as a standard I²C device by the Linux on the processing system. The IMU is then directly configured and polled by the userspace software on the processing system without an additional driver. The Raspberry Pi camera is attached via FPDLink and integrated as a video4linux2 device. The capturing is done with FFMPEG and the debayering in CUDA.\cite{iszt:BA:2021}
 \subsection{Video inputs}
 \label{sec:videoInputs}
 The Sony IMX 219 based Raspberry Pi Camera v2 features a color image with an 8 megapixel resolution for single images, 1080p with 30 frames per second, 720p with 60 frames per second or 480p with 90 frames per second.\cite{raspiCamSpec} In the 1080p mode, the Raspberry Pi Camera v2 crops the sensor, using only a subsection of the field of view. The camera is run in the 720p mode, as it uses pixel-binning and utilizes the whole sensor size and offers the full field of view.\\
-The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.\\
+The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/vizhion.png}
+    \caption{The Nvidia Jetson Xavier AGX on the Anyvision Baseboard.}
+    \label{fig:anyvision}
+\end{figure}
 The PiEye ToF camera is based on the Infineon REAL3 IRS1125A sensor which has a resolution of 352 x 288 pixels\cite{piEyeShop}. The ToF Camera is paired with infrared LED flashes to measure the time of flight of the light emitted and has an intended measurement range from 10 centimeters up to five meters. The entire ToF software stack runs on a Raspberry Pi that sends its video data via Ethernet to the augmented reality system.
 \subsection{Unified Memory}
 \label{sec:unifiedMemory}
