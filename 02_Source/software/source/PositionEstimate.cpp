@@ -463,7 +463,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
 
             // offset correction in a moving average when standing still
-            if ((vec_len_i < 9.81 + 0.2) && (vec_len_i > 9.81 - 0.2))
+            if ((vec_len_i < 9.81 + 0.2) && (vec_len_i > 9.81 - 0.2) && (newdata == 2))
             {
                 for (int i = 0; i < 3; i++)
                 {
@@ -473,9 +473,9 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             }
             for (int i = 0; i < 3; i++)
             {
-                delta_vector_xyz[i] = delta_vector_xyz[i] - delta_vector_xyz_moving[i];
+                // delta_vector_xyz[i] = delta_vector_xyz[i] - delta_vector_xyz_moving[i];
                 // tof_translation_xyz[i] = tof_translation_xyz[i] - delta_tof_vector_moving[i];
-            }
+            }// 
 
             quat delta_vector;
             delta_vector[3] = delta_vector_xyz[0];
@@ -497,8 +497,13 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, delta_vector, R);
             }
             quat tof_translation;
+            tof_translation_xyz[0] =  tof_translation_xyz[0];
+            tof_translation_xyz[1] = -tof_translation_xyz[1];
+            tof_translation_xyz[2] =  tof_translation_xyz[2];
+
+
             tof_translation[3] = 0.5 * tof_translation_xyz[0];
-            tof_translation[0] = -0.5 * tof_translation_xyz[1];
+            tof_translation[0] = 0.5 * tof_translation_xyz[1];
             tof_translation[1] = 0.5 * tof_translation_xyz[2];
             tof_translation[2] = 0;
 
@@ -516,9 +521,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, tof_translation, R);
             }
 
-            // print_quat("ToFquaternion", ToFQuaterion);
-            // print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
-            // print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
+
             // print_vec17("X3", x, true);
             //    print_quat("quat_integrated", quat_integrated);
             //    // std::cout << "------------------------------------------------------------------" << cycle_count << "--------------------------------------------------" << std::endl;
@@ -527,8 +530,8 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 cycle_count = 5;
             // std::cout << vec_len_i << ";" << meas_cnt_i << ";";
             // print_quat("quat_integrated", quat_integrated, true, true);
-            print_quat("quat_gyro", quat_gyro, true, true);
-            print_quat("ToFquaternion", ToFQuaterion, true, true);
+            // 
+            // print_quat("ToFquaternion", ToFQuaterion, true, true);
             //    //print_mat4x4("quat_matrix",quat_matrix);
 
             kalman_rotation[0] = x[10];
@@ -560,15 +563,22 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             // print_vec4("kalman_acceleration", kalman_acceleration, true, true);
             // print_vec4("kalman_velocity", kalman_velocity, true, true);
             // print_vec4("kalman_translation", kalman_translation, true, true);
-            // print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true);
-            print_quat("kalman_rotation", kalman_rotation, true, true);
+            // ;
+            // 
 
             quat kalman_rot_speed = {x[14], x[15], x[16], x[13]};
-
-            // print_quat("kalman_translation", kalman_translation, true, true);
-            // print_quat("kalman_velocity", kalman_velocity, true, true);
-            // print_quat("kalman_acceleration", kalman_acceleration, true);
-            print_quat("kalman_rot_speed", kalman_rot_speed, true);
+            std::cout << nseconds_i << ";";
+            print_quat("quat_gyro", quat_gyro, true, true);
+            print_quat("ToFquaternion", ToFQuaterion, true, true);
+            print_quat("kalman_rotation", kalman_rotation, true, true);
+            print_quat("kalman_rot_speed", kalman_rot_speed, true, true);
+            print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
+            print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
+            print_quat("kalman_translation", kalman_translation, true, true);
+            print_quat("kalman_velocity", kalman_velocity, true, true);
+            print_quat("kalman_acceleration", kalman_acceleration, true, true);
+            print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true);
+            // 
         }
     }
     if (ToFQuaterion[3] > 0.75)

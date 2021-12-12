@@ -268,7 +268,7 @@ void TCPFrameCapture::run()
     }
     // puts("Socket created");
 
-    server.sin_addr.s_addr = inet_addr("10.42.0.58");
+    server.sin_addr.s_addr = inet_addr("192.168.1.107");
     server.sin_family = AF_INET;
     server.sin_port = htons(23999);
 
@@ -374,10 +374,12 @@ void TCPFrameCapture::run()
             std::cout << "Continuing, too few features found!" << std::endl;
             continue;
         }
-        std::cout << siftData[write_buf_id].numPts << ";";
+        
         // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
         computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
+        
         cudaStreamSynchronize(tcpCaptureStream);
+        std::cout << siftData[write_buf_id].numPts << ";";
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
         if (write_buf_id == 0)
         {
