@@ -4,7 +4,7 @@
 The following chapter describes methods and technologies that are used within this thesis.
 \section{3D Cameras}
 \label{sec:ToFCamera}
-In the field of 3D mapping, two expressions often get mentioned: LiDaR sensors and ToF cameras. As the basic principle in both technologies relies on measuring the Time of Flight (ToF) and is in both cases Light-Detection and Ranging, both expressions are ambivalent.\\
+In the field of 3D mapping, two expressions often get mentioned: LiDaR sensors and ToF cameras. As the basic principle in both technologies relies on measuring the Time of Flight (ToF) and is in both cases Light-Detection and Ranging, both expressions are technically ambivalent.\\
 A LiDaR sensor is often referred to work together with a moving laser, that scans its surroundings.\cite{Techradar_Lidar} The mechanical mounting of such a device is too bulky to be embedded in a modern smartphone, which is why solid-state LiDaR sensors are used. A solid-state LiDaR sensor projects a grid of laser dots onto the scene, as seen in image \ref{im:iPadLidar}. The time of flight for each dot is measured individually.
 \begin{figure}[H]
     \centering
@@ -12,9 +12,9 @@ A LiDaR sensor is often referred to work together with a moving laser, that scan
     \caption{Projected dots from the LiDaR scanner of an Apple iPad Pro 2020, made visible with an infrared camera. Image source: iFixit.com}
     \label{im:iPadLidar}
 \end{figure}
-Another method for 3D mapping is, using one wide area infrared flash and measuring the time of flight on each individual sensor pixel. This approach in contrast is often referred to be a ToF camera. ToF cameras are used by different manufacturers of Android powered smart phones.\\
-While the measurement principle in both technologies is the same, the LiDaR scanner generates a point cloud, while the ToF camera outputs a depth map image. With mathematical transformations, both outputs are equivalent. Another difference is that a ToF camera can double as a grayscale infrared camera, providing an image by itself. \\
-The sensor used for this thesis follows the principle of a ToF camera. The measured radial distance from the sensor for each pixel allows the three dimensional reconstruction of the scene. As the distance measurement is of radial nature, it needs to be corrected. This problem is solved bei either knowing the angle from the optical axis for each pixel, or by correcting with a reference measurement. Section \ref{sec:ToFCalibration} explains the performed correction.
+Another method for 3D mapping is, using one wide-area infrared flash and measuring the time of flight on each sensor pixel. This approach, in contrast, is often referred to be a ToF camera. Android-powered smartphones of various manufacturers use ToF cameras to improve autofocus capabilities or add artificial bokeh.\\
+While the physical principle in both technologies is the same, the LiDaR scanner generates a point cloud, while the ToF camera outputs a depth map image. With mathematical transformations, both outputs are equivalent. Another difference is that a ToF camera can double as a grayscale infrared camera, providing an image by itself.  \\
+The sensor used for this thesis follows the principle of a ToF camera. The measured radial distance from the sensor for each pixel allows the three-dimensional reconstruction of the scene. As the distance measurement is radial, it needs to be corrected to obtain flat surfaces. A reference measurement helps solve this problem, section \ref{sec:ToFCalibration} explains the performed correction.
 
 \section{Mathematics for Rotation and Translation}
 \label{sec:LinAlgRotation}
@@ -133,59 +133,6 @@ The dependency on the order of the rotations poses a problem visualized in image
     \caption{Euler rotations are dependent on the order of the individual rotations. Rotating around X and then Z results in a different outcome, than first rotating around Z and then X.}
     \label{im:EulerRotation}
 \end{figure}
-\subsection{Standard Vulkan Coordinate System}
-\label{sec:VulkanCoords}
-In Vulkan, every vertex coordinate of a 3D rendered object gets mapped to the nearest pixel in the viewport window. This vertex mapping is done in multiple steps from "view coordinates" via "clip coordinates" towards "normalized device coordinates" to the "pixel coordinates".\\
-A 3D object is a cloud of vertex coordinates described by a list three-dimensional vectors $\overrightarrow{v_{v}} = (x_{v},y_{v},z_{v})$ (the subscript $v$ denotes the "view coordinates"). These coordinates usually do not contain data regarding the whole object's scale, position, and rotation in 3D space - this information is added with matrices in the shader step.\\
-Vulkan expects the output of the shader step to be in clip coordinates. Clip coordinates are four-dimensional vectors $\overrightarrow{v_{c}} = (x_{c},y_{c},z_{c},w_{c})$ (the subscript $c$ denotes the "clip coordinates") and the result of a matrix multiplication operation.\\
-\begin{equation*}
-    \overrightarrow{v_{c}} = A \cdot  \overrightarrow{v_{v}}
-\end{equation*}
-\begin{equation*}
-    \begin{pmatrix}
-        x_{c} \\
-        y_{c} \\
-        z_{c} \\
-        w_{c}
-    \end{pmatrix}
-    =
-    \begin{bmatrix}
-        a_{0,0} & a_{0,1} & a_{M 0,2} & a_{0,3} \\
-        a_{1,0} & a_{1,1} & a_{M 1,2} & a_{1,3} \\
-        a_{2,0} & a_{2,1} & a_{M 2,2} & a_{2,3} \\
-        a_{3,0} & a_{3,1} & a_{M 3,2} & a_{3,3}
-    \end{bmatrix}
-    \cdot
-    \begin{pmatrix}
-        x_{v} \\
-        y_{v} \\
-        z_{v} \\
-        1
-    \end{pmatrix}
-\end{equation*}
-Generally, three combined matrix multiplications describe how a 3D object is rendered – the model matrix, the view matrix, and an added projection matrix. The model matrix ($A_{Model}$) defines the scale, rotation and position of the 3D object and is a standard 4x4 matrix as explained in section \ref{sec:LinAlgRotation}.\\
-The view matrix ($A_{View}$) is also is a rotation and translation matrix, but describes the position and direction of the viewport camera (or eye). Rotating the camera rotates the rendered virtual space, which indirectly moves and turns the models in the viewport. The linmath-library offers the "4x4\_look\_at" function that calculates the view matrix based on camera position, a viewing angle, and the information regarding the "upwards" direction.\\
-The projection matrix ($A_{Projection}$)  is not a rotation and translation matrix besides the model and the view matrix. As its name suggests, the projection matrix reduces the vertex' 3d coordinates to the viewport plane by projecting them onto a virtual screen. By taking a field of view angle, the projection matrix allows camera distortion. The linmath-library offers the "4x4\_perspective" function that calculates the projection matrix based on a given field of view angle
-Within the vertex shader, these three matrices are chained to perform the desired transformation.
-\begin{equation*}
-    A = A_{Projection} \cdot A_{View} \cdot A_{Model}
-\end{equation*}
-By division of the clip coordinate components $x_{c}$, $y_{c}$ and $z_{c}$ with $w_{c}$, Vulkan itself calculates the normalized device coordinates $\overrightarrow{v_{NDC}} = (x_{NDC}, y_{NDC}, z_{NDC})$.
-\begin{equation*}
-    \begin{pmatrix}
-        x_{NDC} \\
-        y_{NDC} \\
-        z_{NDC} \\
-    \end{pmatrix}
-    =
-    \begin{pmatrix}
-        \frac{x_{c}}{w_{c}} \\
-        \frac{y_{c}}{w_{c}} \\
-        \frac{z_{c}}{w_{c}} \\
-    \end{pmatrix}
-\end{equation*}
-The transformation to the pixel coordinates are also done by Vulkan without requiring any action by the developer. The only noticable detail is the alignment of the normalized device coordinates. On the viewport surface, the point $(0 / 0)$ is located in the center. Top left is $(-1 / -1)$, top right is $(1 / -1)$, bottom left is $(-1 / 1)$ and bottom right is $(1 / 1)$.
-
 \subsection{Rotation with Quaternions}
 \label{sec:RotationQuaternion}
 Quaternions - also known as "Hamilton Numbers" - are the four dimensional equivalent to complex numbers. The theory of quaternions is vast, only the parts needed in this thesis are explained in this section. Analogue to complex numbers, quaternions also consist of a real part, but add three imaginary parts $\textbf{i}$, $\textbf{j}$ and $\textbf{k}$. Most often, quaternions get represented in the form $a+b\textbf{i}+c\textbf{j}+d\textbf{k}$ or a four dimensional vector $(a, b, c, d)$.\\
@@ -311,6 +258,7 @@ By converting a rotation quaternion to a rotation matrix, the gap to Vulkan can 
     \end{bmatrix}
 \end{equation*}
 The basic quaternion operations - like the multiplication - are included in the linmath-library. The linmath-library represents a quaternion as a four-dimensional float-vector in the ordering $(b, c, d, a)$ - the real part being the last element.\\
+
 \subsection{Singular Value Decomposition (SVD)}
 \label{sec:SVD}
 The singular value decomposition is a linear algebra method that allows finding the optimal rotation matrix between two matching point clouds. Adding additional algebraic steps makes it possible to find the optimal translation vector in addition.\cite{SVD_ETH}
@@ -320,7 +268,7 @@ The SVD decomposes any given matrix $M$ of the dimension $n\times m$ into three 
     M= U\Sigma V^{T}
 \end{equation*}
 The individual matrices generated by the SVD act als two rotations and one distortion. As visible in image \ref{im:SVD}, the unit circle $\vec{x}$ first gets rotated by $V^{T}$ that the distortion is in the directions of the coordinate system. After applying the distortion $\Sigma$ to the rotated circle $\vec{y}_{1}$, the intermediate ellipse $\vec{y}_{2}$ gets rotated and mirrored to match $\vec{y}$.
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{images/SVD}
     \caption{Singular Value Decomposition in 2D shown in the individual stages. Blue is before and red is after the applied transformation.}
@@ -388,6 +336,188 @@ Finally, the square-roots of the eigenvalues of either $M^{T}M$ or $MM^{T}$ are 
         0 & 0.6075
     \end{bmatrix}
 \end{equation*}
+\subsection{Spatial coordinates and device coordinates}
+\label{sec:ABC_XYZ_coords}
+As the rotation of the camera head changes the coordinates of the measurement in respect to real-world coordinates, a convention helps carry out the calculations. For the sensors on the camera head, the coordinates are named $a$, $b$, and $c$, while the spatial coordinates are named $x$, $y$, and $z$.
+The coordinates can be transformed by the following formula, knowing the current orientation quaternion $Q_{rot}$.   
+\begin{equation*}
+    Q_{rot}
+    =
+    \begin{pmatrix}
+        r           \\
+        u\textbf{j} \\
+        v\textbf{j} \\
+        w\textbf{k}
+    \end{pmatrix}
+    \quad ; \quad
+    \begin{pmatrix}
+        0           \\
+        x\textbf{i} \\
+        y\textbf{j} \\
+        z\textbf{k}
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+        r           \\
+        u\textbf{i} \\
+        v\textbf{j} \\
+        w\textbf{k}
+    \end{pmatrix}
+    \begin{pmatrix}
+        0           \\
+        a\textbf{i} \\
+        b\textbf{j} \\
+        c\textbf{k}
+    \end{pmatrix}
+    \begin{pmatrix}
+        r           \\
+        -u\textbf{i} \\
+        -v\textbf{j} \\
+        -w\textbf{k}
+    \end{pmatrix}
+\end{equation*}
+Section \ref{sec:RotationQuaternion} describes how to carry out the mathematics of this quaternion multiplication. 
+\section{Standard Vulkan Coordinate System}
+\label{sec:VulkanCoords}
+In Vulkan, every vertex coordinate of a 3D rendered object gets mapped to the nearest pixel in the viewport window. This vertex mapping is done in multiple steps from "local space" coordinates via "clip coordinates" towards "normalized device coordinates" to the "pixel coordinates".
+A 3D object is a group of vertex coordinates, described by a list three-dimensional vectors $\vec{v_{v}} = (x_{v},y_{v},z_{v})$ (the subscript $v$ denotes the "vertex coordinates"). These coordinates usually do not contain data regarding the whole object's scale, position, and rotation in 3D space - the coordinates are in the object's local space.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.52\textwidth]{images/Vulkan_local_space.eps}
+    \caption{A Vulkan object consisting of four vertices in its local space. The green corner acts as an example.}
+    \label{im:VulkanLocalSpace}
+\end{figure}
+Vulkan expects the output of the shader step to be in clip coordinates. The clip coordinates reside in the clip space. Clip coordinates are four-dimensional vectors $\overrightarrow{v_{c}} = (x_{c},y_{c},z_{c},w_{c})$ (the subscript $c$ denotes the "clip coordinates") and the result of a matrix multiplication operation.\\
+\begin{equation*}
+    \vec{v_{c}} = A \cdot  \vec{v_{v}}
+\end{equation*}
+\begin{equation*}
+    \begin{pmatrix}
+        x_{c} \\
+        y_{c} \\
+        z_{c} \\
+        w_{c}
+    \end{pmatrix}
+    =
+    \begin{bmatrix}
+        a_{0,0} & a_{0,1} & a_{M 0,2} & a_{0,3} \\
+        a_{1,0} & a_{1,1} & a_{M 1,2} & a_{1,3} \\
+        a_{2,0} & a_{2,1} & a_{M 2,2} & a_{2,3} \\
+        a_{3,0} & a_{3,1} & a_{M 3,2} & a_{3,3}
+    \end{bmatrix}
+    \cdot
+    \begin{pmatrix}
+        x_{v} \\
+        y_{v} \\
+        z_{v} \\
+        1
+    \end{pmatrix}
+\end{equation*}
+Generally, three combined matrix multiplications describe how a 3D object is rendered – the model matrix, the view matrix, and an added projection matrix. The model matrix ($A_{Model}$) defines the scale, rotation and position of the 3D object in the world space. The model matrix is a standard 4x4 rotation and translation matrix as explained in section \ref{sec:LinAlgRotation}. In the example, shown in the images \ref{im:VulkanLocalSpace} and \ref{im:VulkanCoords}, the rectangle is shifted on the x-axis.\\
+\begin{equation*}
+    A_{Model} =
+\begin{bmatrix}
+    1 & 0 & 0 & 2 \\
+    0 & 1 & 0 & 0 \\
+    0 & 0 & 1 & 0 \\
+    0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation*}
+The view matrix ($A_{View}$) is also a rotation and translation matrix, but describes the position and direction of the viewport camera inside the world space. Rotating the camera rotates the rendered virtual space, which indirectly moves and turns the models in the viewport. The linmath-library offers the "4x4\_look\_at" function that calculates the view matrix based on camera position, a viewing angle, and the "upwards" direction, as visualized in red in image \ref{im:VulkanCoords}. In the upper half of the image, the virtual camera is placed at the source, pointing towards the $x$-axis with the upwards direction facing alongside $z$. In the bottom part of the image, the camera position is shifted, and the camera is rotated slightly.
+\begin{equation*}
+    A_{View, top} = 
+\begin{bmatrix}
+    0 & -1& 0 & 0 \\
+    0 & 0 & 1 & 0 \\
+    -1 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 1
+\end{bmatrix} \quad ; \quad
+    A_{View, bottom} =
+\begin{bmatrix}
+    0.266 &-0.963 & -0.036 & 0.036 \\
+    0.266 & 0.037 & 0.963 & -0.963 \\
+    -0.927 &-0.266 & 0.266 & -0.266 \\
+    0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation*}
+The projection matrix ($A_{Projection}$)  is not a rotation and translation matrix besides the model and the view matrix. As its name suggests, the projection matrix reduces the vertex' 3d coordinates to the viewport plane by projecting them onto a virtual screen. The linmath-library offers the "4x4\_perspective" function that calculates the projection matrix based on a given field of view angle. As the linmath-library was made for OpenGL, which uses a different alignment on the framebuffer, the element $A_{Projection}[1][1]$ needs to be multiplied by $-1$. In image \ref{im:VulkanCoords}, the effect of the projection matrix is shown with the black beams protruding out of the red dot. In the example, the following projection matrix is used.
+\begin{equation*}
+    A_{Projection} =
+\begin{bmatrix}
+    0.678 & 0 & 0 & 0 \\
+    0 & -1.19175 & 0 & 0 \\
+    0 & 0 & -1.0202 & -0.20202 \\
+    0 & 0 & 1 & 0
+\end{bmatrix}
+\end{equation*}
+Within the vertex shader, these three matrices are chained to perform the desired transformation.
+\begin{equation*}
+    A = A_{Projection} \cdot A_{View} \cdot A_{Model}
+\end{equation*}
+Applying the example matrices to the green dot demonstrates the process of calculating the clip coordinates $\vec{v_{c}}$. The developer has to provide these coordinates to Vulkan as the output of the vertex shader:
+\begin{equation*}
+    \vec{v_{v}} =     
+    \begin{pmatrix}
+        0 \\
+        1 \\
+        0.5625 \\
+        1
+    \end{pmatrix} \quad ; \quad
+    \vec{v_{c, top}} = A_{top} \cdot  \vec{v_{v}} =     
+    \begin{pmatrix}
+        -0.678 \\
+        -0.670 \\
+        1.838 \\
+        2.0
+    \end{pmatrix}
+    \quad ; \quad
+    \vec{v_{c, bottom}} = A_{bottom} \cdot  \vec{v_{v}} =     
+    \begin{pmatrix}
+        -0.281 \\
+        -0.175 \\
+        2.079 \\
+        2.235
+    \end{pmatrix}
+\end{equation*}
+By division of the clip coordinate components $x_{c}$, $y_{c}$ and $z_{c}$ with $w_{c}$, Vulkan itself calculates the normalized device coordinates $\vec{v_{NDC}} = (x_{NDC}, y_{NDC}, z_{NDC})$.
+\begin{equation*}
+    \begin{pmatrix}
+        x_{NDC} \\
+        y_{NDC} \\
+        z_{NDC} \\
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+        \frac{x_{c}}{w_{c}} \\
+        \frac{y_{c}}{w_{c}} \\
+        \frac{z_{c}}{w_{c}} \\
+    \end{pmatrix}
+\end{equation*}
+In the example, the normalized device coordinates are: 
+\begin{equation*}
+    \vec{v_{NDC,top}} =     
+    \begin{pmatrix}
+        -0.339 \\
+        -0.335 \\
+        0.919
+    \end{pmatrix} \quad ; \quad
+    \vec{v_{NDC,bottom}} = 
+    \begin{pmatrix}
+        -0.126 \\
+        -0.078 \\
+        0.930
+    \end{pmatrix}
+\end{equation*}
+The transformation to the pixel coordinates are also done by Vulkan without requiring any action by the developer. Only the $x$ and $y$ parts of the normalized device coordinates define, where a pixel is rendered. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/Vulkan_coordinates.eps}
+    \caption{The rectangle is placed with the model-matrix, while the view- and projection-matrices determine the setup of the virtual camera. The green corner point acts as the example. Note the inverted y-axis in clip space.}
+    \label{im:VulkanCoords}
+\end{figure}
+ The $z$ part tells the depth, on how far the vertex is "inside the monitor". Video games use this information to not render objects that are too far away from the observer. On the viewport surface, the point $(0 / 0)$ is located in the center. Top left is $(-1 / -1)$, top right is $(1 / -1)$, bottom left is $(-1 / 1)$ and bottom right is $(1 / 1)$.\\
+If a vertex falls outside of the range ±1 in the clip coordinates, it is not rendered or "clipped away", hence the name of the coordinate space.
+
 \section{Camera Calibration}
 \label{sec:FundCamCalibration}
 An uncalibrated camera image often has lens distortion, warping a rectangle into a pillow or barrel shape and making areas appear closer in certain parts of the image. These distortions are named radial and tangential distortion and are induced by the camera lens.\\
@@ -433,15 +563,21 @@ OpenCV itself provides a script which estimates these values based on multiple p
 The implementation in CUDA is done by storing the pixel coordinates of the uncorrected image for each pixel in the corrected image. This data is loaded into a CUDA allocated memory area and allows mapping the coordinates for the correction without complex caluclations as visualized in image \ref{im:CudaCamCalib}.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{Storing the final calibration values into an array keeps the implementation in CUDA simple.}
+    \includegraphics[width=1.0\textwidth]{images/undistort_LUT.pdf}
+    \caption{Storing the final calibration values in two lookup tables keeps the implementation in CUDA simple.}
     \label{im:CudaCamCalib}
 \end{figure}
 
 \section{Kalman filter}
 \label{sec:Kalmanfilter}
 The Kalman filter is an adaptive filter realized with a predictor-corrector algorithm that uses a model and known gaussian uncertainties of different sensors to estimate a value. Additionally to sensor data, the Kalman filter can adjust the estimate based on known forces– for example, the rotor speed of an RC drone. In an RC drone, a GPS position sensor, an accelerometer, and proximity sensors are fused with the rotor speeds to estimate the current motion with increased accuracy.\\
-In this thesis, motion without a known input needs to be measured, having sensors for acceleration, velocity, and rotation. The following example demonstrates the position, velocity, and acceleration in one dimension. A fifth-order spline is used for the position data from which velocity and acceleration are derived to simulate the sensor data. Adding Gaussian noise to the simulated velocity and acceleration data reflects reality and allows demonstrating the Kalman filter.\\
+In this thesis, motion without a known input needs to be measured, having sensors for acceleration, velocity, and rotation. The following example demonstrates the position, velocity, and acceleration in one dimension. A fifth-order spline is used for the position data from which velocity and acceleration are derived to simulate the sensor data. Adding Gaussian noise to the simulated velocity and acceleration data reflects reality and allows demonstrating the Kalman filter.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/Kalman_example_1d.eps}
+    \caption{The Kalman filter demonstrated. Blue is the acceleration, purple the velocity and red the position. Raw integration of the velocity shows a jagged output of the position estimation. Raw double-integration of the acceleration leads to the position to drift away. The position estimate of the Kalman filter itself follows the jagged line of the raw velocity integration, but the estimated velocity is closer to the true value. In green, the integration of the estimated velocity shows a better approximation of the true value.}
+    \label{im:KalmanFilter1D}
+\end{figure}
 For each new data point, the Kalman filter predicts the next system state based on old data using the model matrix $F$. If a known input $\vec{u}$ would act on the system, the input matrix $B$ would model that. Without a known input, $B$ and $\vec{u}$ are omitted.The system state $\vec{x}$ transitions from the prior state $k-1$ to the prediction $k|k-1$. \\
 \begin{equation*}
     \vec{x}_{k|k-1} = 
@@ -499,7 +635,14 @@ The process noise matrix $Q$ combines the input vector $G$ and the standard devi
     \end{bmatrix}
     \cdot 1
 \end{equation*}
-The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error explodes. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.\\
+The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error increases over time. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/Kalman_example_1d_error.eps}
+    \caption{On the left, the diagonal values of the covariance matrix of the errors are visualized against each other. The errors for velocity and acceleration converge towards a low value, while the error for the position increases.\\
+    On the right, a close-up of the internal workings of the Kalman filter. The blue dots are the raw measurements, the red dots are the corresponding predictions and plotted in green is the output value of the Kalman filter. In contrast, the true velocity is plotted in grey.}
+    \label{im:KalmanError}
+\end{figure}
 With the system state $\vec{x}_{k|k-1}$ and the covariance matrix $P_{k|k-1}$ being predicted, the following steps describe the correction part of the Kalman iteration. The observation matrix $H$ determines which sensor will influence which entry of the system state vector $\vec{x}$. For each correction step, a Kalman Gain matrix $K_{k}$ determines the optimal correction based on the current covariance of errors $P$ and the measurement noise $R$.
 \begin{equation*}
     K_{k} = P_{k|k-1}\cdot H^{T}(H\cdot P_{k|k-1}\cdot H^{T}+R)^{-1}

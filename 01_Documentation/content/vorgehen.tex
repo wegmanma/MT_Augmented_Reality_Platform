@@ -1,46 +1,53 @@
 %!TEX root = ../doc.tex
 \chapter{Implementation}
 \label{sec:Implementation}
-This chapter describes the implementation and the connections of the individual components of the augmented reality system. There are two main tasks, the system needs to perform: A three dimensional estimation of the surrounding and the precise measurement of motion of the camera head.
+This chapter describes the implementation and the connections of the individual components of the augmented reality system. 
 \section{Hardware}
 \label{sec:Hardware}
-The following section describes the evaluation and setup of the hardware used for the camera head and the processing system. 
+The following section describes the evaluation and setup of the hardware used for the camera head and the processing system.
+
 \subsection{Evaluation of ToF Camera}
 \label{sec:CamEvaluation}
 Having no prior experience with time-of-flight (ToF) cameras, a suitable device had to be evaluated first. Cost and availability have been the main factors in the evaluation, with it being directly CSI-2 connected being a big plus.\\
-Internet research has shown a handful of different sensors powering multiple products of other manufacturers in varying price ranges. \\
+Internet research has shown a handful of different sensors powering multiple products of diverse manufacturers in varying price ranges. \\
 \\
 \textbf{Sony DepthSense IMX556PLR}\\
 The Sony IMX556PLR ToF Sensor offers a resolution of 640 x 480 pixels at 30 frames per second and is used by Basler, Lucid Vision Labs, and DephtEye, primarily for Gigabit Ethernet cameras. The IMX556PLR seems to be the most capable ToF sensor freely available in off-the-shelf products at the time.  \\
 The technically most compelling product for this thesis would have been the Helios Flex by Lucid Vision Labs, which directly connects via CSI-2 and is sold specifically for use on an Nvidia Jetson TX2 Developer Kit. It features a maximum range of 6 meters for depth measurement and accuracy of ±10mm. Although with 749 US Dollars, the Helios Flex is relatively expensive and unsuitable for the thesis because of an unknown lead time.\\
+The other cameras using the IMX556PLR sensor are even more costly and also have uncertain lead times.\\
 \\
 \textbf{Infineon REAL3 IRS1125}\\
 The Infineon IRS1125 ToF Sensor is available in a USB-based development kit by pmdtec – an integrator for ToF technology into smartphones – and on the affordable PiEye Nimbus 3D camera, which is sold as a Raspberry Pi accessory.  \\
 The sensor features a resolution of 352x288 pixels at 30 frames per second in the variant IRS1125A. The variant IRS1125C – used by pmdtec – allows 60 frames per second. The pmdtec development kit is tuned for measuring up to 6 meters, while the PiEye camera is limited to 5 meters.\\
 While both camera systems are readily available to be shipped, the pmdtec pico monstar costs about 1500 US Dollars; in contrast, the PiEye Nimbus costs only 230 Euros. The PiEye company advertises its camera with open source software to embed it into the Raspberry Pi ecosystem. However, further investigation has shown that the middleware – the library managing the camera’s settings and connecting to the video4linux2 framework – is still under NDA with Infineon. \\
-With a lightweight TCP/IP protocol, the module is suitable with a Raspberry Pi, acting as a Gigabit Ethernet camera. The PiEye Nimbus is the module of choice for this thesis – the availability, the price, and the specifications are all reasonable. The options to reverse engineer the middleware or sign an individual NDA with Infineon have been kept open initially but were not necessary as the Gigabit Ethernet implementation worked well enough.\\
+With a lightweight TCP/IP protocol, the PiEye module is suitable with a Raspberry Pi, acting as a Gigabit Ethernet camera. The PiEye Nimbus is the module of choice for this thesis – the availability, the price, and the specifications are all reasonable. The options to reverse engineer the middleware or sign an individual NDA with Infineon have been kept open initially but were not necessary as the Gigabit Ethernet implementation worked well enough.\\
 \\
 \textbf{Other image sensors}\\
 During the internet research, the Texas Instruments OPT8241 has shown up. TI declared the chip obsolete – the chip itself was still available, but the development kit was sold out. With 320 times 240 pixels and an advertised range of 4 meters, the OPT8241 is inferior to the chosen PiEye Nimbus. In addition, the Terabee 3Dcam features a custom sensor with a resolution of 80x60 pixels and 4 meters range. It is attached by USB 2.0 and costs 250 Euros. Due to the low resolution, the Terabee 3Dcam is also inferior to the PiEye Nimbus. 
 
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/hardware.pdf}
+    \caption{Hardware overview. The purple objects belong to the camera head, which is connected to the processing system in cyan.}
+    \label{fig:HW_diagram}
+\end{figure}
 \subsection{Camera Head}
 \label{sec:camHead}
-The camera head contains the PiEye Nimbus ToF camera, mounted on a Raspberry Pi 4B, a Bosch BMI160 IMU, attached to a USB to I²C bridge, and a standard Raspberry Pi camera v2.1 which is connected to the processing system via an FPDLink module.\\
+The camera head, shown in image \ref{fig:HW_diagram}, contains the PiEye Nimbus ToF camera, mounted on a Raspberry Pi 4B, a Bosch BMI160 IMU, attached to a USB to I²C bridge, and a standard Raspberry Pi camera v2.1 which is connected to the processing system via an FPDLink module.\\
 All is held together by a plywood structure glued onto a tripod-baseplate, shown in figure \ref{fig:cameraHead}.
 \begin{figure}[H]
     \centering
     \begin{minipage}[b]{0.45\textwidth}
-      \includegraphics[scale=0.40]{images/todo.png}
+      \includegraphics[scale=0.20]{images/cam_head_frontside.png}
       \caption{Frontside}
       \label{fig:cameraHeadfront} 
     \end{minipage} % Hier darf keine Leerzeile zwischen den beiden Minipages liegen!
     \begin{minipage}[b]{0.45\textwidth}
-      \includegraphics[scale=0.40]{images/todo.png} 
+      \includegraphics[scale=0.20]{images/cam_head_backside.png} 
       \caption{Backside}
       \label{fig:cameraHeadback} 
     \end{minipage}
-    \caption{The camera head consisting of the ToF camera, the IMU and the Raspberry Pi camera}
+    \caption{The camera head consisting of the ToF camera and the Raspberry Pi camera on the front side, and the IMU, its I²C to USB bridge and the FPDLink III Serializer on the backside.}
     \label{fig:cameraHead}
   \end{figure}
 The IMU could have been attached directly to the Raspberry Pi, but at the time of the implementation, the decision on how to connect the ToF camera was not taken yet. Therefore, it was not certain that a Raspberry Pi would be mounted at the camera head.
@@ -49,32 +56,45 @@ Four individual cables connect to the different components on the camera head: A
 
 \subsection{Processing System}
 \label{sec:procSystem}
-An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rendering, and data acquisition. An Anyvision baseboard - shown in image \ref{fig:anyvision} - carries the Nvidia Jetson module and allows the direct attachment of the used data cables.
+An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rendering, and data acquisition. An Anyvision baseboard - shown in image \ref{fig:anyvision} - carries the Nvidia Jetson module and allows the direct attachment of the used data cables, thanks to its modular design.\cite{groo:Thesis:2020}\\
+The Nvidia Jetson Xavier AGX 8GB offers a 6-core ARM v8.2 64bit CPU, a GPU with 384 Volta cores and 48 Tensor cores. A 256 bit wide link offers 85GB/s bandwith to the 8GB unified LPDDR4x RAM.\\
+A TCP/IP server application on the Raspberry Pi powering the PiEye ToF camera, to which the processing system connects, serves the necessary ToF camera data in a frame-based protocol. The USB to I²C bridge gets loaded as a standard I²C device by the Linux on the processing system. The IMU is then directly configured and polled by the userspace software on the processing system without an additional driver. The Raspberry Pi camera is attached via FPDLink and integrated as a video4linux2 device. The capturing is done with FFMPEG and the debayering in CUDA.\cite{iszt:BA:2021}
+\subsection{Video inputs}
+\label{sec:videoInputs}
+The Sony IMX 219 based Raspberry Pi Camera v2 features a color image with an 8 megapixel resolution for single images, 1080p with 30 frames per second, 720p with 60 frames per second or 480p with 90 frames per second.\cite{raspiCamSpec} In the 1080p mode, the Raspberry Pi Camera v2 crops the sensor, using only a subsection of the field of view. The camera is run in the 720p mode, as it uses pixel-binning and utilizes the whole sensor size and offers the full field of view.\\
+The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
+    \includegraphics[width=1.0\textwidth]{images/vizhion.png}
     \caption{The Nvidia Jetson Xavier AGX on the Anyvision Baseboard.}
     \label{fig:anyvision}
 \end{figure}
-A TCP/IP server application on the Raspberry Pi powering the PiEye ToF camera, to which the processing system connects, serves the necessary ToF camera data in a frame-based protocol. The USB to I²C bridge gets loaded as a standard I²C device by the Linux on the processing system. The IMU is then directly configured and polled by the userspace software on the processing system without an additional driver. The Raspberry Pi camera is attached via FPDLink and integrated as a video4linux2 device. The capturing is done with FFMPEG and the debayering in CUDA.
-\subsection{Video inputs}
-\label{sec:videoInputs}
-The system utilizes two cameras, a Raspberry Pi Camera v2 and a PiEye ToF camera that doubles as an infrared camera. The Sony IMX 219 based Raspberry Pi Camera v2 features a color image with an 8 megapixel resolution for single images, 1080p with 30 frames per second, 720p with 60 frames per second or 480p with 90 frames per second.\cite{raspiCamSpec} The Raspberry Pi Camera v2 is a Mipi CSI2 attached camera module whichs cable length got extended by an FPDLink serializer and deserializer.\\
-The PiEye ToF camera is based on the Infineon REAL3 IRS1125A sensor which has a resolution of 352 x 288 pixels\cite{piEyeShop}. The ToF Camera is paired with infrared LED flashes to measure the time of flight of the light emitted and has an intended measurement range from 10 centimeters up to five meters. The entire ToF software stack runs on a Raspberry Pi that sends its video data via Ethernet to the augmented reality system.\\
+The PiEye ToF camera is based on the Infineon REAL3 IRS1125A sensor which has a resolution of 352 x 288 pixels\cite{piEyeShop}. The ToF Camera is paired with infrared LED flashes to measure the time of flight of the light emitted and has an intended measurement range from 10 centimeters up to five meters. The entire ToF software stack runs on a Raspberry Pi that sends its video data via Ethernet to the augmented reality system.
 \subsection{Unified Memory}
 \label{sec:unifiedMemory}
 In a standard desktop computer, the GPU and the CPU have separate memory. It is possible to expose GPU memory to the host CPU, but this has numerous downsides. State-of-the-art desktop GPUs connect via PCIe 4.0 to the host system, which induces latency. The measured round-trip latency of PCIe 3.0 is around 900ns\cite{PCIe_performance}, which also varies with traffic on the system. In comparison, a DDR4 SDRAM access has a latency of around 10-15ns\cite{Wiki_CAS}. Disabling the caching on the memory - as required for concurrent memory access - worsens the latency problem. Therefore, the optimal way to share data between the CPU and the GPU in a standard desktop computer is to copy the memory from the host to the device and vice versa.\\
 On a system with unified memory - like the used Nvidia Jetson AGX Xavier - both the CPU and the GPU have direct access to the same memory. Latency information for the LPDDR4 SDRAM on the Xavier is unavailable, but it is likely in the same range as DDR4 SDRAM. CUDA offers functions to allocate memory available for both CPU and GPU with individual memory pointers. This allocation method disables caching; memory only used by either the GPU or the CPU should be allocated traditionally.\\
-To avoid the overhead for allocating and freeing memory, multiple cached and uncached - but shared - memory zones get allocated at the start of the application.
-
-\section{Software}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/Jetson_Xavier_NX_Block_Diagram.png}
+    \caption{Block diagram of the technically equivalent Jetson Xavier NX. Note the shared DRAM and the separated caches for CPU and GPU. Copyright by Nvidia}
+    \label{im:XavierNX}
+\end{figure}
+\section{Software Architecture}
 \label{sec:Software}
-A single application needs to gather the data from the different sensors and cameras, apply the processing and render the result to an attached monitor. Within this application, various subsystems run in separate threads at different speeds. The Vulkan framework, developed for a former thesis, is the skeleton of this application, to which additional C++ and CUDA modules got attached. Vulkan itself renders the 3D object – a rectangle – into the 2D viewfinder image. The image- and data processing is mainly performed in parallel on the GPU using CUDA. Using the unified memory architecture of the Nvidia Jetson AGX Xavier – the GPU and the CPU have access to the same RAM – the time-consuming copying of memory is not necessary. Therefore, the GPU can also perform smaller tasks without generating a significant copying overhead. Section \ref{sec:unifiedMemory} explains the use of the unified memory further. \\
-Due to the multithreaded nature of the system, and as several threads access the GPU simultaneously, the GPU access got grouped into different CUDA streams. \\
+A single application needs to gather the data from the different sensors and cameras, apply the processing and render the result to an attached monitor. Within this application, various subsystems run in separate threads at different speeds. As visible in image \ref{fig:sw_concept}, the Vulkan framework, developed for a former thesis, is the skeleton of this application, to which additional C++ and CUDA modules got attached. Vulkan itself renders the 3D object – a rectangle named "projected image" – into the 2D viewfinder image of the main camera, as described in section \ref{sec:VideoDisplay}. The image processing and the calculation of rotation and translation are mainly performed on the GPU, while the Kalman filtering is done on the CPU.\\
+Due to the multithreaded nature of the system, and as multiple threads access the GPU simultaneously, the GPU access got grouped into different CUDA streams. \\
 A separate application runs on the Raspberry Pi, serving a TCP/IP connection for streaming the ToF data. 
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/SoftwareArchitecture.pdf}
+    \caption{Software overview. The routine inside the Vulkan Framework creates four child classes.}
+    \label{fig:sw_concept}
+\end{figure}
 
-
+\section{Motion estimation from ToF camera}
+The following section describes the extraction of motion - rotational and translational velocity - from the ToF camera data. The purple section in image \ref{fig:sw_concept} shows the location of the algorithms within the software.
 \subsection{ToF Camera calibration}
 \label{sec:ToFCalibration}
 On the ToF Camera, two parts need to be calibrated: The optics, as described in section \ref{sec:FundCamCalibration}, and the distance measurement. The ToF camera has a barrel type distortion that is corrected by the camera calibration algorithm implemented in OpenCV\cite{openCVCamCalib} and shown in image \ref{fig.camCalib}. As the process of lens correction cuts off parts of the image, the image size gets lowered to 265 x 205 pixels.\\
@@ -100,75 +120,8 @@ Pixel by pixel multiplication of any other image $I_{Any}$ with $I_{cos}$ will c
     \label{im:ToFCorrected}
 \end{figure}
 To apply this calibration in CUDA, a file has been generated which holds the $I_{Cos}$ values for each pixel. The application reads the file at initialization and keeps it stored in a Cuda allocated memory area. 
-\subsection{Raspberry Pi Camera calibration}
-\label{sec:RBPiCalibration}
-The Raspberry Pi camera only provides images for enhancing the system's video output cosmetically; the lens calibration serves no algorithmic purpose. The lens was calibrated solely to map the image into the undistorted Vulkan 3D space, so the virtual rectangle fits the real world's picture.\\
-The camera streams in 720p to use the entire sensor with pixel binning. In 1080p, the sensor uses only a portion of the image sensor, which narrows down the field of view. Like with the ToF camera, a lookup table calibrates the Raspberry Pi camera, which reduces the image size to a resolution of 1273 times 709 pixels.
 
-\section{Gyroscope and Accelerometer Calibration}
-\label{sec:GyroCal}
-The used inertial movement unit (IMU) is a Bosch BMI160, that is sold soldered on a PCB by DFRobot.\\
-As the gyroscope and accelerometer output incremental movement, the values need to be integrated over time. Accurate data is crucial for finding the direction of gravity or detecting movement - especially because of positional information being the result of derivating the acceleration twice.\\
-The range of the acclerometer is variable and has been set to ±8 G, it has an output resolution of 16 bit and an output data rate of 200 Hz.
-The accelerometer has been calibrated in 24 orientations to even out angle errors inside the IMU, on the PCB and of the calibration table, as shown im image \ref{im:IMU_cal}. For each orientation, 100 raw measurements have been averaged to even out noise. 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1.0\textwidth]{images/todo.png}
-    \caption{The 24 orientations used for calibration - four directions for each of the six sides.}
-    \label{im:IMU_cal}
-\end{figure}
-The largest error has been 38 mG, that lies within the sensor's specification of ±40 mG\cite{BMI160}. In addition, the gain for the accelerometer has been corrected based on gravity. A maximum error of 1.8\% has been measured and corrected, which also lies in the sensor's specification of ±0.5\% full scale\cite{BMI160}.\\
-For the gyroscope, the range is set to ±2000 degrees per second with an output data rate of 200 Hz. The gyroscope has been calibrated only for zero offset, whose maximum error was 0.2 degrees per second which lies well in the specified ±3 degrees per second\cite{BMI160}. A gain correction was not made, because of not having the required equipment to do so.\\
-\section{Position and Orientation Estimation}
-\label{sec:PositionEstimate}
-The position estimation of the camera head is crucial for the augmented reality platform. The following section describes the implementation of the different systems involved in sensing motion.\\
-While the measurement using the IMU is standard implementation via I²C communication, the implementation of the ToF-Camera based measurement is more complex and got split into multiple subsections. 
-\subsection{Spatial coordinates and device coordinates}
-\label{sec:ABC_XYZ_coords}
-As the rotation of the camera head changes the coordinates of the measurement in respect to real-world coordinates, a convention helps carry out the calculations. For the sensors on the camera head, the coordinates are named $a$, $b$, and $c$, while the spatial coordinates are named $x$, $y$, and $z$.
-The coordinates can be transformed by the following formula, knowing the current orientation quaternion $Q_{rot}$.   
-\begin{equation*}
-    Q_{rot}
-    =
-    \begin{pmatrix}
-        r           \\
-        u\textbf{j} \\
-        v\textbf{j} \\
-        w\textbf{k}
-    \end{pmatrix}
-    \quad ; \quad
-    \begin{pmatrix}
-        0           \\
-        x\textbf{i} \\
-        y\textbf{j} \\
-        z\textbf{k}
-    \end{pmatrix}
-    =
-    \begin{pmatrix}
-        r           \\
-        u\textbf{i} \\
-        v\textbf{j} \\
-        w\textbf{k}
-    \end{pmatrix}
-    \begin{pmatrix}
-        0           \\
-        a\textbf{i} \\
-        b\textbf{j} \\
-        c\textbf{k}
-    \end{pmatrix}
-    \begin{pmatrix}
-        r           \\
-        -u\textbf{i} \\
-        -v\textbf{j} \\
-        -w\textbf{k}
-    \end{pmatrix}
-\end{equation*}
-Section \ref{sec:RotationQuaternion} describes how to carry out the mathematics of this quaternion multiplication. 
-\subsection{Gyroscope and Accelerometer}
-\label{sec:GyroPosition}
-The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements via an I²C connection, extended by a Silicon Labs CP2112 USB-to-I²C bridge. The IMU generates measurements regarding acceleration in the directions $a$, $b$, and $c$, and measurements regarding rotation speed around these axes.\\
-The IMU shows a hysteresis that lies within the specification of the datasheet; therefore, a simple offset correction does not yield the best results. A moving average – that gets updated whenever no motion of the camera head is detected – helps deal with the hysteresis by subtraction from the measurement value.
-\subsection{ToF Camera: SIFT feature extraction}
+\subsection{SIFT feature extraction}
 \label{sec:ToFPosition_SIFT}
 The PiEye Nimbus ToF camera generates three different image channels for each picture taken: The depth map, the confidence, and the greyscale infrared image. By correcting the lens distortion as described in chapter \ref{sec:FundCamCalibration}, straight lines in the real world get projected as straight lines on the images. By further correcting the characteristic of the ToF camera to measure radial distances, as described in section \ref{sec:ToFCamera}, flat surfaces in the real world are also flat on the depth map. The implementations of both corrections are explained in section \ref{sec:ToFCalibration}. \\
 The points of the point clouds need to be matched to estimate rotation and translation between two consecutive ToF images. The CudaSift library\cite{cudaSiftRepo}\cite{CudaSiftPublication} extracts SIFT\cite{siftpaper} features on each greyscale infrared image the ToF camera sends $k$, which are then brute-force matched with the features of the prior image $k-1$, as visualized in image \ref{im:SiftExtraction}. SIFT features were chosen because of the author's prior experience, and it is a well-known feature extraction algorithm whose patent expired.\cite{siftpatent}
@@ -189,7 +142,7 @@ The PiEye Nimbus ToF camera has an advertised viewing angle of $1.152rad$ horizo
     \caption{Second step of ToF motion estimation: Map features into 3D space}
     \label{im:SiftCoordTransform}
 \end{figure}
-\subsection{ToF Camera: Find rotation and translation}
+\subsection{Find rotation and translation}
 \label{sec:ToFPosition_SVD}
 Calculating the rotation and translation of one point cloud $P_{k-1}$ to another point cloud $P_{k}$ is possible with at least three correctly matched point pairs. Following the recipe from a note from the ETH Zurich, also containing the proof, the three points must be centered. The method described in the ETH note also adds the possibility to add weights to individual data points. Upper case $P$ denotes a point cloud, lower case $p$ denotes a single point in that cloud. The number of matched point pairs in the following formulae is $n$, in the example $n = 3$, $i$ is the index of the single point in the point cloud and $k$ is the image frame number from which the point cloud got extracted.
 The centroids for both point groups are:
@@ -390,7 +343,7 @@ The rotation matrix $R$ and the translation vector $\vec{t}$ fulfill the followi
     \vec{p}_{i,k} = R\cdot\vec{p}_{i,k-1}+\vec{t}+E
 \end{equation*}
 
-\subsection{ToF Camera: 3D RANSAC}
+\subsection{3D Random Sample Consensus (RANSAC)}
 \label{sec:ToFPosition_RANSAC}
 The motion estimation of the ToF camera relies on having good matches, which is not the case with the brute-force matcher, as the authors of the CudaSift library claim to have less than 50\% accuracy on its brute-force matcher.\cite{cudaSiftRepo} Low matching accuracy is a known problem in other fields of image processing - like panorama stitching - and is there often solved with an algorithm named RANSAC (random sample consensus).\\
 These applications of the RANSAC algorithm work on two-dimensional images and are not suitable for three-dimensional point clouds; therefore, the RANSAC algorithm got extended.\\
@@ -419,8 +372,23 @@ Ignoring the SIFT metrics that lead to the brute force matching, all the feature
 Finally, the optimal rotation matrix and translation vector are calculated using the method described in section \ref{sec:ToFPosition_SVD}, this time not with only three points but all accepted matches. With more than three points, the calculated rotation and translation is not the exact result, but the result that yields the least square error.\cite{SVD_ETH}\\
 The whole methodology relies on finding the correct rotation and translation from randomly grouped matches. 
 
+\section{Sensor Fusion}
+\label{sec:PositionEstimate}
+The following section describes the implementation of the accelerometer and gyroscope processing, marked blue in image \ref{fig:sw_concept}, and the Kalman filter, marked in cyan in the same image, which fuses the data with the ToF camera motion data.
+
+\subsection{Gyroscope and Accelerometer}
+\label{sec:GyroCal}
+The 6-axis IMU Bosch BMI160 provides gyroscope and accelerometer measurements via an I²C connection, extended by a Silicon Labs CP2112 USB-to-I²C bridge. The BMI160 is soldered onto a module by DFRobot. The IMU generates measurements regarding acceleration in the directions $a$, $b$, and $c$, and measurements regarding rotation speed around these axes.\\
+As the gyroscope and accelerometer output incremental movement, the values need to be integrated over time. Accurate data is crucial for finding the direction of gravity or detecting movement - especially because of positional information being the result of derivating the acceleration twice.\\
+The range of the acclerometer is variable and has been set to ±8 G, it has an output resolution of 16 bit and an output data rate of 200 Hz.
+The accelerometer has been calibrated in 24 orientations to even out angle errors inside the IMU, on the PCB and of the calibration table. For each orientation, 100 raw measurements have been averaged to even out noise. 
+The largest error has been 38 mG, that lies within the sensor's specification of ±40 mG\cite{BMI160}. In addition, the gain for the accelerometer has been corrected based on gravity. A maximum error of 1.8\% has been measured and corrected, which also lies in the sensor's specification of ±0.5\% full scale\cite{BMI160}.\\
+For the gyroscope, the range is set to ±2000 degrees per second with an output data rate of 200 Hz. The gyroscope has been calibrated only for zero offset, whose maximum error was 0.2 degrees per second which lies well in the specified ±3 degrees per second\cite{BMI160}. A gain correction was not made, because of not having the required equipment to do so.\\
+The IMU shows a hysteresis that lies within the specification of the datasheet; therefore, a simple offset correction does not yield the best results. A moving average – that gets updated whenever no motion of the camera head is detected – helps deal with the hysteresis by subtraction from the measurement value.
+
 \subsection{Sensor Fusion with Kalman Filter}
 \label{sec:SensorFusion}
+TODO: Resolve overlap with "Fundamentals" section\\
 The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same movement. Both sensors have noise and inaccuracies that need to be considered to calculate the system state $\vec{x}$, which includes the current position, velocity, acceleration, angular orientation, and angular velocity.\\
 A method to estimate the system state is the Kalman filter that allows modeling the system by combining the sensors' uncertainties and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state using the previous system state $\vec{x}_{k-1}$. The sensor data corrects the system state prediction $\vec{x}_{k|k-1}$ which results in the corrected system state $\vec{x}$.\\
 The system requires equal sampling rates for the individual sensors; therefore, the IMU data is downsampled to match the ToF camera's framerate.
@@ -510,6 +478,10 @@ If there were a known active influence on the system, for example, an RC car to 
 \end{equation*}
 As there are no known active inputs to the system, both $B$, and $\vec{u}$ are omitted.\\
 The Kalman filter relies on knowing the uncertainties of the model. If a system has rigid constraints by design, the sensor data will naturally be interpreted to support the model. The model of the camera head has loose restrictions, as the camera head is free to move in any direction and rotation; therefore, the output heavily relies on the sensor data. 
+\section{Raspberry Pi Camera calibration}
+\label{sec:RBPiCalibration}
+The Raspberry Pi camera only provides images for enhancing the system's video output cosmetically; the lens calibration serves no algorithmic purpose. The lens was calibrated solely to map the image into the undistorted Vulkan 3D space, so the virtual rectangle fits the real world's picture.\\
+The camera streams in 720p to use the entire sensor with pixel binning. In 1080p, the sensor uses only a portion of the image sensor, which narrows down the field of view. Like with the ToF camera, a lookup table calibrates the Raspberry Pi camera, which reduces the image size to a resolution of 1273 times 709 pixels.
 \section{Video display}
 \label{sec:VideoDisplay}
 TODO: Vulkan Output

@@ -38,8 +38,8 @@ for i in range(len(a)):
 # add noise to a and v "measurement" and recalculate results from these inputs
 an = a.copy()
 vn = v.copy()
-a_noise = np.random.normal(0, 0.05, n)
-v_noise = np.random.normal(0, 0.1, n)
+a_noise = np.random.normal(0, 0.000001, n)
+v_noise = np.random.normal(0, 0.01, n)
 for i in range(len(an)):
     an[i] += a_noise[i]
     vn[i] += v_noise[i]
@@ -119,24 +119,24 @@ ax22 = fig2.add_subplot(122)
 ax21.plot(t, matrix1_kalman, color='#544265')
 ax21.plot(t, matrix2_kalman, color='#544265')
 ax21.plot(t, matrix3_kalman, color='#A41F22')
-ax21.set_ylim(0, 1.5)
+ax21.set_ylim(0, 0.4)
 ax21.set_xlim(0, 20)
-
+print(matrix2_kalman[len(matrix2_kalman)-2])
 index = 0
 for i in range(n):
-    if t[i] > 1.1:
+    if t[i] > 1.2:
         index = i
         break
 
-ax22.plot(t[0:index], v_kalman[0:index], color='#544265')
-ax22.plot(t[0:index+1], v[0:index+1], color='#000000')
+ax22.plot(t[0:index], v_kalman[0:index], color='#8dc048')
+ax22.plot(t[0:index+1], v[0:index+1], color='#888888')
 ax22.scatter(t[0:index+1], v_kalman_pred[0:index+1], color='#A41F22')
-ax22.scatter(t[index], v_kalman[index], color='#544265')
+ax22.scatter(t[index], v_kalman[index], color='#8dc048')
 ax22.scatter(t[0:index+1], vn[0:index+1], color='#0465A9')
-ax22.set_ylim(-0.05, 0.05)
-ax22.set_xlim(0.8, 1.2)
-
-
+ax22.set_ylim(-0.01, 0.12)
+ax22.set_xlim(0.0, 1.3)
+ax21.set_title("Diagonal Values of Covariance Matrix of Errors")
+ax22.set_title("Close up of the Kalman Filter velocity data")
 fig = plt.figure(figsize=(15, 12))
 ax1 = fig.add_subplot(221)
 ax2 = fig.add_subplot(222)
@@ -161,7 +161,7 @@ ax3.plot(t, pan, color='#A41F22')
 ax4.plot(t, a_kalman, color='#0465A9')
 ax4.plot(t, v_kalman, color='#544265')
 ax4.plot(t, p_kalman, color='#A41F22')
-ax4.plot(t, p_vkalman, color='#00ff00')
+ax4.plot(t, p_vkalman, color='#8dc048')
 
 # initial condition, x_0 = 0
 P_k = np.array(([[1, 0, 0],[0, 1, 0],[0, 0, 1]]))
