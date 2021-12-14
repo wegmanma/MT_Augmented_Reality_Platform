@@ -478,6 +478,7 @@ If there were a known active influence on the system, for example, an RC car to 
 \end{equation*}
 As there are no known active inputs to the system, both $B$, and $\vec{u}$ are omitted.\\
 The Kalman filter relies on knowing the uncertainties of the model. If a system has rigid constraints by design, the sensor data will naturally be interpreted to support the model. The model of the camera head has loose restrictions, as the camera head is free to move in any direction and rotation; therefore, the output heavily relies on the sensor data. 
+Todo: overhaul whole section and finish...
 \section{Raspberry Pi Camera calibration}
 \label{sec:RBPiCalibration}
 The Raspberry Pi camera only provides images for enhancing the system's video output cosmetically; the lens calibration serves no algorithmic purpose. The lens was calibrated solely to map the image into the undistorted Vulkan 3D space, so the virtual rectangle fits the real world's picture.\\
