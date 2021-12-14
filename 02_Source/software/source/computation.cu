@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 0.00005
+#define MIN_THRESH_RANSAC 0.005
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -1525,7 +1525,7 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
     }
     printf("[%f,%f,%f, %f, %f, %f, %f, %f, %f, %d],", point[i].x_3d, point[i].y_3d, point[i].z_3d, point[i].xpos, point[i].ypos, point[i].distance, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d, (int)point[i].draw);
   }
-  printf("]");
+  printf("]\n");
   printf("========================\n");
   printf("%d;",number_matches);
   
@@ -1804,12 +1804,12 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
     return;
   __syncthreads();
 #define FILTER_ZONE 500
-  if (idx == 0)
-  { 
-    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 0] = 255 * 255;
-    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 1] = 0;
-    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 2] = 0;
-  }
+  // if (idx == 0)
+  // { 
+  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 0] = 255 * 255;
+  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 1] = 0;
+  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 2] = 0;
+  // }
   if (idx < nPoints)
   {
     // if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&

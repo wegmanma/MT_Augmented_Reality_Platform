@@ -540,14 +540,14 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             kalman_rotation[3] = x[9];
 
             kalman_translation[0] = x[0];
-            kalman_translation[1] = x[1];
-            kalman_translation[2] = x[2];
+            kalman_translation[1] = x[3];
+            kalman_translation[2] = x[6];
             kalman_translation[3] = 0;
 
             quat kalman_velocity;
-            kalman_velocity[0] = x[3];
+            kalman_velocity[0] = x[1];
             kalman_velocity[1] = x[4];
-            kalman_velocity[2] = x[5];
+            kalman_velocity[2] = x[7];
             kalman_velocity[3] = 0;
 
             kalman_translation_from_velocity[0] += kalman_velocity[0]*nseconds_i;
@@ -556,8 +556,8 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             kalman_translation_from_velocity[3] = 0;
 
             quat kalman_acceleration;
-            kalman_acceleration[0] = x[6];
-            kalman_acceleration[1] = x[7];
+            kalman_acceleration[0] = x[2];
+            kalman_acceleration[1] = x[5];
             kalman_acceleration[2] = x[8];
             kalman_acceleration[3] = 0;
             // print_vec4("kalman_acceleration", kalman_acceleration, true, true);
