@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 8
+#define MIN_THRESH_RANSAC 0.00005
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -1421,6 +1421,7 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     return;
   point_new[idx].score = 1.0f;
   point_new[idx].match = -1;
+  point_new[idx].draw = false;
   vec4 coords_new;
   coords_new[0] = point_new[idx].x_3d - *(translation[0]);
   coords_new[1] = point_new[idx].y_3d - *(translation[1]);
@@ -1516,11 +1517,16 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   vec4 cent_old;
   vec4 cent_new;
   int number_matches = 0;
+  printf("=========================\n");
+  printf("[");
   for (int i = 0; i < numPts; i++) {
     if (point[i].draw == true) {
       number_matches++;
     }
+    printf("[%f,%f,%f, %f, %f, %f, %f, %f, %f, %d],", point[i].x_3d, point[i].y_3d, point[i].z_3d, point[i].xpos, point[i].ypos, point[i].distance, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d, (int)point[i].draw);
   }
+  printf("]");
+  printf("========================\n");
   printf("%d;",number_matches);
   
     int idx;
@@ -1798,68 +1804,76 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
     return;
   __syncthreads();
 #define FILTER_ZONE 500
+  if (idx == 0)
+  { 
+    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 0] = 255 * 255;
+    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 1] = 0;
+    dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 2] = 0;
+  }
   if (idx < nPoints)
   {
-    if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
-        (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].match_ypos)) < height) &&
-        (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].match_xpos)) < width))
+    // if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
+    //     (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos)) < height) &&
+    //     (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos)) < width))
+    // {
+    //   if (d_sift[idx].ypos < d_sift[idx].ransac_ypos)
+    //   {
+    //     for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos - 1; i++)
+    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
+    //   }
+    //   else
+    //   {
+    //     for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos; i--)
+    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
+    //   }
+    //   if (d_sift[idx].xpos < d_sift[idx].ransac_xpos)
+    //   {
+    //     for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos - 1; i++)
+    //       dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
+    //   }
+    //   else
+    //   {
+    //     for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos; i--)
+    //       dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
+    //   }
+    // }
 
-    if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
-        (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos)) < height) &&
-        (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos)) < width))
-    {
-      if (d_sift[idx].ypos < d_sift[idx].ransac_ypos)
-      {
-        for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos - 1; i++)
-          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
-      }
-      else
-      {
-        for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos; i--)
-          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
-      }
-      if (d_sift[idx].xpos < d_sift[idx].ransac_xpos)
-      {
-        for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos - 1; i++)
-          dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
-      }
-      else
-      {
-        for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos; i--)
-          dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
-      }
-    }
-    if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
-    (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos_3d)) < height) &&
-    (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos_3d)) < width))
-    {
-      if (d_sift[idx].ypos < d_sift[idx].ransac_ypos_3d)
-      {
-        for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos_3d - 1; i++)
-          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
-      }
-      else
-      {
-        for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos_3d; i--)
-          dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
-      }
-      if (d_sift[idx].xpos < d_sift[idx].ransac_xpos_3d)
-      {
-        for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos_3d - 1; i++)
-          dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
-      }
-      else
-      {
-        for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos_3d; i--)
-          dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
-      }
-      //printf("New;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].xpos, d_sift[idx].ypos, d_sift[idx].distance, d_sift[idx].x_3d, d_sift[idx].y_3d, d_sift[idx].z_3d);
-      //printf("Old;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].match_xpos, d_sift[idx].match_ypos, d_sift[idx].match_distance, d_sift[idx].match_x_3d, d_sift[idx].match_y_3d, d_sift[idx].match_z_3d);
-
-      //else {
-      //  //printf("Filtered - score = %f, scale= %f, sharpness= %f, ambiguity= %f, edgeness= %f\n",d_sift[idx].score, d_sift[idx].scale, d_sift[idx].sharpness, d_sift[idx].ambiguity, d_sift[idx].edgeness);
-      //}
-    }
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 0;
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 2] = 0;
+    // if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
+    // (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos_3d)) < height) &&
+    // (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos_3d)) < width))
+    // {
+// 
+    //   
+    //   if (d_sift[idx].ypos < d_sift[idx].ransac_ypos_3d)
+    //   {
+    //     for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos_3d - 1; i++)
+    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
+    //   }
+    //   else
+    //   {
+    //     for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos_3d; i--)
+    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
+    //   }
+    //   if (d_sift[idx].xpos < d_sift[idx].ransac_xpos_3d)
+    //   {
+    //     for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos_3d - 1; i++)
+    //       dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
+    //   }
+    //   else
+    //   {
+    //     for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos_3d; i--)
+    //       dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
+    //   }
+    //   //printf("New;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].xpos, d_sift[idx].ypos, d_sift[idx].distance, d_sift[idx].x_3d, d_sift[idx].y_3d, d_sift[idx].z_3d);
+    //   //printf("Old;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].match_xpos, d_sift[idx].match_ypos, d_sift[idx].match_distance, d_sift[idx].match_x_3d, d_sift[idx].match_y_3d, d_sift[idx].match_z_3d);
+// 
+    //   //else {
+    //   //  //printf("Filtered - score = %f, scale= %f, sharpness= %f, ambiguity= %f, edgeness= %f\n",d_sift[idx].score, d_sift[idx].scale, d_sift[idx].sharpness, d_sift[idx].ambiguity, d_sift[idx].edgeness);
+    //   //}
+    // }
   }
   __syncthreads();
   if (idx == 0)
@@ -1976,6 +1990,9 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   }
   return;
 #endif
+if (idx == 0) {
+  printf("%f;",depthData[(int)(128) + 256 * 128]);
+}
   if ((depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] > 60000) || (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] == 0))
   {
     data[idx].distance = 0.0;
@@ -1987,10 +2004,10 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   else
   {
     data[idx].conf = conf[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
-    data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;
-    data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / 100.;   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].y_3d = -(data[idx].xpos+128)/280*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].z_3d = (data[idx].ypos+102.5)/280*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) *0.0002+0.2408;
+    data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) *0.0002+0.2408; //(depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / (2048*4);   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].y_3d = -(data[idx].xpos-128)/220*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].z_3d = (data[idx].ypos-102.5)/220*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
     // printf("distance = x_3d = %f, y_3d = %f, z_3d = %f, xpos = %f, ypos = %f\n", data[idx].x_3d, data[idx].y_3d, data[idx].z_3d, data[idx].xpos, data[idx].ypos);
   }
 }

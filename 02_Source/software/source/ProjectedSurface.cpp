@@ -287,35 +287,37 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     mat4x4 translation;
     mat4x4 rotation;
     
-    // std::cout << "rotation = " << std::endl;
-    // std::cout << "|" << rotation[0][0] << " " << rotation[1][0] << " " << rotation[2][0] << " " << rotation[3][0] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][1] << " " << rotation[1][1] << " " << rotation[2][1] << " " << rotation[3][1] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][2] << " " << rotation[1][2] << " " << rotation[2][2] << " " << rotation[3][2] << "|" << std::endl;
-    // std::cout << "|" << rotation[0][3] << " " << rotation[1][3] << " " << rotation[2][3] << " " << rotation[3][3] << "|" << std::endl;
 
-    mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(0.0f));
+
+    mat4x4_rotate(rotation, Model, 0.0f, 1.0f, 1.0f, degreesToRadians(0.0f));
     mat4x4_translate(translation, 2.0f, 0.0f, 0.0f);
     mat4x4_mul(ubo.model, translation, rotation);
 
     // std::cout << "ubo.model = " << std::endl;
-    // std::cout << "|" << ubo.model[0][0] << " " << ubo.model[1][0] << " " << ubo.model[2][0] << " " << ubo.model[3][0] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][1] << " " << ubo.model[1][1] << " " << ubo.model[2][1] << " " << ubo.model[3][1] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][2] << " " << ubo.model[1][2] << " " << ubo.model[2][2] << " " << ubo.model[3][2] << "|" << std::endl;
-    // std::cout << "|" << ubo.model[0][3] << " " << ubo.model[1][3] << " " << ubo.model[2][3] << " " << ubo.model[3][3] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][0] << ", " << ubo.model[1][0] << ", " << ubo.model[2][0] << ", " << ubo.model[3][0] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][1] << ", " << ubo.model[1][1] << ", " << ubo.model[2][1] << ", " << ubo.model[3][1] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][2] << ", " << ubo.model[1][2] << ", " << ubo.model[2][2] << ", " << ubo.model[3][2] << "|" << std::endl;
+    // std::cout << "|" << ubo.model[0][3] << ", " << ubo.model[1][3] << ", " << ubo.model[2][3] << ", " << ubo.model[3][3] << "|" << std::endl;
 
     vec3 eye = {0.0f, 0.0f, 0.0f};
     vec4 center_before = {1.0f, 0.0f, 0.0f, 1.0f};
     vec4 center_after; 
     vec4 up_before = {0.0f, 0.0f, 1.0f, 1.0f};
     vec4 up_after;
-    // mat4x4_rotate(rotation, Model, 0.0f, 0.0f, 1.0f, degreesToRadians(gyroData[2]));
+    // mat4x4_rotate(rotation, Model, 0.0f, 1.0f, 1.0f, degreesToRadians(25));
+    // std::cout << "rotation = " << std::endl;
+    // std::cout << "|" << rotation[0][0] << ", " << rotation[1][0] << ", " << rotation[2][0] << ", " << rotation[3][0] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][1] << ", " << rotation[1][1] << ", " << rotation[2][1] << ", " << rotation[3][1] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][2] << ", " << rotation[1][2] << ", " << rotation[2][2] << ", " << rotation[3][2] << "|" << std::endl;
+    // std::cout << "|" << rotation[0][3] << ", " << rotation[1][3] << ", " << rotation[2][3] << ", " << rotation[3][3] << "|" << std::endl;
     positionEstimate->get_gyro_matrix(rotation);
     mat4x4_mul_vec4(center_after, rotation, center_before);
     mat4x4_mul_vec4(up_after, rotation, up_before);
     vec3 center = {center_after[0],center_after[1],center_after[2]};
     vec3 up = {up_after[0],up_after[1],up_after[2]};
     mat4x4_look_at(ubo.view, eye, center, up);
-
+    // std::cout << "center: " << center[0] << ", " << center[1] << ", " << center[2] << ", " << center[3] << std::endl;
+    // std::cout << "up: " << up[0] << ", " << up[1] << ", " << up[2] << ", " << up[3] << std::endl;
     // std::cout << "ubo.view = " << std::endl;
     // std::cout << "|" << ubo.view[0][0] << " " << ubo.view[1][0] << " " << ubo.view[2][0] << " " << ubo.view[3][0] << "|" << std::endl;
     // std::cout << "|" << ubo.view[0][1] << " " << ubo.view[1][1] << " " << ubo.view[2][1] << " " << ubo.view[3][1] << "|" << std::endl;
@@ -333,24 +335,29 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
 
     // mat4x4 totalMatrix;
     // mat4x4 perspView;
-    // vec4 source = {1.0f, 1.0f, 1.0f, 1.0};
+    // vec4 source = {0.0f, 1.0f, 0.5625f, 1.0};
     // vec4 result;
     // mat4x4_mul(perspView,ubo.proj,ubo.view);
     // mat4x4_mul(totalMatrix, perspView,ubo.model);
+    // std::cout << "totalMatrix = " << std::endl;
+    // std::cout << "|" << totalMatrix[0][0] << ", " << totalMatrix[1][0] << ", " << totalMatrix[2][0] << ", " << totalMatrix[3][0] << "|" << std::endl;
+    // std::cout << "|" << totalMatrix[0][1] << ", " << totalMatrix[1][1] << ", " << totalMatrix[2][1] << ", " << totalMatrix[3][1] << "|" << std::endl;
+    // std::cout << "|" << totalMatrix[0][2] << ", " << totalMatrix[1][2] << ", " << totalMatrix[2][2] << ", " << totalMatrix[3][2] << "|" << std::endl;
+    // std::cout << "|" << totalMatrix[0][3] << ", " << totalMatrix[1][3] << ", " << totalMatrix[2][3] << ", " << totalMatrix[3][3] << "|" << std::endl;
     // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,1,1) result = " << std::endl;
+    // std::cout << "(0.0f, 1.0f, 0.5625f) result = " << std::endl;
     // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
     // source[1] = -1.0f;
     // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,-1,1) result = " << std::endl;
+    // std::cout << "(0.0f, -1.0f, 0.5625f) result = " << std::endl;
     // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
-    // source[2] = -1.0f;
+    // source[2] = -0.5625f;
     // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,-1,-1) result = " << std::endl;
+    // std::cout << "(0.0f, -1.0f, -0.5625f) result = " << std::endl;
     // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
     // source[1] = 1.0f;
     // mat4x4_mul_vec4(result, totalMatrix, source);
-    // std::cout << "(1,1,-1) result = " << std::endl;
+    // std::cout << "(0.0f, 1.0f, -0.5625f) result = " << std::endl;
     // std::cout << "(" << result[0]/result[3] << " " << result[1]/result[3] << " " << result[2]/result[3]  << ")" << std::endl;
     void *data;
 
