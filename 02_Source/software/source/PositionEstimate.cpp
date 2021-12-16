@@ -497,7 +497,7 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
                 kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, delta_vector, R);
             }
             quat tof_translation;
-            tof_translation_xyz[0] =  tof_translation_xyz[0];
+            tof_translation_xyz[0] = -tof_translation_xyz[0];
             tof_translation_xyz[1] = -tof_translation_xyz[1];
             tof_translation_xyz[2] =  tof_translation_xyz[2];
 
@@ -577,7 +577,8 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             print_quat("kalman_translation", kalman_translation, true, true);
             print_quat("kalman_velocity", kalman_velocity, true, true);
             print_quat("kalman_acceleration", kalman_acceleration, true, true);
-            print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true);
+            print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true, true);
+            std::cout << "]," << std::endl;
             // 
         }
     }

@@ -341,7 +341,7 @@ void TCPFrameCapture::run()
 
         // std::cout << "start undistorting" << std::endl;
         cudaStreamSynchronize(tcpCaptureStream);
-        std::cout << frame_counter << ";";
+        std::cout << "[" << frame_counter << ";";
         frame_counter++;
 
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1], radial_d, image_x_d, image_y_d, tcpCaptureStream, cos_alpha_map_d);

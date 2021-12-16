@@ -324,7 +324,7 @@ void ProjectedSurface::updateUniformBuffer(VkDevice device, VkExtent2D swapChain
     // std::cout << "|" << ubo.view[0][2] << " " << ubo.view[1][2] << " " << ubo.view[2][2] << " " << ubo.view[3][2] << "|" << std::endl;
     // std::cout << "|" << ubo.view[0][3] << " " << ubo.view[1][3] << " " << ubo.view[2][3] << " " << ubo.view[3][3] << "|" << std::endl;
 
-    mat4x4_perspective(ubo.proj, degreesToRadians(62.2f/2.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 20.0f);
+    mat4x4_perspective(ubo.proj, degreesToRadians(62.2f/2.f), swapChainExtent.width / (float)(swapChainExtent.height)*0.9, 0.1f, 20.0f);
     ubo.proj[1][1] *= -1;
 
     // std::cout << "ubo.proj = " << std::endl;

@@ -784,7 +784,7 @@ __device__ __inline__ float ld_gbl_cg(const float *addr)
   return return_value;
 }
 
-#define MIN_THRESH_RANSAC 0.005
+#define MIN_THRESH_RANSAC 0.0005
 
 __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMemory, bool *index_list, mat4x4 *rotation, vec4 *translation, int numPts)
 {
@@ -1517,16 +1517,16 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   vec4 cent_old;
   vec4 cent_new;
   int number_matches = 0;
-  printf("=========================\n");
-  printf("[");
+  // printf("=========================\n");
+  // printf("[");
   for (int i = 0; i < numPts; i++) {
     if (point[i].draw == true) {
       number_matches++;
     }
-    printf("[%f,%f,%f, %f, %f, %f, %f, %f, %f, %d],", point[i].x_3d, point[i].y_3d, point[i].z_3d, point[i].xpos, point[i].ypos, point[i].distance, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d, (int)point[i].draw);
+    // printf("[%f,%f,%f, %f, %f, %f, %f, %f, %f, %d],", point[i].x_3d, point[i].y_3d, point[i].z_3d, point[i].xpos, point[i].ypos, point[i].distance, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d, (int)point[i].draw);
   }
-  printf("]\n");
-  printf("========================\n");
+  // printf("]\n");
+  // printf("========================\n");
   printf("%d;",number_matches);
   
     int idx;
