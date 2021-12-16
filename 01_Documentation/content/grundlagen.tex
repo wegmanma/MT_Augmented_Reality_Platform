@@ -570,7 +570,7 @@ The implementation in CUDA is done by storing the pixel coordinates of the uncor
 
 \section{Kalman filter}
 \label{sec:Kalmanfilter}
-The Kalman filter is an adaptive filter realized with a predictor-corrector algorithm that uses a model and known gaussian uncertainties of different sensors to estimate a value. Additionally to sensor data, the Kalman filter can adjust the estimate based on known forces– for example, the rotor speed of an RC drone. In an RC drone, a GPS position sensor, an accelerometer, and proximity sensors are fused with the rotor speeds to estimate the current motion with increased accuracy.\\
+The Kalman filter is an adaptive filter realized with a predictor-corrector algorithm that uses a model and known gaussian uncertainties of different sensors to estimate a value. Additionally to sensor data, the Kalman filter can adjust the estimate based on known forces – for example, the rotor speed of an RC drone. In an RC drone, a GPS position sensor, an accelerometer, and proximity sensors are fused with the rotor speeds to estimate the current motion with increased accuracy.\\
 In this thesis, motion without a known input needs to be measured, having sensors for acceleration, velocity, and rotation. The following example demonstrates the position, velocity, and acceleration in one dimension. A fifth-order spline is used for the position data from which velocity and acceleration are derived to simulate the sensor data. Adding Gaussian noise to the simulated velocity and acceleration data reflects reality and allows demonstrating the Kalman filter.
 \begin{figure}[H]
     \centering
