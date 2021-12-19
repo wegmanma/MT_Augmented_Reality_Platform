@@ -34,7 +34,7 @@ During the internet research, the Texas Instruments OPT8241 has shown up. TI dec
 \subsection{Camera Head}
 \label{sec:camHead}
 The camera head, shown in image \ref{fig:HW_diagram}, contains the PiEye Nimbus ToF camera, mounted on a Raspberry Pi 4B, a Bosch BMI160 IMU, attached to a USB to I²C bridge, and a standard Raspberry Pi camera v2.1 which is connected to the processing system via an FPDLink module.\\
-All is held together by a plywood structure glued onto a tripod-baseplate, shown in figure \ref{fig:cameraHead}.
+All is held together by a plywood structure glued onto a tripod-baseplate, shown in figure \ref{fig:cameraHead}. 
 \begin{figure}[H]
     \centering
     \begin{minipage}[b]{0.45\textwidth}
@@ -51,7 +51,7 @@ All is held together by a plywood structure glued onto a tripod-baseplate, shown
     \label{fig:cameraHead}
   \end{figure}
 The IMU could have been attached directly to the Raspberry Pi, but at the time of the implementation, the decision on how to connect the ToF camera was not taken yet. Therefore, it was not certain that a Raspberry Pi would be mounted at the camera head.
-Four individual cables connect to the different components on the camera head: A USB-C power cable and an RJ45 Ethernet cable for the Raspberry Pi, a USB 2.0 cable for the USB to I²C bridge, and an FPDLink coaxial cable for the Raspberry Pi Camera.
+Four individual cables connect to the different components on the camera head: A USB-C power cable and an RJ45 Ethernet cable for the Raspberry Pi, a USB 2.0 cable for the USB to I²C bridge, and an FPDLink coaxial cable for the Raspberry Pi Camera. Zip ties through holes in the plywood structure help managing the cables and releave stress on the connectors.
 
 
 \subsection{Processing System}
@@ -85,6 +85,12 @@ On a system with unified memory - like the used Nvidia Jetson AGX Xavier - both 
 A single application needs to gather the data from the different sensors and cameras, apply the processing and render the result to an attached monitor. Within this application, various subsystems run in separate threads at different speeds. As visible in image \ref{fig:sw_concept}, the Vulkan framework, developed for a former thesis, is the skeleton of this application, to which additional C++ and CUDA modules got attached. Vulkan itself renders the 3D object – a rectangle named "projected image" – into the 2D viewfinder image of the main camera, as described in section \ref{sec:VideoDisplay}. The image processing and the calculation of rotation and translation are mainly performed on the GPU, while the Kalman filtering is done on the CPU.\\
 Due to the multithreaded nature of the system, and as multiple threads access the GPU simultaneously, the GPU access got grouped into different CUDA streams. \\
 A separate application runs on the Raspberry Pi, serving a TCP/IP connection for streaming the ToF data. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/todo.png}
+    \caption{Data flow for one single frame.}
+    \label{im:DataFlow}
+\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -342,6 +348,7 @@ The rotation matrix $R$ and the translation vector $\vec{t}$ fulfill the followi
 \begin{equation*}
     \vec{p}_{i,k} = R\cdot\vec{p}_{i,k-1}+\vec{t}+E
 \end{equation*}
+The estimated translation is only the translation between two frames. To estimate the velocity, the translation is divided by the sampling time.
 
 \subsection{3D Random Sample Consensus (RANSAC)}
 \label{sec:ToFPosition_RANSAC}
@@ -350,14 +357,14 @@ These applications of the RANSAC algorithm work on two-dimensional images and ar
 The first step of the three-dimensional RANSAC is finding a proper rotation and translation from the brute-force matches. To find these transformations, each matched feature pair gets two other feature pairs randomly assigned. Using the method described in section \ref{sec:ToFPosition_SVD}, the corresponding rotations and translations are calculated on these groups of three feature pairs as visualized in image \ref{im:ransac1}.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step1.pdf}
+    \includegraphics[width=0.95\textwidth]{images/ransac_3d_step1.pdf}
     \caption{First step of the 3D RANSAC: The SVD method calculates the rotation and translation from three randomly assigned points. This step is performed in parallel on multiple groups of three. Each group $P_{i}$ generates the rotation $R_{i}$ and translation $\vec{t}_{i}$.}
     \label{im:ransac1}
 \end{figure}
 Each group's calculated rotation matrices and translation vectors get checked against all the other matched feature pairs. The data point from the previous image of the feature pair gets moved by the matrix-vector-pair and compared to the data point of the current picture. If the sum of square differences (SSD) of the two points is underneath a threshold, the feature pair is counted for the matrix-vector-pair. The threshold is explained in the chapter "Results" in section \ref{sec:RANSAC_Results}. On these feature pairs, the average distance from the calculated points to the matched points is measured. The matrix-vector-pair that generates the smallest average distance is likely suitable for further processing.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step2.pdf}
+    \includegraphics[width=0.95\textwidth]{images/ransac_3d_step2.pdf}
     \caption{Second step of the 3D RANSAC: The calculated rotations and translations get evaluated against the whole dataset. In the example, the fourth matching point fulfills the criterion. As this group is the best possible in the example, an improved rotation $R_{improved}$ and translation $\vec{t}_{improved}$ is calculated from these.}
     \label{im:ransac2}
 \end{figure}
@@ -365,7 +372,7 @@ Each group's calculated rotation matrices and translation vectors get checked ag
 Ignoring the SIFT metrics that lead to the brute force matching, all the features get matched anew based on the position alone, using the rotation and translation estimated before. The matrix-vector pair transforms every data point from the previous image. The distance between the transformed point and the closest data point of the current picture determines the new match. If the proximity is below a threshold, the match is accepted.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/ransac_3d_step3.pdf}
+    \includegraphics[width=0.95\textwidth]{images/ransac_3d_step3.pdf}
     \caption{Third step of the 3D RANSAC: With $R_{improved}$ and $\vec{t}_{improved}$ being present, the brute-force matches get discarded. Applying the currently available rotation- and translation-information the the point clouds allows re-matching based alone on the position. Theoptimal rotation $R_{opt}$ and translation $_vec{t}_{opt}$ result from these feature pairs.}
     \label{im:ransac3}
 \end{figure}
@@ -388,15 +395,16 @@ The IMU shows a hysteresis that lies within the specification of the datasheet; 
 
 \section{Sensor Fusion with Kalman Filter}
 \label{sec:SensorFusion}
-TODO: Resolve overlap with "Fundamentals" section\\
 The combination of data coming from different sensors or sensor types is named sensor fusion. In this case, the accelerometer and the calculated motion from the ToF camera add information to the system describing the same movement. Both sensors have noise and inaccuracies that need to be considered to calculate the system state $\vec{x}$, which includes the current position, velocity, acceleration, angular orientation, and angular velocity.\\
-A method to estimate the system state is the Kalman filter that allows modeling the system by combining the sensors' uncertainties and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm that uses a system model to predict the next system state using the previous system state $\vec{x}_{k-1}$. The sensor data corrects the system state prediction $\vec{x}_{k|k-1}$ which results in the corrected system state $\vec{x}$.\\
+A method to estimate the system state is the Kalman filter that allows modeling the system by combining the sensors' uncertainties and the described model itself. The Kalman filter is a discrete predictor-corrector algorithm - as explained in section \ref{sec:Kalmanfilter} - that uses a system model to predict the next system state using the previous system state $\vec{x}_{k-1}$. The sensor data corrects the system state prediction $\vec{x}_{k|k-1}$ which results in the corrected system state $\vec{x}$.\\
 The system requires equal sampling rates for the individual sensors; therefore, the IMU data is downsampled to match the ToF camera's framerate.
 With the translational information being present in all three directions and the rotation being inserted in quaternion form, the system state vector $\vec{x}$ has 17 entries. $x$, $y$ and $z$ describe the position in space, and $r_{a}$, $r_{b}$, $r_{c}$, and $r_{d}$ being the components of the orientation quaternion $R = (a, b\textbf{i}, c\textbf{j}, d\textbf{k})$. The time-derivatives of these values are denoted with dots.
 \begin{equation*}
     \vec{x}^{T} = (
         x, \dot{x}, \ddot{x}, y, \dot{y}, \ddot{y}, z, \dot{z}, \ddot{z}, r_{a}, r_{b}, r_{c}, r_{d}, \dot{r}_{a}, \dot{r}_{b}, \dot{r}_{c}, \dot{r}_{d})
 \end{equation*}
+\subsection{Prediction}
+\label{sec:KalmanPrediction}
 The model $F$ that predicts the intermediate state $\vec{x}_{k|k-1}$ brings the individual entries of the system state into a relationship. The velocities and accelerations both alter the position, while the accelerations alter the velocities. For the rotation, the quaternion containing the angular rotation already contains the sampling rate and gets added by a quaternion multiplication. 
 \begin{equation*}
     \vec{x}_{k|k-1} = 
@@ -465,6 +473,7 @@ The $\dot{r}$-values in the matrix are from $\vec{x}_{k-1}$ and $\Delta t$ is th
         \dot{r}_{d,k-1}
     \end{pmatrix}
 \end{equation*}
+The $\dot{r}$ values inside the model matrix $F$ are the same as in the vector $\vec{x}_{k-1}$. Technically, the operation is not a linear transformation anymore, as the quaternion multiplication itself is not linear.\\
 If there were a known active influence on the system, for example, an RC car to which the camera head could be mounted, the motor input and the steering could be modeled in a different matrix $B$ with the input vector $\vec{u}$.
 \begin{equation*}
     \vec{x}_{k|k-1} = 
@@ -477,15 +486,185 @@ If there were a known active influence on the system, for example, an RC car to 
     \vec{u}
 \end{equation*}
 As there are no known active inputs to the system, both $B$, and $\vec{u}$ are omitted.\\
-The Kalman filter relies on knowing the uncertainties of the model. If a system has rigid constraints by design, the sensor data will naturally be interpreted to support the model. The model of the camera head has loose restrictions, as the camera head is free to move in any direction and rotation; therefore, the output heavily relies on the sensor data. 
-Todo: overhaul whole section and finish...
+The Kalman filter relies on knowing the uncertainties of the model. If a system has rigid constraints by design, the sensor data will naturally be interpreted to support the model. The model of the camera head has loose restrictions, as the camera head is free to move in any direction and rotation; therefore, the output heavily relies on the sensor data.\\
+The second step of the prediction is the prediction of the covariance matrix of the errors $P$. 
+\begin{equation*}
+    P_{k|k-1} = 
+    F
+    \cdot
+    P_{k-1}
+    \cdot
+    F^{T}
+    +
+    Q
+\end{equation*}
+While $P_{0}$ starts as identity matrix, $Q$ is the gaussian process noise, which got explained in section \ref{sec:Kalmanfilter} for the translational part. For the rotation, the diagonal elements got set to 50, making the system noise vastly bigger than the noise of the input data.\\
+Generally, a large process noise leads to a lower emphasis to the current system state and larger weight to the sensor data.\\ 
+\begin{equation*}
+    Q = 
+    \begin{bmatrix}
+        \frac{\Delta t^{4}}{4} & \frac{\Delta t^{3}}{2} & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        \frac{\Delta t^{3}}{2} & \Delta t^{2} & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        \frac{\Delta t^{2}}{2} & \Delta t & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & \frac{\Delta t^{4}}{4} & \frac{\Delta t^{3}}{2} & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & \frac{\Delta t^{3}}{2} & \Delta t^{2} & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & \frac{\Delta t^{2}}{2} & \Delta t & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & \frac{\Delta t^{4}}{4} & \frac{\Delta t^{3}}{2} & \frac{\Delta t^{2}}{2} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & \frac{\Delta t^{3}}{2} & \Delta t^{2} & \Delta t & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & \frac{\Delta t^{2}}{2} & \Delta t & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 &  1 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 50 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 50 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 50 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 50
+    \end{bmatrix}
+\end{equation*}
+\subsection{Correction: Rotation}
+\label{sec:CorrectionRotation}
+The Kalman filter allows chaining multiple correction steps after another, which helps add data of different sensors to the same input and helps simplify the calculation. The observation matrix H maps the four quaternion values of an input – gyroscope or ToF camera – to the 17 values of the system state vector x. Choosing a $4\times17$ matrix changes the bracket of the following equation to a $4\times4$ matrix, simplifying the matrix inversion for calculating the Kalman gain. The iteration $n$ in the equations denote the number of the chained correction steps, as the system state vector $\vec{x}$ and the covariance matrix of errors $P$ are updated in each step.
+\begin{equation*}
+    K_{k|k-1|n} = P_{k|k-1|n}\cdot H^{T}(H\cdot P_{k|k-1|n}\cdot H^{T}+R)^{-1}
+\end{equation*}
+The order of the subsequent correction steps is irrelevant. The following H maps the rotation speed to the system state and is used for both sensors.
+\begin{equation*}
+    H=
+    \begin{bmatrix}
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1
+    \end{bmatrix}
+\end{equation*}
+For both sensors – the gyroscope and the ToF camera – R is a diagonal matrix with the standard deviation of the respective sensor as its values.
+\begin{equation*}
+    R = \sigma \cdot I
+\end{equation*}
+With the Kalman gain at hand, the correction for the system state vector $\vec{x}$ and the covariance matrix of errors $P$ are the last equations of the Kalman correction step with the rotation quaternion $Q_{Rot}$. 
+\begin{equation*}
+    x_{k} = \vec{x}_{k|k-1|n}+K_{k}(\vec{z}_{k}-H\cdot \vec{x}_{k|k-1|n})
+    \qquad ; \qquad
+    P_{k|k-1|n+1}= (I-K_{k}\cdot H)P_{k|k-1|n}
+\end{equation*}
+\begin{equation*}
+    Q_{Rot}=\begin{pmatrix}
+        r_{c}           \\
+        a_{c}\textbf{i} \\
+        b_{c}\textbf{j} \\
+        c_{c}\textbf{k}
+    \end{pmatrix} \quad ; \quad \vec{z}_{k} =\begin{pmatrix}
+        r_{c} \\
+        a_{c} \\
+        b_{c} \\
+        c_{c}
+    \end{pmatrix}
+\end{equation*}
+The quaternion multiplication inside the model matrix $F$ adds up the subsequent rotation speed in each iteration to the cumulated rotation.
+
 \subsection{Rotation Drift compensation with Accelerometer}
 \label{sec:RotDriftCompensation}
-
+When the camera head is stationary, the accelerometer measures the direction of gravity, allowing the correction of rotation on the x- and y-axis.  Using the earth's magnetic field, a magnetometer could compensate for the drift on the z-axis, but the used IMU does not contain one.
+Knowing the system's orientation at the start $Q_{init}$ of the application and the cumulated rotation $R$, calculating the system's current orientation $Q_{c}$ is a quaternion multiplication, as described in section \ref{sec:RotationQuaternion}. If the orientation drifted, it would be different from the measured orientation $Q_{m}$ from the accelerometer. The complex parts of the two orientation quaternions get normalized and stored in individual vectors $\vec{s}$ and $\vec{d}$. 
+\begin{equation*}
+    Q_{c} =
+    \begin{pmatrix}
+        r_{c}           \\
+        a_{c}\textbf{i} \\
+        b_{c}\textbf{j} \\
+        c_{c}\textbf{k}
+    \end{pmatrix} \quad ; \quad
+    \vec{v}_{c} =
+    \begin{pmatrix}
+        a_{c} \\
+        b_{c} \\
+        c_{c}
+    \end{pmatrix} 
+    \quad ; \quad
+    \vec{s} = \frac{\vec{v}_{c}}{|\vec{v}_{c}|} 
+    \quad ; \quad
+    Q_{m} =
+    \begin{pmatrix}
+        r_{m}           \\
+        a_{m}\textbf{i} \\
+        b_{m}\textbf{j} \\
+        c_{m}\textbf{k}
+    \end{pmatrix} \quad ; \quad
+    \vec{v}_{m} =
+    \begin{pmatrix}
+        a_{m} \\
+        b_{m} \\
+        c_{m}
+    \end{pmatrix} 
+    \quad ; \quad
+    \vec{d} = \frac{\vec{v}_{m}}{|\vec{v}_{m}|}          
+\end{equation*}
+The dot product of the two normalized vectors calculates the cosine of the angle between the vectors $\theta$, and the cross product calculates the rotation axis $\vec{r}$. 
+\begin{equation*}
+    cos(\theta) = \vec{s}\cdot\vec{d} \quad ; \quad \vec{r} = \vec{s}\times\vec{d} \quad ; \quad
+    \vec{r} =
+    \begin{pmatrix}
+        r_{1} \\
+        r_{2} \\
+        r_{3}
+    \end{pmatrix} 
+\end{equation*}
+Estimating the value $x$ from the angle helps scale the values for generating a correcting rotation quaternion $Q_{corr}$.
+\begin{equation*}
+    x=\sqrt{(1+cos(\theta)*2)} \quad ; \quad Q_{corr} =
+    \begin{pmatrix}
+        0.5\cdot x           \\
+        r_{1}\cdot\frac{1}{x}\textbf{i} \\
+        r_{2}\cdot\frac{1}{x}\textbf{j} \\
+        r_{3}\cdot\frac{1}{x}\textbf{k}
+    \end{pmatrix}    
+\end{equation*}
+An additional Kalman correction step adds the correcting rotation quaternion $Q_{corr}$ to the system. The calculation is the same as for the rotation quaternions from the gyroscope and the ToF camera, which is described in section \ref{sec:CorrectionRotation}.
+\subsection{Correction: Translation}
+Data from the accelerometer and the translational velocity from the ToF camera get sampled in the ABC-space, as the sensors rotate with the whole camera head. The speeds in the ABC-space require transformation to the XYZ-space, as covered in section \ref{sec:ABC_XYZ_coords}. After processing all the rotation sensors, the system rotation in the system state vector x transforms the data into the XYZ-space. 
+Even though six individual values from two different sensors correct the system state vector, the 4-dimensional equations of the rotation correction are kept. By choosing H with a lower rank, three-dimensional corrections are possible with the same formulae. Same as for the rotation, the system state vector and the covariance matrix of errors get refreshed at each subsequent correction.
+Again, the following three equations are calculated:
+\begin{equation*}
+    K_{k} = P_{k|k-1|n}\cdot H^{T}(H\cdot P_{k|k-1|n}\cdot H^{T}+R)^{-1}
+\end{equation*}
+\begin{equation*}
+    x_{k|k-1|n+1} = \vec{x}_{k|k-1|n}+K_{k}(\vec{z}_{k}-H\cdot \vec{x}_{k|k-1|n})
+\end{equation*}
+\begin{equation*}
+    P_{k|k-1|n+1}= (I-K_{k}\cdot H)P_{k|k-1|n}
+\end{equation*}
+The observation matrices for acceleration data $H_{a}$ and for velocity data $H_{v}$ are different.
+\begin{equation*}
+    H_{a}=
+    \begin{bmatrix}
+        0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0
+    \end{bmatrix}
+\end{equation*}
+\begin{equation*}
+    H_{v}=
+    \begin{bmatrix}
+        0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0
+    \end{bmatrix}
+\end{equation*}
+The process noise matrices $R$ are diagonal matrices with the standard deviation being the values.
+\begin{equation*}
+R = \sigma \cdot I
+\end{equation*}
+The input vectors $\vec{z}$ contain the XYZ-corrected sensor values, either for acceleration or for velocity.
 \section{Raspberry Pi Camera calibration}
 \label{sec:RBPiCalibration}
 The Raspberry Pi camera only provides images for enhancing the system's video output cosmetically; the lens calibration serves no algorithmic purpose. The lens was calibrated solely to map the image into the undistorted Vulkan 3D space, so the virtual rectangle fits the real world's picture.\\
-The camera streams in 720p to use the entire sensor with pixel binning. In 1080p, the sensor uses only a portion of the image sensor, which narrows down the field of view. Like with the ToF camera, a lookup table calibrates the Raspberry Pi camera, which reduces the image size to a resolution of 1273 times 709 pixels.
+The camera streams in 720p to use the entire sensor with pixel binning. In 1080p, the sensor uses only a portion of the image sensor, which narrows down the field of view. Like with the ToF camera, a lookup table calibrates the Raspberry Pi camera, which reduces the image size to a resolution of 1273 times 709 pixels. Section \ref{sec:FundCamCalibration} describes the process of the lens calibration.
+
 \section{Video display}
 \label{sec:VideoDisplay}
-TODO: Vulkan Output
+Vulkan is a graphics-oriented low-level API that allows rendering and computation on the GPU. Like OpenGL, Vulkan is maintained by Khronos and is open-source software. Vulkan is – next to DirectX, which is limited to Windows – the go-to standard for computer games because of the developer having superior control over the whole graphics pipeline, including CUDA-like computation. While requiring more preparation than OpenGL, Vulkan is the framework of choice because the author has prior experience. The window in which the scene is rendered is managed by GLFW, a helper library for OpenGL.\\
+The implementation renders two rectangles consisting of four vertices – corner points -  to the GLFW window. The Raspberry Pi video stream should cover the entire window, as it acts as the viewfinder of the system. Knowing what Vulkan expects after the shader stage, as explained in section \ref{sec:VulkanCoords}, the easiest way to achieve a full and undistorted coverage is to provide the clip coordinates (-1,-1), (-1,1), (1,1), and (1,-1). The given vertex shader transformation matrix is the identity matrix. This technique will not disable the bilinear and anisotropic filtering, the image sampler of Vulkan provides.\\
+Additional to the Raspberry Pi video stream, a projected surface gets rendered in front. As the projected plane should react to the motion data from the Kalman filter, hardcoding the coordinates does not work. Section \ref{sec:VulkanCoords} contains an example of the vertices and the matrix transformations used to achieve that goal. The motion data of the Kalman filter gets fed in a 4x4 matrix to move and rotate the three defining vectors of the «view»-matrix – namely the eye, the center, and the up vector.

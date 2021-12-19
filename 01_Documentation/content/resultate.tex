@@ -143,7 +143,7 @@ Without a reference measurement, it isn't easy to classify these results. The de
 \end{figure}
 \subsection{Translation}
 \label{sec:kalman_translation_results}
-The fusion of the accelerometer data and the velocity data from the ToF camera has been simulated in section 222. The simulation did not consider that an offset taints the accelerometer data, leading to an even faster drift on its integrations. Figure 333 shows the output of the Kalman filter in green against the data from the accelerometer in blue and the ToF camera in red. Lacking any other input to compare against, the Kalman filter follows the accelerometer directly; the blue line is hidden behind the green Kalman output. The accelerometer's integration curve compares directly against the raw ToF camera data and the Kalman filter output on the velocity. Further integration allows the comparison with the positional data.\\
+The fusion of the accelerometer data and the velocity data from the ToF camera has been simulated in section \ref{sec:Kalmanfilter}. The simulation did not consider that an offset taints the accelerometer data, leading to an even faster drift on its integrations. Figure \ref{im:meas_kalman_translation} shows the output of the Kalman filter in green against the data from the accelerometer in blue and the ToF camera in red. Lacking any other input to compare against, the Kalman filter follows the accelerometer directly; the blue line is hidden behind the green Kalman output. The accelerometer's integration curve compares directly against the raw ToF camera data and the Kalman filter output on the velocity. Further integration allows the comparison with the positional data.\\
 Arguably, the accelerometer taints the Kalman filter data, rendering it worse than the raw integration of the ToF camera. The Kalman velocity output is significantly worse than in the simulation, the proposed integration on this output, to get even better positional data fails.
 \begin{figure}[H]
   \centering
@@ -151,3 +151,9 @@ Arguably, the accelerometer taints the Kalman filter data, rendering it worse th
   \caption{Motion in y direction. Blue lines are data from the accelerometer and its integrations, red are the velocity from the ToF camera and its integration and in green are the different Kalman outputs.}
   \label{im:meas_kalman_translation}
 \end{figure} 
+\section{Cross sensitivity}
+\label{sec:cross_sensitivity}
+Todo: Discuss translation of rotation tests and a free hand motion.
+\section{Performance}
+\label{sec:performance}
+Todo: Cuda-Speed Performance measurement

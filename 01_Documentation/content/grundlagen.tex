@@ -574,7 +574,7 @@ The Kalman filter is an adaptive filter realized with a predictor-corrector algo
 In this thesis, motion without a known input needs to be measured, having sensors for acceleration, velocity, and rotation. The following example demonstrates the position, velocity, and acceleration in one dimension. A fifth-order spline is used for the position data from which velocity and acceleration are derived to simulate the sensor data. Adding Gaussian noise to the simulated velocity and acceleration data reflects reality and allows demonstrating the Kalman filter.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{images/Kalman_example_1d.eps}
+    \includegraphics[width=0.95\textwidth]{images/Kalman_example_1d.eps}
     \caption{The Kalman filter demonstrated. Blue is the acceleration, purple the velocity and red the position. Raw integration of the velocity shows a jagged output of the position estimation. Raw double-integration of the acceleration leads to the position to drift away. The position estimate of the Kalman filter itself follows the jagged line of the raw velocity integration, but the estimated velocity is closer to the true value. In green, the integration of the estimated velocity shows a better approximation of the true value.}
     \label{im:KalmanFilter1D}
 \end{figure}
@@ -635,7 +635,7 @@ The process noise matrix $Q$ combines the input vector $G$ and the standard devi
     \end{bmatrix}
     \cdot 1
 \end{equation*}
-The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes a exponential growth on this error without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error increases over time. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.
+The covariance matrix of the errors $P$ shows that the position estimate will worsen over time. The error propagation causes this error to steadily increase without receiving a direct correction from any sensor. The system would need the possibility to determine the position to avoid long-term drift; otherwise, the error increases over time. On the other values - where sensor values are present - the covariance matrix of errors $P$ converges towards a constant error.
 \begin{figure}[H]
     \centering
     \includegraphics[width=1.0\textwidth]{images/Kalman_example_1d_error.eps}
