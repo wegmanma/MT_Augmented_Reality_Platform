@@ -1211,5 +1211,12 @@ ax34.set_xlim(0,len(data)-1)
 ax35.set_xlim(0,len(data)-1)
 ax36.set_xlim(0,len(data)-1)
 
+print(np.average(data[:,2]))
+print(np.average(data[:,3]))
+print(np.average(data[:,4]))
+print("============")
+print(100/np.average(data[:,2])*np.average(data[:,3]))
+print(100/np.average(data[:,2])*np.average(data[:,4]))
+print(np.average(data[:,4])/np.average(data[:,3]))
 plt.show()
 
