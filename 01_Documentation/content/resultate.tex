@@ -2,6 +2,22 @@
 \chapter{Testing and Results}
 \label{sec:Results}
 The following chapter describes the calibration, testing and the results of the system components. 
+\section{Performance}
+\label{sec:performance}
+Even though, no performance optimization was done, the frame rates got measured. Activating the FFMPEG capture for the Raspberry Pi Camera causes a performance hit, that not only affects other CUDA processes, but also Vulkan. The framerates have thus been measured with and without activated FFMPEG capture. 
+\begin{table}[H] \centering
+	\begin{tabular}{|p{3.3cm}|p{2.5cm}|p{2.5cm}|p{2.5cm}|p{2.5cm}|} \hline
+		\rowcolor{gray} Measurement & ToF Camera & IMU & Vulkan & RPi Camera \\
+		\hline
+		With RPi Camera & 7.85 fps & 202.01 Hz & 42.08 fps & 42.50 fps\\
+		\hline
+		Without RPi Camera & 11.19 fps & 200.66 Hz & 107.41 fps & - \\
+		\hline
+	\end{tabular}
+	\caption{Average Framerates with and without activated FFMPEG Raspberry Pi Camera capture}
+	\label{tab:performance}
+ \end{table}
+ The thread with the ToF Camera involves the whole SIFT feature extraction, RANSAC matching and the evaluation of the rigid motion. The IMU thread only polls an open I2C connection and sums up values.Because of this performance hit, the following measurements got recorded without activated FFMPEG RPi Camera. Instead of the RaspberryPi Camera, the ToF camera's debug image got drawn onto the viewfinder.
 \section{ToF Camera}
 The time-of-flight camera is the main part of this thesis, allowing a three-dimensional scene reconstruction. This section describes the measurements and the results of the motion estimation using this camera at every involved step.
 \subsection{Setup}
@@ -41,7 +57,7 @@ Straight lines in the real world appear straight in the point cloud, which was v
     \caption{The scene reconstruction from the left image to the full point cloud. The red line is equivalent in both figures. Each green dot in the left image is a SIFT feature. The red dot in the point cloud is the position of the camera.}
     \label{fig:linearity3d}
   \end{figure}
-\newpage
+
 \subsection{RANSAC feature matching}
 \label{sec:RANSAC_Results}
 The RANSAC algorithm improves the quality of matched features over the flawed brute-force matcher. The data of the ToF camera is prone to noise, the RANSAC algorithm needs to cope with positional uncertainties. As discussed in Section \ref{sec:results_distance_meas}, the standard deviation in the $a$-axis is roughly 7mm, which also affects the mapping to the$b$- and $c$-axis from the 3d reconstruction.\\
@@ -57,7 +73,12 @@ Higher tresholds in Figure \ref{im:noise_against_thresh} show the expected perfo
 The balance between the uncertainty and the requirements for detecting slow speeds lead to a chosen threshold of 0.0005. This threshold leads to a sphere of about 4.4 cm in diameter, which filters outliers.\\ 
 Figure \ref{im:3d_features_rotation} on the next page demonstrates the matching with the chosen threshold at the example of a rotation of the camera head. Two consecutive frames generated a point cloud each. The estimated rotation and translation move each data point of one cloud to a hypothetical position. The closest data point of the other cloud around this hypothetical position is accepted if it lies within a sphere of 4.4cm diameter. 
 After another calculation, these matched data points lead to the optimal rigid motion, discussed in the following sections.\\
-
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.0\textwidth,trim={7cm 7cm 8cm 5cm},clip]{images/3d_features_rotation.eps}
+  \caption{Two raw point clouds with the found matches connecting them. The camera is rotated in between the frames, which leads to the displacement of the point cloud. The connecting lines are roughly 10cm long, depending on the position. The large red dot in the foreground is the position of the camera.}
+  \label{im:3d_features_rotation}
+\end{figure}
 \begin{table}[ht] \centering
 	\begin{tabular}{|p{5cm}|p{3cm}|p{3cm}|p{3cm}|} \hline
 		\rowcolor{gray} Measurement & Rotation & Translation X & Translation Y \\
@@ -75,12 +96,7 @@ After another calculation, these matched data points lead to the optimal rigid m
  The claimed performance for the brute-force matcher is below 50\% when applied to two identical images, according to the developers of the CudaSift library.\cite{cudaSiftRepo} On noisy frames, even with motion between frames, the quality is expected to be lower.\\
  Table \ref{tab:ransac_performance} shows the performance of the RANSAC implementation in comparison to the brute-force matcher. On average an improvement of over 100\% in the number of accepted matches is achieved by running the three-dimensional RANSAC algorithm.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.97\textwidth,trim={7cm 7cm 8cm 5cm},clip]{images/3d_features_rotation.eps}
-  \caption{Two raw point clouds with the found matches connecting them. The camera is rotated in between the frames, which leads to the displacement of the point cloud. The connecting lines are roughly 10cm long, depending on the position. The large red dot in the foreground is the position of the camera.}
-  \label{im:3d_features_rotation}
-\end{figure}
+
 \subsection{Rotation from ToF camera}
 \label{sec:results_tof_rotation}
 Both the gyroscope and the ToF rotation generate rotation speeds and are both converted into rotation quaternions. Transforming the rotation speed to a quaternion allows direct comparison of the two sensory systems. Analyzing the imaginary parts is sufficient, as explained in Section \ref{sec:RotationQuaternion}.
