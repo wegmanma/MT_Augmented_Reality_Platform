@@ -38,20 +38,18 @@ All is mounted to a plywood structure glued onto a tripod-baseplate, shown in Fi
     \centering
     \begin{minipage}[b]{0.45\textwidth}
       \includegraphics[scale=0.20]{images/cam_head_frontside.png}
-      \captionsetup{labelformat=empty}
-      \caption{a) Frontside}
+      \subcaption{Frontside}
       \label{fig:cameraHeadfront} 
     \end{minipage} % Hier darf keine Leerzeile zwischen den beiden Minipages liegen!
     \begin{minipage}[b]{0.45\textwidth}
       \includegraphics[scale=0.20]{images/cam_head_backside.png} 
-      \captionsetup{labelformat=empty}
-      \caption{b) Backside}
+      \subcaption{Backside}
       \label{fig:cameraHeadback} 
     \end{minipage}
     \caption{The camera head consisting of the ToF camera and the Raspberry Pi camera on the front side, and the IMU, its I²C to USB bridge and the FPDLink III Serializer on the backside.}
     \label{fig:cameraHead}
   \end{figure}
-Four individual cables connect to the different components on the camera head: A USB-C power cable and an RJ45 Ethernet cable for the Raspberry Pi, a USB 2.0 cable for the USB to I²C bridge, and an FPDLink coaxial cable for the Raspberry Pi Camera. Zip ties through holes in the plywood structure help managing the cables and releave stress on the connectors.
+Four individual cables connect to the different components on the camera head: A USB-C power cable and an RJ45 Ethernet cable for the Raspberry Pi, a USB 2.0 cable for the USB to I²C bridge, and an FPDLink coaxial cable for the Raspberry Pi Camera. Zip ties through holes in the plywood structure help managing the cables and relieve stress on the connectors.
 \subsection{Processing System}
 \label{sec:procSystem}
 An Nvidia Jetson Xavier AGX in the 8GB version carries out the processing, rendering, and data acquisition. An Anyvision baseboard, shown in Figure \ref{fig:anyvision}, carries the Nvidia Jetson module and allows the direct attachment of the used data cables, thanks to its modular design.\cite{groo:Thesis:2020}\\
@@ -97,7 +95,7 @@ A separate application runs on the Raspberry Pi, serving a TCP/IP connection for
     \caption{Software overview. The routine inside the Vulkan Framework creates four child classes.}
     \label{fig:sw_concept}
 \end{figure}
-
+Figure \ref{im:DataFlow} shows the order in which a single time of flight frame, and a single Kalman iteration, is ordered. The IMU data cumulator, the FFMPEG capture for the Raspberry Camera and the Vulkan mainloop run at faster rates. 
 \section{Motion estimation from ToF camera}
 The following section describes the extraction of motion - rotational and translational velocity - from the ToF camera data. The purple section in Figure \ref{fig:sw_concept} shows the location of the algorithms within the software.
 \subsection{ToF Camera calibration}
