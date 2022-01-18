@@ -1,16 +1,30 @@
 %!TEX root = ../doc.tex
 \chapter{Introduction}
 \label{sec:Introduction}
-This introduction is very doge.
-\section{Scope}
-\label{sec:Scope}
-The scope is much wow. 
+Augmented Reality - or AR – is the concept of projecting virtual objects into the real world. Phone screens, tablet computers, and specialized goggles render virtual objects over the camera image or display them on translucent screens. A form of Augmented Reality is a heads-up display, for example, in cars to project the current speed and navigation information to the windshield or in airplanes for comprehensive avionic information.\\
+In contrast, Virtual Reality – or VR – limits itself to entirely virtual worlds, into which the user dives. While Virtual Reality is already readily available through off-the-shelf goggles, which lets users meet other people and play games in virtual worlds, Augmented Reality is mainly limited to smartphone applications. Currently, it lacks readily available and specialized hardware, other than niche products specialized for specific industries.\\
+Augmented Reality faces numerous technical challenges. Projecting a virtual object – for example, a flowerpot – into the real world requires the system to recognize a table and find an unoccupied location. Apart from placing decoration or furniture, a pair of Augmented Reality goggles could project helpful information into the air. A mechanic could have virtual schematics or instructions floating beside his work, while another virtual monitor displays a video phone call with the customer. Hand detection and gesture control would enable interaction with virtual objects. Another example could be pedestrian navigation, projecting arrows to the street. \\
+AR goggles need to react in real-time to any motion of the user’s head. Any latency would break immersion as virtual objects lose the connection with their anchor point in the real world. A flowerpot would jump on the table, and arrows on the street would start to float and collide with walls. Fast and reliable motion tracking of the system itself is vital for avoiding visual glitches.
 \section{Initial Situation}
 \label{sec:Situation}
-The initial situation is kinda sus.
+Multiple consulting companies like Deloitte and KPMG described virtual, augmented, and extended reality as possibly the biggest source of digital disruption since the smartphone\cite{KPMG_on_AR} and the next big thing of the digital environment\cite{Deloitte_on_AR}.\\
+While Augmented Reality platforms already exist in consumer products, the know-how is developed within the walls of multi-billion tech companies like Apple or Microsoft. According to Bloomberg, Facebooks Augmented Reality and Virtual Reality, and hardware teams account for more than 6000 employees\cite{Bloomberg_on_AR}. \\
+The most advanced hardware available today is the Microsoft HoloLens\cite{Hololens} featuring four cameras for motion tracking, two infrared cameras for eye-tracking, a time-of-flight sensor for depth measurement, a 9-Axis IMU (Accelerometer, Gyroscope, and Magnetometer), and an additional camera for photos and recording videos. Microsoft targets a professional environment with the Holo Lens, for example, to support Airbus technicians at maintenance\cite{AirbusHololens}.\\
+The Implementation of how these sensors are fused for generating a smooth experience is closed source.\\
+Other than the HoloLens, there exist numerous applications on Smartphones and Tablets running either Android, iOS, or iPadOS. Google ARCore implementation relies on Machine Vision and can benefit from – but does not require –  a ToF camera. ARCore detects objects, estimates their size, tracks objects, and finds flat surfaces. The analysis of light sources allows a virtual object to cast a realistic shadow. Apple’s counterpart is ARKit, which leverages machine learning hardware on their $Bionic$ SoCs and the LiDaR sensors used in iPads and iPhones.\cite{AppleLidar}\\
+Next to these two, numerous open-source projects focus on specific do-it-yourself projects and, for example, enable AR capabilities in a web browser through JavaScript\cite{ar_js}\cite{argon_js}. 
+\section{Motivation}
+\label{sec:Motivation}
+While advanced solid-state LiDaR scanners used in consumer products were not available on the open market in finished modules, time-of-flight cameras get marketed directly. Multiple companies sell time-of-flight cameras for industrial processes or on evaluation boards for development. Building a prototype becomes viable with off-the-shelf time-of-flight cameras and powerful embedded devices, like the Nvidia Jetson series. 
+With the availability of time-of-flight cameras, it becomes worthwhile investigating the possibilities they offer for motion detection and if the acquired data could be helpful in an Augmented Reality system. 
+
+\section{Scope}
+\label{sec:Scope}
+This thesis focuses on close-to-hardware fundamentals and omits the implementation of end-user applications. Without solid motion tracking of the Augmented Reality system, all the other parts of Augmented Reality fail. Developing specialized goggles is pointless without reliable motion tracking; this also falls out of the scope.
 \section{Goals}
 \label{sec:Goals}
-There are so many goals!
+The goals of the thesis are to set up an end-to-end pipeline from data recording over processing to rendering, involving a three-dimensional object which follows the motion of a camera. An off-the-shelf time-of-flight (ToF) camera delivers depth information from which the camera motion is estimated. A sensor fusion approach will combine the estimated camera motion with an IMU.
+
 \section{Target audience}
 \label{sec:Ziel}
 This document is targeted at readers with a basic understanding of computer science and computer vision. Prior knowledge in linear algebra is beneficial.

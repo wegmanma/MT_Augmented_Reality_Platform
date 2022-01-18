@@ -1,11 +1,21 @@
 %!TEX root = ../doc.tex
 \chapter{Conclusion}
 \label{sec:Conclusion}
+This work provides a proof of concept for extraction of rotation and translation speed from a ToF camera on a frame-by-frame basis works. The reconstruction of a three-dimensional scene from the depth image and SIFT feature points and with up to 512 parallel singular value transforms on brute-forced matches allows finding a good rotation and translation transformation. Enhancing the brute-force matcher with a three-dimensional RANSAC algorithm more than doubles the matching performance. Applying the singular value transform to each improved match results in an optimal rigid motion transform. As the system relies on finding SIFT features on its grayscale image – the algorithm will possibly not find enough features in an empty room.\\
+The noise of the ToF camera was a significant problem during this thesis. The noise of the grayscale image causes the extracted SIFT features to jitter, even when the camera is stationary. The noise of the depth information increases the error on the three-dimensional scene reconstruction that forces the RANSAC algorithm to run with loose constraints. These loose constraints allow the RANSAC algorithm to falsely match features only because they are close enough, which induces an error on the rotation and translation estimation. This error again causes the motion data to be noisy.\\
+The low framerate of the ToF camera limits the iteration rate of the Kalman filter. The frame-by-frame translation and rotation information is an average of the motion between the frames, not the velocity at the current frame's time. The low sampling rate requires a downsampling of the IMU data, which induces problems with the gravity compensation.\\ 
+
+
 
 \section{Possible improvement}
 \label{sec:improvement}
-
-\subsection{Proposal: Position Estimation by Camera}
+A system that estimates the position directly based on visual key points is required to avoid drift on the rigid motion. A visual key point might be a specific cloud of SIFT features or an object classified by an machine learning algorithm.\\
+The system would need to detect new key points, store them in a list, store the position and maybe even improve its position information when new data is available. Estimating the camera's position becomes possible from the external objects' position.\\
+The position estimation from an image is valid for the moment where the frame got recorded – unlike the velocity, which is an average between two images. Therefore, other parts of a Kalman filter could run at higher speeds.\\
+A different sensor fusion approach, which allows the IMU to run at its sampling rate without requiring a cumulative sum, would improve the position estimation. The orientation of gravity could be estimated at any point and could correct every single accelerometer measurement.
+ 
 
 \section{Outlook}
 \label{sec:outlook}
+Augmented Reality is a vast field with various problems that need to be solved. When motion tracking works reliably, it enables multiple applications. Increasing the frame rate and accuracy with a better ToF sensor, as currently investigated by the Institute of Signal Processing and Wireless Communications of ZHAW, might enable the system for further topics. Motion tracking by a ToF camera might be implemented in an autonomous driving platform, with a custom-tailored Kalman filter that takes the wheel motion and steering action into account.\\ 
+Developing specialized hardware would be a larger project, as this involves many technologies, like optics, eye tracking, translucent displays and a portable processing platform.

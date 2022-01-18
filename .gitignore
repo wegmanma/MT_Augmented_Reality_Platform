@@ -37,3 +37,6 @@
 01_Documentation/images/_MG_7146.CR2
 01_Documentation/images/_MG_7146.xmp
 02_Source/data/*
+04_data/~$Framerates.xlsx
+*.psd
+*.png

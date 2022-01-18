@@ -28,13 +28,14 @@
 \usepackage{float}
 \usepackage{pbox}
 \usepackage{caption}
+\usepackage{subcaption}
 \ifdefined\USEGLOSSARIES
 	\usepackage[acronyms]{glossaries}
 	\makeglossaries
 	\include{glossaries/glossaries}
 \fi
 
-\DeclareCaptionFormat{myformat}{#1#2#3\hrulefill}
+\DeclareCaptionFormat{myformat}{#1#2#3}
 \captionsetup[figure]{format=myformat}
 
 \begin{document}
@@ -51,9 +52,9 @@
 % Generate your title page, it takes the arguments author, title
 % and email. The title page is then generated with maketitle
 \author{Marcel Wegmann \newline }
-\title{Augmented Reality Platform using Sensor Fusion}
+\title{Augmented Reality Platform using Sensor Fusion and embedded GPU Processing}
 \email{wegr@zhaw.ch}
-\newcommand{\version}{0.1}
+\newcommand{\version}{1.0}
 
 % Add Copyright informations and Contact infos
  \newcommand{\confidential}{no}  %write yes to have a confidential mark on every normal page
@@ -69,23 +70,23 @@
 
 % Include anti-plagiarism statement. The Word template is located in the same folder
 \includepdf[scale=0.9,pages=1]{pdf/plagiatserklaerung.pdf}
-
 % Include abstract
 \include{content/abstract} 
 
-% Start page numbering
-\pagenumbering{arabic}
+
 
 %Include table of content
 \tableofcontents
-
+\newpage
+% Start page numbering
+\pagenumbering{arabic}
 % Starts the page count from here, pdf viewers will be able to jump to the corret page.
 \setcounter{page}{1}
 \setcounter{MaxMatrixCols}{17}
 %Include all chapters. Chapters itself are in the content subfolder
 % \include{content/howtoLaTeX} % Remove for final document
 \include{content/einleitung}
-\include{content/motivation}
+% \include{content/motivation}
 \include{content/concept}
 \include{content/grundlagen} 
 \include{content/vorgehen} 
@@ -128,7 +129,7 @@
 \else
 	\cleardoublepage
 	\phantomsection
-	\addcontentsline{toc}{section}{Abkürzungsverzeichnis}
+	\addcontentsline{toc}{section}{List of Abbreviations}
 	\include{content/glossar}
 \fi
 
