@@ -918,18 +918,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
           v[0][2], v[1][2], v[2][2]);
       
       mat4x4 u_t;
-      // if (idx0 == 0)
-      // printf("IDX0: %d, IDX1: %d, IDX2: %d, S[0][0] = %f, S[1][1] = %f, S[2][2] = %f\n",idx0,idx1, idx2, s[0][0], s[1][1], s[2][2]);
-      // if (idx0 == 0)
-      // printf("Point Pairs 0: %f->%f, %f->%f, %f->%f centriod: (%f, %f, %f) -> (%f, %f, %f) \n",
-      // corr0.x_3d, corr0.match_x_3d,corr0.y_3d, corr0.match_y_3d,corr0.z_3d, corr0.match_z_3d,
-      // centroids.x_3d,centroids.y_3d,centroids.z_3d,centroids.match_x_3d,centroids.match_y_3d,centroids.match_z_3d);
-      // if (idx0 == 0)
-      // printf("Point Pairs %d: %f->%f, %f->%f, %f->%f \n", idx1,
-      // corr1.x_3d, corr1.match_x_3d,corr1.y_3d, corr1.match_y_3d,corr1.z_3d, corr1.match_z_3d);
-      // if (idx0 == 0)
-      // printf("Point Pairs %d: %f->%f, %f->%f, %f->%f \n", idx2,
-      // corr2.x_3d, corr2.match_x_3d,corr2.y_3d, corr2.match_y_3d,corr2.z_3d, corr2.match_z_3d);
+
       for (j = 0; j < 4; ++j)
         for (i = 0; i < 4; ++i)
           u_t[i][j] = u[j][i];
@@ -990,7 +979,14 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
       det = rot[0][0] * rot[1][1] * rot[2][2] + rot[1][0] * rot[2][1] * rot[0][2] +
             rot[2][0] * rot[0][1] * rot[1][2] - rot[2][0] * rot[1][1] * rot[0][2] -
             rot[1][0] * rot[0][1] * rot[2][2] - rot[0][0] * rot[2][1] * rot[1][2];
-
+      //if (idx0 == 0) {
+      //  // printf("all_features\n[");
+      //  // for (int idx = 0; idx < numPts; idx++) {
+      //  //   printf("[%f,%f,%f,%f,%f,%f,%f,%f,%f,%f],",ld_gbl_cg(&(point[idx].x_3d)),ld_gbl_cg(&(point[idx].y_3d)),ld_gbl_cg(&(point[idx].z_3d)),ld_gbl_cg(&(point[idx].match_x_3d)),ld_gbl_cg(&(point[idx].match_y_3d)),ld_gbl_cg(&(point[idx].match_z_3d)),ld_gbl_cg(&(point[idx].xpos)),ld_gbl_cg(&(point[idx].ypos)),ld_gbl_cg(&(point[idx].match_xpos)),ld_gbl_cg(&(point[idx].match_ypos)));
+      //  // }
+      //  //printf("]\nfind_rotation on these features:");
+      //  //printf("%d,%d,%d\n",idx0, idx1, idx2);
+      //}
       if ((det < 1.1f) && (det > 0.9f) && (rot[0][0] > 0.6) && (rot[1][1] > 0.6) && (rot[2][2] > 0.6))
       {
         float ssd_local;
@@ -1019,9 +1015,6 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
               for (i = 0; i < 4; ++i)
                 temp_vec_old_rot[j] += rot[i][j] * temp_vec_old[i];
             }
-
-            // if (idx0 <= 5)
-            //   printf("idx0: %d, idx %d: : temp_vec: %f->%f=%f, %f->%f=%f, %f->%f=%f\n", idx0, idx, temp_vec_old[0], temp_vec_old_rot[0], temp_vec_new[0], temp_vec_old[1], temp_vec_old_rot[1], temp_vec_new[1], temp_vec_old[2], temp_vec_old_rot[2], temp_vec_new[2]);
             ssd_local = 0.0f;
             ssd_local += (temp_vec_old_rot[0] - temp_vec_new[0]) * (temp_vec_old_rot[0] - temp_vec_new[0]);
             ssd_local += (temp_vec_old_rot[1] - temp_vec_new[1]) * (temp_vec_old_rot[1] - temp_vec_new[1]);
@@ -1034,19 +1027,14 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
             } 
           }
         }
+
         if (num_inliners == 0)
           inliners_metric = -1.0;
         else
           inliners_metric = inliners_metric / ((float)num_inliners);
       }
-      // printf("Diagonal values of S: (%f, %f, %f), inliners metric: %f\n",s[0][0], s[1][1], s[2][2], inliners_metric);
     }
   }
-  // if (idx0 == 2)
-  // printf("rot\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n",
-  //      rot[0][0], rot[1][0], rot[2][0], t[0],  // matrix 1st row
-  //      rot[0][1], rot[1][1], rot[2][1], t[1],  // matrix 2nd row
-  //      rot[0][2], rot[1][2], rot[2][2], t[2]); // matrix 3rd row)
   tempMemory[6 + idx0 * 15 + 0] = rot[0][0];
   tempMemory[6 + idx0 * 15 + 1] = rot[0][1];
   tempMemory[6 + idx0 * 15 + 2] = rot[0][2];
@@ -1056,9 +1044,9 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
   tempMemory[6 + idx0 * 15 + 6] = rot[2][0];
   tempMemory[6 + idx0 * 15 + 7] = rot[2][1];
   tempMemory[6 + idx0 * 15 + 8] = rot[2][2];
-  tempMemory[6 + idx0 * 15 + 9] = t[0];
-  tempMemory[6 + idx0 * 15 + 10] = t[1];
-  tempMemory[6 + idx0 * 15 + 11] = t[2];
+  tempMemory[6 + idx0 * 15 + 9] = float(idx0);
+  tempMemory[6 + idx0 * 15 + 10] = float(idx1);
+  tempMemory[6 + idx0 * 15 + 11] = float(idx2);
   tempMemory[6 + idx0 * 15 + 12] = (float)num_inliners;
   tempMemory[6 + idx0 * 15 + 13] = inliners_metric;
 }
@@ -1128,8 +1116,6 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
       }
     }    
   }
-  // printf("======== BEST ONES: max_idx: %d, max_inliners %f, its matrix[0][0] %f, min_idx, %d, min_metric %f,its matrix[0][0]%f\n",
-  //       max_idx, max_inliners, tempMemory[6 + max_idx * 15 + 0], min_idx, min_metric, tempMemory[6 + min_idx * 15 + 0]);
   inliners0 = tempMemory[6 + min_idx * 15 + 12];
   inliners1 = tempMemory[6 + min_idx1 * 15 + 12];
   inliners2 = tempMemory[6 + min_idx2 * 15 + 12];
@@ -1156,12 +1142,7 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   int num_inliners;
   int i, j;
   int k, r, c;
-
-  // printf("rot before: idx %d\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num inliners: %f, metric: %f\n", idx0,
-  //        tempMemory[6 + idx0 * 15 + 0], tempMemory[6 + idx0 * 15 + 1], tempMemory[6 + idx0 * 15 + 2], tempMemory[6 + idx0 * 15 + 9],                                                                   // matrix 1st row
-  //        tempMemory[6 + idx0 * 15 + 3], tempMemory[6 + idx0 * 15 + 4], tempMemory[6 + idx0 * 15 + 5], tempMemory[6 + idx0 * 15 + 10],                                                                  // matrix 2nd row
-  //        tempMemory[6 + idx0 * 15 + 6], tempMemory[6 + idx0 * 15 + 7], tempMemory[6 + idx0 * 15 + 8], tempMemory[6 + idx0 * 15 + 11], tempMemory[6 + idx0 * 15 + 12], tempMemory[6 + idx0 * 15 + 13]); // matrix 3rd row)
-
+  // printf("------ BEST TRIO!!!!: %d, %d, %d\n",(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 9]))),(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 10]))),(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 11]))));
   for (i = 0; i < 4; ++i)
   {
     for (j = 0; j < 4; ++j)
@@ -1200,10 +1181,12 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   centroids.match_y_3d /= num_inliners;
   centroids.match_z_3d /= num_inliners;
   int number_matches = 0;
+  // printf("Using these matches: \n[");
   for (int i = 0; i < numPts; i++)
   {
     if (index_list[idx0 * 512 + i] == true)
     {
+      // printf("%d,",i);
       number_matches++;
       h[0][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_x_3d - centroids.match_x_3d);
       h[1][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_y_3d - centroids.match_y_3d);
@@ -1222,7 +1205,8 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
         // point[i].draw = false;
       }
   }
-  printf("%d;",number_matches);
+  // printf("]\n");
+  // printf("%d;",number_matches);
   mat4x4 u;
   mat4x4 s;
   mat4x4 s_det;
@@ -1517,17 +1501,17 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   vec4 cent_old;
   vec4 cent_new;
   int number_matches = 0;
-  // printf("=========================\n");
+  // printf("RANSAC Features\n");
   // printf("[");
   for (int i = 0; i < numPts; i++) {
     if (point[i].draw == true) {
       number_matches++;
+      // printf("[%d,%d,%f,%f,%f,%f,%f],", i, (int)point[i].ransac_match, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d,point[i].ransac_xpos_3d,point[i].ransac_ypos_3d);
     }
-    // printf("[%f,%f,%f, %f, %f, %f, %f, %f, %f, %d],", point[i].x_3d, point[i].y_3d, point[i].z_3d, point[i].xpos, point[i].ypos, point[i].distance, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d, (int)point[i].draw);
   }
   // printf("]\n");
   // printf("========================\n");
-  printf("%d;",number_matches);
+  // printf("%d;",number_matches);
   
     int idx;
     for (idx = 0; idx < 6; idx++)
@@ -1780,10 +1764,7 @@ __global__ void gpuNormalizeToInt16(uint16_t *dst, float *src, const int width, 
   }
   for (int i = 0; i < height; ++i)
   {
-    dst[i * width * 4 + idx * 4 + 0] = (uint16_t)(src[i * width + idx]);
-    dst[i * width * 4 + idx * 4 + 1] = (uint16_t)(src[i * width + idx]);
-    dst[i * width * 4 + idx * 4 + 2] = (uint16_t)(src[i * width + idx]);
-    dst[i * width * 4 + idx * 4 + 3] = 255 * 255;
+    dst[i * width + idx] = (uint16_t)(src[i * width + idx]);
   }
 }
 
@@ -1990,9 +1971,9 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   }
   return;
 #endif
-if (idx == 0) {
-  printf("%f;",depthData[(int)(128) + 256 * 128]);
-}
+// if (idx == 0) {
+//   printf("%f;",depthData[(int)(128) + 256 * 128]);
+// }
   if ((depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] > 60000) || (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] == 0))
   {
     data[idx].distance = 0.0;
@@ -2010,6 +1991,9 @@ if (idx == 0) {
     data[idx].z_3d = (data[idx].ypos-102.5)/220*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
     // printf("distance = x_3d = %f, y_3d = %f, z_3d = %f, xpos = %f, ypos = %f\n", data[idx].x_3d, data[idx].y_3d, data[idx].z_3d, data[idx].xpos, data[idx].ypos);
   }
+  data[idx].match = -1;
+  data[idx].ransac_match = -1;
+  data[idx].score = 0;
 }
 
 __global__ void gpuScaleFloat2Float(float *dst, float *src, const int width, const int height)
@@ -3516,10 +3500,10 @@ inline void __checkMsg(const char *errorMessage, const char *file, const int lin
 inline void __checkMsgNoFail(const char *errorMessage, const char *file, const int line)
 {
   cudaError_t err = cudaGetLastError();
-  // if (cudaSuccess != err)
-  // {
-  //   fprintf(stderr, "checkMsg() CUDA warning: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
-  // }
+  //if (cudaSuccess != err)
+  //{
+  //  fprintf(stderr, "checkMsg() CUDA warning: %s in file <%s>, line %i : %s.\n", errorMessage, file, line, cudaGetErrorString(err));
+  //}
 }
 
 void Computation::initCuda()

@@ -27,20 +27,20 @@ inline void __checkMsg(const char *errorMessage, const char *file, const int lin
         exit(-1);
     }
 }
-// #define SAVE_IMAGES_TO_DISK
+#define SAVE_IMAGES_TO_DISK
 
 #include "TCPFrameCapture.hpp"
 
-void write_data(std::string filename, uint16_t *buffer, int n)
+void write_data(std::string filename, uint16_t *buffer, int n, int width, int height)
 {
-    std::cout << "WRITING IMAGE DATA! " << n << std::endl;
+    // std::cout << "WRITING IMAGE DATA! " << n << std::endl;
     std::ofstream fileData;
     std::string num = std::to_string(n);
-    filename = "../data/ToFData/" + filename + "_chess_placement_" + num + ".txt";
+    filename = "../data/DemoImages/" + filename + "_demo_image_" + num + ".txt";
     fileData.open(filename);
-    for (int i = 0; i < 352 * 286; i++)
+    for (int i = 0; i < width * height; i++)
     {
-        if (i < ((352 * 286) - 1))
+        if (i < ((width * height) - 1))
         {
             fileData << buffer[i] << ";";
         }
@@ -114,9 +114,9 @@ void TCPFrameCapture::start(Computation *computation_p)
     cudaHostAlloc((void **)&image_x_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&image_y_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&radial_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
-    cudaHostAlloc((void **)&x_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
-    cudaHostAlloc((void **)&y_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
-    cudaHostAlloc((void **)&z_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&x_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&y_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
+    cudaHostAlloc((void **)&z_h, 205 * 265 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&conf_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&ampl_h, 352 * 286 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&cos_alpha_map_h, 205 * 265 * sizeof(float), cudaHostAllocMapped);
@@ -268,7 +268,7 @@ void TCPFrameCapture::run()
     }
     // puts("Socket created");
 
-    server.sin_addr.s_addr = inet_addr("192.168.1.107");
+    server.sin_addr.s_addr = inet_addr("192.168.1.123");
     server.sin_family = AF_INET;
     server.sin_port = htons(23999);
 
@@ -341,31 +341,19 @@ void TCPFrameCapture::run()
 
         // std::cout << "start undistorting" << std::endl;
         cudaStreamSynchronize(tcpCaptureStream);
-        std::cout << "[" << frame_counter << ";";
+        // std::cout << "[" << frame_counter << ";";
         frame_counter++;
 
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1], radial_d, image_x_d, image_y_d, tcpCaptureStream, cos_alpha_map_d);
-        // computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
+        computation->buffer_Float_to_uInt16x4(y_d,temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
         computation->tof_medianfilter_3x3(temp_mem_265x205xfloat_0_d[0], temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
-        // computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
-        // computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
-        checkMsg("Error at tof_camera_undistort\n");
-        computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[5], conf_d, image_x_d, image_y_d, tcpCaptureStream);
-        // computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[4],temp_mem_265x205xfloat_0_d[5], tcpCaptureStream);
+        checkMsg("Error at tof_camera_undistort\n");        
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[5], ampl_d, image_x_d, image_y_d, tcpCaptureStream);
+        computation->buffer_Float_to_uInt16x4(x_d,temp_mem_265x205xfloat_0_d[5],256,205, tcpCaptureStream);
         computation->scale_float_to_float(siftImage.d_data, temp_mem_265x205xfloat_0_d[5], 256, 205, tcpCaptureStream);
-        // computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1],x_d,image_x_d,image_y_d, tcpCaptureStream);
-        // computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[2],y_d,image_x_d,image_y_d, tcpCaptureStream);
-        // computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[3],z_d,image_x_d,image_y_d, tcpCaptureStream);
 
-        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[1],temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
-        //computation->tof_meanfilter_3x3(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
-        //computation->tof_sobel(temp_mem_265x205xfloat_0_d[2],NULL,temp_mem_265x205xfloat_0_d[0], tcpCaptureStream);
-        //computation->tof_maxfilter_3x3(temp_mem_265x205xfloat_0_d[3],temp_mem_265x205xfloat_0_d[2], tcpCaptureStream);
-        //computation->tof_fill_area(temp_mem_265x205xfloat_0_d[0],temp_mem_265x205xfloat_0_d[3],50,50,150.0, tcpCaptureStream);
         cudaStreamSynchronize(tcpCaptureStream);
         std::this_thread::sleep_for(std::chrono::microseconds(50000));
-        computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id], siftImage.d_data, 256, 205, tcpCaptureStream);
         checkMsg("Error at cudaStreamSynchronize\n");
         computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 0.0f, false, memoryTmp, NULL, tcpCaptureStream);
         checkMsg("Error at ExtractSift\n");
@@ -379,8 +367,9 @@ void TCPFrameCapture::run()
         computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
         
         cudaStreamSynchronize(tcpCaptureStream);
-        std::cout << siftData[write_buf_id].numPts << ";";
+        // std::cout << siftData[write_buf_id].numPts << ";";
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
+        // std::cout << std::endl << std::endl << cnt << "n:" << n << std::endl;
         if (write_buf_id == 0)
         {
             computation->MatchSiftData(siftData[0], siftData[1], tcpCaptureStream);
@@ -410,7 +399,18 @@ void TCPFrameCapture::run()
             standing_still = true;
         }
         cudaStreamSynchronize(tcpCaptureStream);
-
+        
+        if (cnt >= 10)
+        {
+            if(ampl_h[0]!=0) {
+            write_data("ampl_352_286",ampl_h,n,352,286);
+            write_data("radial_352_286",radial_h,n,352,286);
+            write_data("ampl_corr_256_205",x_h,n,256,205);
+            write_data("radial_corr_256_205",y_h,n,256,205);
+            n++;
+            }
+        }
+        cnt++;
         if (min_diag > *(best_rotation_h[0][0]))
             min_diag = *(best_rotation_h[0][0]);
         if (min_diag > *(best_rotation_h[1][1]))
@@ -453,6 +453,7 @@ void TCPFrameCapture::run()
         translation_buf[write_buf_id][1] = *opt_translation_h[1];
         translation_buf[write_buf_id][2] = *opt_translation_h[2];
         translation_buf[write_buf_id][3] = *opt_translation_h[3];
+        // print_vec4("best_translation",translation_buf[write_buf_id]);
         newdata = true;
 
         if (write_buf_id == 0)
@@ -468,7 +469,7 @@ void TCPFrameCapture::run()
         endTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        // std::cout << "ToF Frame by frame time: " << nseconds << "s"<<  std::endl;
+        // std::cout << "ToF Frame by frame time;" << 1/nseconds << ";fps"<<  std::endl;
         // while(1) {
         //     std::this_thread::sleep_for(std::chrono::microseconds(5000));
         // }

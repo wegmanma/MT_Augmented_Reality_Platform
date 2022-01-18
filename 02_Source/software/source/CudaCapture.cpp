@@ -125,10 +125,10 @@ void CudaCapture::run()
     while (running)
     {
         
-
+        std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
         lost_frames = get_last_frame(&f_context, pInputPacket, pInputFrame);   
         if (lost_frames == -1) continue;   
-        m_lock[write_buf_id].lock();  
+        m_lock[write_buf_id].lock(); 
         computation->gpuConvertBayer10toRGB((uint16_t *) pInputFrame->data[0], temp_mem_1280x720x4uint16_0_d, WIDTH, HEIGHT, AV_PIX_FMT_BAYER_RGGB10, 4, cudaCaptureStream); 
 
         computation->rpi_camera_undistort(buffers_d[write_buf_id],temp_mem_1280x720x4uint16_0_d,image_x_d,image_y_d, cudaCaptureStream);      
@@ -146,6 +146,11 @@ void CudaCapture::run()
             write_buf_id = 0;
             m_lock[1].unlock();
         }
+        std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
+
+        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+        // std::cout <<  1/nseconds <<  std::endl;
 
     }
     cudaStreamDestroy(cudaCaptureStream);

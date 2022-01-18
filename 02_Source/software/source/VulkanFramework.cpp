@@ -156,7 +156,7 @@ void VulkanFramework::mainLoop() {
         std::chrono::steady_clock::duration timeSpan = endTime - startTime;
 
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        // std::cout << "Calculation and rendering in " << 1/nseconds << "fps"<<  std::endl;
+        // std::cout <<  1/nseconds <<   std::endl;
     }
 
     vkDeviceWaitIdle(device);
