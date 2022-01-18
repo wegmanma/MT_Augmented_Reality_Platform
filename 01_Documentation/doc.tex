@@ -52,9 +52,9 @@
 % Generate your title page, it takes the arguments author, title
 % and email. The title page is then generated with maketitle
 \author{Marcel Wegmann \newline }
-\title{Augmented Reality Platform using Sensor Fusion}
+\title{Augmented Reality Platform using Sensor Fusion and embedded GPU Processing}
 \email{wegr@zhaw.ch}
-\newcommand{\version}{0.1}
+\newcommand{\version}{1.0}
 
 % Add Copyright informations and Contact infos
  \newcommand{\confidential}{no}  %write yes to have a confidential mark on every normal page
@@ -70,16 +70,16 @@
 
 % Include anti-plagiarism statement. The Word template is located in the same folder
 \includepdf[scale=0.9,pages=1]{pdf/plagiatserklaerung.pdf}
-
 % Include abstract
 \include{content/abstract} 
 
-% Start page numbering
-\pagenumbering{arabic}
+
 
 %Include table of content
 \tableofcontents
-
+\newpage
+% Start page numbering
+\pagenumbering{arabic}
 % Starts the page count from here, pdf viewers will be able to jump to the corret page.
 \setcounter{page}{1}
 \setcounter{MaxMatrixCols}{17}
