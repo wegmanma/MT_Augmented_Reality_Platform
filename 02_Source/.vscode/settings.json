@@ -1,7 +1,8 @@
 {
     "C_Cpp.default.includePath": [
         "${workspaceFolder}/**",
-        "/usr/local/cuda-10.2/include/"
+        "/usr/local/cuda-10.2/include/",
+        "/opt/ffmpeg_isztldav/include"
     ],
     "files.associations": {
         "iostream": "cpp",

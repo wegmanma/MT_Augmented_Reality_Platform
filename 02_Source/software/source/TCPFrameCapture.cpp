@@ -55,39 +55,40 @@ void write_data(std::string filename, uint16_t *buffer, int n, int width, int he
 size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int max_length)
 {
     int size_recv, total_size = 0;
-    int size_to_recv = 512;
+    int size_to_recv = 1024;
     //loop
-    // total_size = recv(socket_desc, client_message + total_size, 1107392, 0);
-    // if (size_recv != 12) {
-    //     return 0;
-    // }
     size_t bytes_sent = 0;
-    // std::cout << "Sending request in TCP!" << std::endl;
+    std::cout << "Sending request in TCP!" << std::endl;
 
     bytes_sent = send(socket_desc, "100", 4, 0);
     if (bytes_sent != 4)
         std::cout << "Problem sending request in TCP!" << std::endl;
+    for (int i = 0; i < max_length; i=i+500) {
+        printf("%d, %d",i,*(int*)((void*)(client_message + i)));
+    }
+
     while (total_size < max_length)
     {
-        // std::cout << "Begin: Total_size: " << total_size << " size_recv: " << size_recv << "size_to_recv" << size_to_recv << std::endl;
+        std::cout << "Begin: Total_size: " << total_size << " size_recv: " << size_recv << " size_to_recv" << size_to_recv << " max length" << max_length << std::endl;
+        std::cout << "Pointer: " << (void*)client_message << " added pointer: " << (void*)(client_message + total_size) << std::endl;
         memset(client_message + total_size, 0, size_to_recv); //clear the variable
-        size_recv = recv(socket_desc, client_message + total_size, size_to_recv, 0);
+        printf("cleared successfully\n");
+        size_recv = 1024; //recv(socket_desc, client_message + total_size, size_to_recv, 0);
+        printf("filled successfully\n");
         if (size_recv <= 0)
         {
-            int size_recv, total_size = 0;
-            int size_to_recv = 512;
-            continue;
+            break;
         }
         else
         {
             total_size += size_recv;
         }
-        // if (max_length - total_size <= size_to_recv) {
-        //     size_to_recv = max_length - total_size;
-        // }
-        // std::cout << "End: Total_size: " << total_size << " size_recv: " << size_recv << "size_to_recv" << size_to_recv << std::endl;
+        if (max_length - total_size <= size_to_recv) {
+            size_to_recv = max_length - total_size;
+        }
+        std::cout << "End: Total_size: " << total_size << " size_recv: " << size_recv << " size_to_recv" << size_to_recv << " max length" << max_length << std::endl;
     }
-    // std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
+    std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
     return total_size;
 }
 
@@ -259,7 +260,7 @@ void TCPFrameCapture::run()
     int sock;
     struct sockaddr_in server;
     char server_data[FRAME_LENGTH + 4];
-
+    printf("allocated %d bytes for server data\n",FRAME_LENGTH + 4);
     //Create socket
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1)
@@ -268,7 +269,7 @@ void TCPFrameCapture::run()
     }
     // puts("Socket created");
 
-    server.sin_addr.s_addr = inet_addr("192.168.1.123");
+    server.sin_addr.s_addr = inet_addr("10.42.0.58");
     server.sin_family = AF_INET;
     server.sin_port = htons(23999);
 
@@ -288,7 +289,7 @@ void TCPFrameCapture::run()
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::duration timeSpan;
 
-    std::cout << "Start loop" << std::endl;
+    
     double quality = 0.0f;
     int inliers_count = 0;
     int frame_count = 0;
@@ -303,9 +304,10 @@ void TCPFrameCapture::run()
     newdata = false;
     standing_still = false;
     int frame_counter = -5;
+    std::cout << "Start loop" << std::endl;
     while (running)
     {
-        // std::cout << "Start of loop" << std::endl;
+        std::cout << "Start of loop" << std::endl;
         startTime = std::chrono::steady_clock::now();
         //Receive a reply from the server
         size_t len = receive_all(sock, server_data, FRAME_LENGTH);
@@ -316,7 +318,7 @@ void TCPFrameCapture::run()
         }
         if (len != 1107392)
             continue;
-
+        std::cout << "Received" << std::endl;
         // printf("Server reply len: = %ld\n", len);
 
         int offset_src = 0;

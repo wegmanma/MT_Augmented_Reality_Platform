@@ -1548,16 +1548,11 @@ int8_t BMI160::getAccelGyroDataFast(int file, int16_t *data)
     uint8_t lsb;
     uint8_t msb;
     int16_t msblsb;
-    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
     if (read(file, data_array, size) != size)
     {
         printf("Error : Input/Output error \n");
         exit(1);
     }
-    std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
-        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
-
-        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
     // std::cout << "I2C took " << nseconds << "s"<<  std::endl;
     /* Gyro Data */
     lsb = data_array[idx++];

@@ -192,8 +192,6 @@ void vkh::createBufferExtMem(VkDevice device, VkPhysicalDevice physicalDevice, V
         vkBindBufferMemory(device, buffer, bufferMemory, 0);
     }
 
-#pragma warning(push)
-#pragma warning(disable : 26812) // disabling a warning when including a header works normally for most warnings.
 void vkh::createImage(VkDevice device, VkPhysicalDevice physicalDevice, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -320,7 +318,6 @@ void vkh::transitionImageLayout(VkDevice device, VkCommandPool commandPool, VkIm
 
     vkh::endSingleTimeCommands(device, commandPool, commandBuffer, graphicsQueue);
 }
-#pragma warning(pop)
 
 uint32_t vkh::findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
