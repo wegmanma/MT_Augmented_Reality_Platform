@@ -116,6 +116,7 @@ typedef struct {
   float match_distance;
   float empty[3];
   float data[128];
+  int clusterIndex;
 } SiftPoint;
 
 typedef struct {
@@ -128,6 +129,22 @@ typedef struct {
   SiftPoint *d_data;  // Device (GPU) data
 #endif
 } SiftData;
+
+typedef struct{
+  int index;
+  int n_matches;
+  float x_mean;
+  float y_mean;
+  float z_mean; 
+} KMeansCluster ;
+
+typedef struct{
+  KMeansCluster *h_clusters;
+  KMeansCluster *d_clusters;
+  int maxClusters;
+  int numClusters;
+
+} KMeansClusterSet;
 
 class Computation {
 
@@ -167,24 +184,23 @@ struct Vertex2 {
         attributeDescriptions[2].offset = offsetof(Vertex2, texcoords);
         return attributeDescriptions;
     }
-
 };
+
+
 
     std::vector<uint32_t> indices; 
     
-    size_t vertexBufSize;
+    size_t projectedVkBufSize;
 
-    void* cudaDevVertptr;
-
-    void* cudaDevIndexptr;
-
-    int memHandleVertex;
-
-    int memHandleIndex;
+    size_t mainVkBufSize;
 
     int cudaUpdateVkVertexBufSemaphoreHandle;
 
     int vkUpdateCudaVertexBufSemaphoreHandle;
+
+    void *projectedCudaDevBuffptr;
+
+    void *mainCudaDevBuffptr;
 
     uint8_t  vkDeviceUUID[VK_UUID_SIZE];
 
@@ -192,9 +208,25 @@ struct Vertex2 {
 
     float* imagePtr; // temp pointer for handing images to host for debugging. 
 
+    int projectedMemHandleVkBuffer;
+
+    int mainMemHandleVkBuffer;
+
+    cudaExternalMemory_t projectedCudaExtMemBuffer;
+
+    cudaExternalMemory_t mainCudaExtMemBuffer;
+
     void initCuda();
 
+    void setupCudaForSharingVulkan();
+
+    void cudaVkImportSemaphore();
+
+    void cudaVkImportMem();
+
     void cleanup();
+
+void InitClusterSet(KMeansClusterSet &data, int numPoints, bool host, bool dev, bool shared);
     
 void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev);
 

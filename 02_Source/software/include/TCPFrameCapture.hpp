@@ -24,12 +24,18 @@ public:
 
     void unlockMutex(int mtx_nr);
 
+    void attachOutputBuffer(uint16_t* buffer);
+
 private:
 
     struct buffer {
         void* start;
         size_t                  length;
     };
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point endTime;
+    std::chrono::steady_clock::duration timeSpan;
+
 
     Computation* computation;
 
@@ -37,6 +43,13 @@ private:
     uint16_t *image_y_h;
     uint16_t *image_x_d;
     uint16_t *image_y_d;
+
+    std::vector<uint16_t*> outputBuffers{};
+
+    KMeansClusterSet kMeansClusters; //Clusters in current image abc-coords
+    KMeansClusterSet spatialObjects; //Clusters in scene, xyz-coords
+
+    
 
     float *cos_alpha_map_h;
     float *cos_alpha_map_d;
@@ -94,6 +107,6 @@ private:
 
     void run();
 
-    size_t receive_all(int socket_desc, char *client_message, int max_length);
+    size_t receive_all(int socket_desc, char *client_message, struct sockaddr_in servaddr);
 
 };

@@ -482,19 +482,19 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             delta_vector[1] = delta_vector_xyz[2];
             delta_vector[2] = 0;
 
-            mat17x17_dup(P_apriori, P_aposteriori);
-            vec17_dup(x_apriori, x);
-            {
-                mat4x17 H_k = {0};
-                H_k[2][0] = 1;
-                H_k[5][1] = 1;
-                H_k[8][2] = 1;
-                mat4x4 R = {0};
-                mat4x4_identity(R);
-                mat4x4_scale(R, R, 0.000004);
-                // print_vec4("", delta_vector_xyz, true, true);
-                kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, delta_vector, R);
-            }
+            // mat17x17_dup(P_apriori, P_aposteriori);
+            // vec17_dup(x_apriori, x);
+            // {
+            //     mat4x17 H_k = {0};
+            //     H_k[2][0] = 1;
+            //     H_k[5][1] = 1;
+            //     H_k[8][2] = 1;
+            //     mat4x4 R = {0};
+            //     mat4x4_identity(R);
+            //     mat4x4_scale(R, R, 0.000004);
+            //     // print_vec4("", delta_vector_xyz, true, true);
+            //     kalmanCorrectionStep(H_k, P_apriori, P_aposteriori, x, x_apriori, delta_vector, R);
+            // }
             quat tof_translation;
             tof_translation_xyz[0] = -tof_translation_xyz[0] / nseconds_i;
             tof_translation_xyz[1] = -tof_translation_xyz[1] / nseconds_i;
@@ -571,8 +571,8 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             // print_quat("kalman_rot_speed", kalman_rot_speed, true, true);
             // print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
             // print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
-            // print_quat("kalman_translation", kalman_translation, true, true);
-            // print_quat("kalman_velocity", kalman_velocity, true, true);
+            print_quat("kalman_translation", kalman_translation, false, false);
+            print_quat("kalman_velocity", kalman_velocity, false, false);
             // print_quat("kalman_acceleration", kalman_acceleration, true, true);
             // print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true, true);
             // std::cout << "]," << std::endl;

@@ -38,7 +38,7 @@
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
-const bool enableValidationLayers = true;
+const bool enableValidationLayers = false;
 #endif
 #pragma warning(push)
 #pragma warning(disable : 26812) // disabling a warning when including a header works normally for most warnings.
@@ -111,7 +111,7 @@ void VulkanFramework::framebufferResizeCallback(GLFWwindow* window, int width, i
 
 void VulkanFramework::initVulkan() {
     computation = new Computation{};
-    computation->initCuda();
+    // computation->initCuda();
     
     tcpCapture = new TCPFrameCapture;
     tcpCapture->start(computation);
@@ -120,7 +120,7 @@ void VulkanFramework::initVulkan() {
     cudaCapture.start(computation);
     #endif // DRAW_RPI_IMAGE
     createInstance();
-    
+    computation->initCuda();
     setupDebugCallback();
     createSurface();
     pickPhysicalDevice();
@@ -135,6 +135,15 @@ void VulkanFramework::initVulkan() {
     createTextureImageView();
     createTextureSampler();
     createSyncObjects();
+    
+    computation->projectedMemHandleVkBuffer = getVkMemHandle(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT, stagingProjectedBufferMemory);
+    computation->mainMemHandleVkBuffer = getVkMemHandle(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT, stagingMainBufferMemory);
+    computation->setupCudaForSharingVulkan();
+    std::cout << "Proj Pointer: " << (void*)computation->projectedCudaDevBuffptr << std::endl;
+    std::cout << "Main Pointer: " << (void*)computation->mainCudaDevBuffptr << std::endl;
+    tcpCapture->attachOutputBuffer((uint16_t*)computation->projectedCudaDevBuffptr);
+    tcpCapture->attachOutputBuffer((uint16_t*)computation->mainCudaDevBuffptr);
+    
     projectedSurface.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), projectedImageView, projectedSampler, positionEstimate);
     mainCamera.create(device, physicalDevice, renderPass, commandPool, graphicsQueue,swapChainExtent, swapChainImages.size(), mainImageView, mainSampler);
     createCommandBuffers();
@@ -275,16 +284,16 @@ void VulkanFramework::createInstance() {
             throw std::runtime_error("failed to create instance!");
         }
 
-        // pointCloud.fpGetPhysicalDeviceProperties2 = (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
-        // if (pointCloud.fpGetPhysicalDeviceProperties2 == NULL) {
-        //     throw std::runtime_error("Vulkan: Proc address for \"vkGetPhysicalDeviceProperties2KHR\" not found.\n");
-        // }
-// 
-// 
-        // pointCloud.fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetInstanceProcAddr(instance, "vkGetMemoryFdKHR");
-        // if (pointCloud.fpGetMemoryFdKHR == NULL) {
-        //     throw std::runtime_error("Vulkan: Proc address for \"vkGetMemoryFdKHR\" not found.\n");
-        // }
+        fpGetPhysicalDeviceProperties2 = (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
+        if (fpGetPhysicalDeviceProperties2 == NULL) {
+            throw std::runtime_error("Vulkan: Proc address for \"vkGetPhysicalDeviceProperties2KHR\" not found.\n");
+        }
+
+
+        fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetInstanceProcAddr(instance, "vkGetMemoryFdKHR");
+        if (fpGetMemoryFdKHR == NULL) {
+            throw std::runtime_error("Vulkan: Proc address for \"vkGetMemoryFdKHR\" not found.\n");
+        }
 
 }
 
@@ -335,9 +344,9 @@ void VulkanFramework::pickPhysicalDevice() {
         vkPhysicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         vkPhysicalDeviceProperties2.pNext = &vkPhysicalDeviceIDProperties;
 
-        // pointCloud.fpGetPhysicalDeviceProperties2(physicalDevice, &vkPhysicalDeviceProperties2);
+        fpGetPhysicalDeviceProperties2(physicalDevice, &vkPhysicalDeviceProperties2);
 
-        // memcpy(pointCloud.computation.vkDeviceUUID, vkPhysicalDeviceIDProperties.deviceUUID, sizeof(pointCloud.computation.vkDeviceUUID));
+        memcpy(computation->vkDeviceUUID, vkPhysicalDeviceIDProperties.deviceUUID, sizeof(computation->vkDeviceUUID));
 
 }
 
@@ -391,10 +400,10 @@ void VulkanFramework::createLogicalDevice() {
 }
 
 void VulkanFramework::getKhrExtensionsFn() {
-    // pointCloud.fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(device, "vkGetSemaphoreFdKHR");
-    // if (pointCloud.fpGetSemaphoreFdKHR == NULL) {
-    //     throw std::runtime_error("Vulkan: Proc address for \"vkGetSemaphoreFdKHR\" not found.\n");
-    // }
+    fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(device, "vkGetSemaphoreFdKHR");
+    if (fpGetSemaphoreFdKHR == NULL) {
+        throw std::runtime_error("Vulkan: Proc address for \"vkGetSemaphoreFdKHR\" not found.\n");
+    }
 }
 
 void VulkanFramework::createSwapChain() {
@@ -798,12 +807,16 @@ void VulkanFramework::createTextureImage() {
     }
 
     void* data;
-
-    vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingProjectedBuffer, stagingProjectedBufferMemory);
-    vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
-    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingProjectedBufferMemory);
+    // data = malloc(imageSize);
+    //memset(data,0,imageSize);
+    computation->projectedVkBufSize = imageSize;
+    vkh::createBufferExtMem(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT, stagingProjectedBuffer, stagingProjectedBufferMemory);
     tcpCapture->unlockMutex(mtx);
+    //vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
+    //memcpy((void *)(((uint16_t *)data)), stagingProjectedBufferMemory, static_cast<size_t>(imageSize));
+    // vkUnmapMemory(device, stagingProjectedBufferMemory);
+
+    // free(data);
     vkh::createImage(device, physicalDevice, texWidth, texHeight, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, projectedImage, projectedImageMemory);
     
     vkh::transitionImageLayout(device, commandPool, projectedImage, VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, graphicsQueue);
@@ -830,12 +843,8 @@ void VulkanFramework::createTextureImage() {
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
-
-    vkh::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMainBuffer, stagingMainBufferMemory);
-    vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
-
-    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingMainBufferMemory);
+    computation->mainVkBufSize = imageSize;
+    vkh::createBufferExtMem(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT, stagingMainBuffer, stagingMainBufferMemory);
     #ifdef DRAW_RPI_IMAGE
     cudaCapture.unlockMutex(mtx);
     #else
@@ -892,9 +901,6 @@ void VulkanFramework::updateTextureImage() {
     void* data;
     int mtx = tcpCapture->lockMutex();
     pixels = (unsigned char*)((void*)tcpCapture->getToFFrame(mtx));
-    vkMapMemory(device, stagingProjectedBufferMemory, 0, imageSize, 0, &data);
-    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingProjectedBufferMemory);
     tcpCapture->unlockMutex(mtx);
 // 
   // 
@@ -925,9 +931,6 @@ void VulkanFramework::updateTextureImage() {
         throw std::runtime_error("failed to load texture image!");
     }
     // std::cout << "buffers_h at use: "<< (int)pixels[50*265*4+50*4+0] << std::endl;
-    vkMapMemory(device, stagingMainBufferMemory, 0, imageSize, 0, &data);
-    memcpy((void*)(((uint16_t*)data)), pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingMainBufferMemory);
 
     #ifdef DRAW_RPI_IMAGE
     cudaCapture.unlockMutex(mtx);
@@ -943,20 +946,20 @@ void VulkanFramework::updateTextureImage() {
 
 }
 
-// int VulkanFramework::getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda)
-// {
-//     if (externalSemaphoreHandleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
-//         int fd;
-//         VkSemaphoreGetFdInfoKHR vulkanSemaphoreGetFdInfoKHR = {};
-//         vulkanSemaphoreGetFdInfoKHR.sType      = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
-//         vulkanSemaphoreGetFdInfoKHR.pNext      = NULL;
-//         vulkanSemaphoreGetFdInfoKHR.semaphore  = semVkCuda;
-//         vulkanSemaphoreGetFdInfoKHR.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
-//         // pointCloud.fpGetSemaphoreFdKHR(device, &vulkanSemaphoreGetFdInfoKHR, &fd);
-//         return fd;
-//     }
-//     return -1;
-// }
+int VulkanFramework::getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda)
+{
+    if (externalSemaphoreHandleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
+        int fd;
+        VkSemaphoreGetFdInfoKHR vulkanSemaphoreGetFdInfoKHR = {};
+        vulkanSemaphoreGetFdInfoKHR.sType      = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+        vulkanSemaphoreGetFdInfoKHR.pNext      = NULL;
+        vulkanSemaphoreGetFdInfoKHR.semaphore  = semVkCuda;
+        vulkanSemaphoreGetFdInfoKHR.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+        fpGetSemaphoreFdKHR(device, &vulkanSemaphoreGetFdInfoKHR, &fd);
+        return fd;
+    }
+    return -1;
+}
 
 bool VulkanFramework::checkValidationLayerSupport() {
     uint32_t layerCount;
@@ -983,3 +986,20 @@ bool VulkanFramework::checkValidationLayerSupport() {
     return true;
 }
 
+
+int VulkanFramework::getVkMemHandle(VkExternalMemoryHandleTypeFlagsKHR externalMemoryHandleType, VkDeviceMemory memory){
+         if (externalMemoryHandleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT) {
+            int fd;
+
+            VkMemoryGetFdInfoKHR vkMemoryGetFdInfoKHR = {};
+            vkMemoryGetFdInfoKHR.sType      = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+            vkMemoryGetFdInfoKHR.pNext      = NULL;
+            vkMemoryGetFdInfoKHR.memory     = memory;
+            vkMemoryGetFdInfoKHR.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+
+            fpGetMemoryFdKHR(device, &vkMemoryGetFdInfoKHR, &fd);
+
+            return fd;
+        }
+        return -1;   
+}

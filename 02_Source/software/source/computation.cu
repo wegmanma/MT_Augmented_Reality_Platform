@@ -1773,13 +1773,17 @@ __global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, in
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < width)
   {
+    // if (idx == width/2) printf("Pixels: ");
     for (int i = 0; i < height; ++i)
     {
+
+      // if (idx == width/2) printf("%d ",(uint16_t)(src[i * width + idx] * 255));
       dst[i * width * 4 + idx * 4 + 0] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 1] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 2] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 3] = 255 * 255;
     }
+    // if (idx == width/2) printf("\n");
   }
   if (nPoints <= 0)
     return;
@@ -3511,6 +3515,61 @@ void Computation::initCuda()
   cudaSetDeviceFlags(cudaDeviceMapHost);
 }
 
+void Computation::setupCudaForSharingVulkan()
+{
+        setCudaVkDevice();
+        // cudaVkImportSemaphore();
+        cudaVkImportMem();
+}
+
+void Computation::cudaVkImportSemaphore()
+{
+    cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc;
+    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
+    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
+    externalSemaphoreHandleDesc.handle.fd = cudaUpdateVkVertexBufSemaphoreHandle;
+    externalSemaphoreHandleDesc.flags = 0;
+    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtCudaUpdateVkVertexBufSemaphore, &externalSemaphoreHandleDesc));
+    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
+    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
+    externalSemaphoreHandleDesc.handle.fd = vkUpdateCudaVertexBufSemaphoreHandle;
+    externalSemaphoreHandleDesc.flags = 0;
+    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtVkUpdateCudaVertexBufSemaphore, &externalSemaphoreHandleDesc));
+    printf("CUDA Imported Vulkan semaphore\n");
+}
+
+void Computation::cudaVkImportMem()
+{
+    cudaExternalMemoryHandleDesc projectedCudaExtMemHandleDesc;
+    memset(&projectedCudaExtMemHandleDesc, 0, sizeof(projectedCudaExtMemHandleDesc));
+    projectedCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+    projectedCudaExtMemHandleDesc.handle.fd = projectedMemHandleVkBuffer;
+    projectedCudaExtMemHandleDesc.size = projectedVkBufSize;
+    checkCudaErrors(cudaImportExternalMemory(&projectedCudaExtMemBuffer, &projectedCudaExtMemHandleDesc));
+    cudaExternalMemoryBufferDesc projectedCudaExtBufferDesc;
+    projectedCudaExtBufferDesc.offset = 0;
+    projectedCudaExtBufferDesc.size = projectedVkBufSize;
+    projectedCudaExtBufferDesc.flags = 0;
+    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&projectedCudaDevBuffptr, projectedCudaExtMemBuffer, &projectedCudaExtBufferDesc));
+
+    cudaExternalMemoryHandleDesc mainCudaExtMemHandleDesc;
+    memset(&mainCudaExtMemHandleDesc, 0, sizeof(mainCudaExtMemHandleDesc));
+    mainCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+    mainCudaExtMemHandleDesc.handle.fd = mainMemHandleVkBuffer;
+    mainCudaExtMemHandleDesc.size = mainVkBufSize;
+    checkCudaErrors(cudaImportExternalMemory(&mainCudaExtMemBuffer, &mainCudaExtMemHandleDesc));
+    cudaExternalMemoryBufferDesc mainCudaExtBufferDesc;
+    mainCudaExtBufferDesc.offset = 0;
+    mainCudaExtBufferDesc.size = mainVkBufSize;
+    mainCudaExtBufferDesc.flags = 0;
+    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&mainCudaDevBuffptr, mainCudaExtMemBuffer, &mainCudaExtBufferDesc));
+
+
+
+}
+
+
+
 void Computation::cleanup()
 {
 }
@@ -3621,6 +3680,25 @@ void Computation::LowPass_forSubImages(float *res, float *src, int width, int he
   GaussKernelBlock<<<grid, block, 0>>>(res, src, width, height, kernelSize);
 
   return;
+}
+
+void Computation::InitClusterSet(KMeansClusterSet &data, int numPoints, bool host, bool dev, bool shared)
+{
+  data.numClusters = 0;
+  data.maxClusters = numPoints;
+  int sz = sizeof(KMeansCluster) * numPoints;
+  data.h_clusters = NULL;
+  if (shared) {
+    host = false;
+    dev = false;
+    cudaHostAlloc((void **)&data.h_clusters, sz, cudaHostAllocMapped);
+    cudaHostGetDevicePointer((void **)&data.d_clusters, (void *)data.h_clusters, 0);
+  }
+  if (host)
+    data.h_clusters = (KMeansCluster *)malloc(sz);
+    data.d_clusters = NULL;
+  if (dev)
+    cudaMalloc((void **)&data.d_clusters, sz);
 }
 
 void Computation::InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev)

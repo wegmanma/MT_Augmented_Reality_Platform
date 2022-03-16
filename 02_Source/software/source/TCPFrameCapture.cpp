@@ -13,9 +13,11 @@
 #include <any>
 #include <computation.cuh>
 
+#define ELEMENT 145*300
+
 // #define PRINT_DATA
 
-#define FRAME_LENGTH 11 * 352 * 286 // Bytes
+#define FRAME_LENGTH 5 * 352 * 286 // Bytes
 #define checkMsg(msg) __checkMsg(msg, __FILE__, __LINE__)
 
 inline void __checkMsg(const char *errorMessage, const char *file, const int line)
@@ -52,43 +54,46 @@ void write_data(std::string filename, uint16_t *buffer, int n, int width, int he
     fileData.close();
 }
 
-size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, int max_length)
+size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, struct sockaddr_in servaddr)
 {
     int size_recv, total_size = 0;
-    int size_to_recv = 1024;
+    int size_to_recv = 8192*4;
     //loop
     size_t bytes_sent = 0;
-    std::cout << "Sending request in TCP!" << std::endl;
+    // std::cout << "Sending request in TCP!" << std::endl;
 
-    bytes_sent = send(socket_desc, "100", 4, 0);
-    if (bytes_sent != 4)
-        std::cout << "Problem sending request in TCP!" << std::endl;
-    for (int i = 0; i < max_length; i=i+500) {
-        printf("%d, %d",i,*(int*)((void*)(client_message + i)));
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 10000;
+    if (setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+        perror("Error");
     }
 
-    while (total_size < max_length)
+    bytes_sent = sendto(socket_desc, "1", 2, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (bytes_sent != 2)
+        std::cout << "Problem sending request in TCP!" << std::endl;
+    // std::cout << "Waiting for data to come..." << std::endl;
+    while (total_size < FRAME_LENGTH)
     {
-        std::cout << "Begin: Total_size: " << total_size << " size_recv: " << size_recv << " size_to_recv" << size_to_recv << " max length" << max_length << std::endl;
-        std::cout << "Pointer: " << (void*)client_message << " added pointer: " << (void*)(client_message + total_size) << std::endl;
-        memset(client_message + total_size, 0, size_to_recv); //clear the variable
-        printf("cleared successfully\n");
-        size_recv = 1024; //recv(socket_desc, client_message + total_size, size_to_recv, 0);
-        printf("filled successfully\n");
+        // memset(client_message + total_size, 0, size_to_recv); //clear the variable
+        socklen_t len = sizeof(servaddr);
+        size_recv = recvfrom(socket_desc, (char*)(client_message+ total_size), size_to_recv, 0, (struct sockaddr *) &servaddr,
+                &len);
         if (size_recv <= 0)
         {
-            break;
+            // printf("Oh dear, something went wrong with read()! %s\n", strerror(errno));
+            return 0;
         }
         else
         {
             total_size += size_recv;
         }
-        if (max_length - total_size <= size_to_recv) {
-            size_to_recv = max_length - total_size;
+        if (FRAME_LENGTH - total_size <= size_to_recv) {
+            size_to_recv = FRAME_LENGTH - total_size;
         }
-        std::cout << "End: Total_size: " << total_size << " size_recv: " << size_recv << " size_to_recv" << size_to_recv << " max length" << max_length << std::endl;
+        if (size_to_recv == 0) break;
     }
-    std::cout << "First element has brightness: " << (int)client_message[0] << " total size: " << total_size << std::endl;
+    // std::cout << "Element has brightness: " << (int)client_message[ELEMENT*2] << ":" << (int)client_message[ELEMENT*2+1] << " ";
     return total_size;
 }
 
@@ -109,6 +114,7 @@ void TCPFrameCapture::start(Computation *computation_p)
     ampl_h = NULL;
     conf_h = NULL;
     cos_alpha_map_h = NULL;
+    
 
     cudaHostAlloc((void **)&buffers_h[0], 205 * 265 * 4 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&buffers_h[1], 205 * 265 * 4 * sizeof(uint16_t), cudaHostAllocMapped);
@@ -169,6 +175,8 @@ void TCPFrameCapture::start(Computation *computation_p)
 #endif
     siftImage.Allocate(256, 205, 256, false, NULL, NULL);
     memoryTmp = computation->AllocSiftTempMemory(256, 205, 5, true);
+    computation->InitClusterSet(kMeansClusters, 160, false, false, true);
+    computation->InitClusterSet(spatialObjects, 200, false, false, true);
 
     FILE *datfile;
     char buff[256];
@@ -204,6 +212,10 @@ uint16_t *TCPFrameCapture::getToFFrame(int buffer)
 {
 
     return buffers_h[buffer];
+}
+
+void TCPFrameCapture::attachOutputBuffer(uint16_t* buffer){
+    outputBuffers.push_back(buffer);
 }
 
 int TCPFrameCapture::getRotationTranslation(int buffer, mat4x4 rotation, quat translation)
@@ -257,37 +269,22 @@ void TCPFrameCapture::run()
     // std::cout << "cuda priorities - least: " << least << " greatest: " << greatest << std::endl; 
     cudaStreamCreateWithPriority(&tcpCaptureStream, 0, greatest);
 
-    int sock;
-    struct sockaddr_in server;
-    char server_data[FRAME_LENGTH + 4];
-    printf("allocated %d bytes for server data\n",FRAME_LENGTH + 4);
-    //Create socket
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1)
-    {
-        printf("Could not create socket");
+    int sockfd;
+    char buffer[FRAME_LENGTH];
+    struct sockaddr_in     servaddr;
+   
+    // Creating socket file descriptor
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0 ) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
     }
-    // puts("Socket created");
-
-    server.sin_addr.s_addr = inet_addr("10.42.0.58");
-    server.sin_family = AF_INET;
-    server.sin_port = htons(23999);
-
-    //Connect to remote server
-    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
-    {
-        perror("connect failed. Error");
-    }
-#ifdef SAVE_IMAGES_TO_DISK
-    int cnt = 0;
-    int n = 0;
-#endif
-    int flags = fcntl(sock, F_GETFL, 0);
-    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-
-    std::chrono::steady_clock::time_point endTime;
-    std::chrono::steady_clock::time_point startTime;
-    std::chrono::steady_clock::duration timeSpan;
+   
+    memset(&servaddr, 0, sizeof(servaddr));
+       
+    // Filling server information
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(23999);
+    servaddr.sin_addr.s_addr = inet_addr("10.42.0.58");
 
     
     double quality = 0.0f;
@@ -307,39 +304,36 @@ void TCPFrameCapture::run()
     std::cout << "Start loop" << std::endl;
     while (running)
     {
-        std::cout << "Start of loop" << std::endl;
-        startTime = std::chrono::steady_clock::now();
+        
+       
+        // std::cout << "Start of loop" << std::endl;
         //Receive a reply from the server
-        size_t len = receive_all(sock, server_data, FRAME_LENGTH);
+        size_t len = receive_all(sockfd, buffer, servaddr);
+        // std::cout << +(buffer[ELEMENT*2]) << ":"<< +(buffer[ELEMENT*2+1]) << " ";
         if (len < 0)
         {
             printf("recv failed");
             break;
         }
-        if (len != 1107392)
+        if (len != 503360)
             continue;
-        std::cout << "Received" << std::endl;
+        startTime = std::chrono::steady_clock::now();
         // printf("Server reply len: = %ld\n", len);
 
         int offset_src = 0;
 
         // std::cout << "locking W" << write_buf_id << std::endl;
-        memcpy(ampl_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
+        memcpy(ampl_h, buffer + offset_src, 352 * 286 * sizeof(uint16_t));
         offset_src += 352 * 286 * sizeof(uint16_t);
         //memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
+        // std::cout << (ampl_h)[ELEMENT] << std::endl;
         for (int i = 0; i < 352 * 286; i++)
         {
             uint16_t *ptr = conf_h + i;
-            *ptr = server_data[offset_src + i] * 255;
+            *ptr = buffer[offset_src + i] * 255;
         }
         offset_src += 352 * 286 * sizeof(uint8_t);
-        memcpy(radial_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-        offset_src += 352 * 286 * sizeof(uint16_t);
-        memcpy(x_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-        offset_src += 352 * 286 * sizeof(uint16_t);
-        memcpy(y_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
-        offset_src += 352 * 286 * sizeof(uint16_t);
-        memcpy(z_h, server_data + offset_src, 352 * 286 * sizeof(uint16_t));
+        memcpy(radial_h, buffer + offset_src, 352 * 286 * sizeof(uint16_t));
 
         // std::cout << "start undistorting" << std::endl;
         cudaStreamSynchronize(tcpCaptureStream);
@@ -347,15 +341,15 @@ void TCPFrameCapture::run()
         frame_counter++;
 
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1], radial_d, image_x_d, image_y_d, tcpCaptureStream, cos_alpha_map_d);
-        computation->buffer_Float_to_uInt16x4(y_d,temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
+        // computation->buffer_Float_to_uInt16x4(y_d,temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
         computation->tof_medianfilter_3x3(temp_mem_265x205xfloat_0_d[0], temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         checkMsg("Error at tof_camera_undistort\n");        
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[5], ampl_d, image_x_d, image_y_d, tcpCaptureStream);
-        computation->buffer_Float_to_uInt16x4(x_d,temp_mem_265x205xfloat_0_d[5],256,205, tcpCaptureStream);
+        // computation->buffer_Float_to_uInt16x4(x_d,temp_mem_265x205xfloat_0_d[5],256,205, tcpCaptureStream);
         computation->scale_float_to_float(siftImage.d_data, temp_mem_265x205xfloat_0_d[5], 256, 205, tcpCaptureStream);
 
         cudaStreamSynchronize(tcpCaptureStream);
-        std::this_thread::sleep_for(std::chrono::microseconds(50000));
+        // std::this_thread::sleep_for(std::chrono::microseconds(50000));
         checkMsg("Error at cudaStreamSynchronize\n");
         computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 0.0f, false, memoryTmp, NULL, tcpCaptureStream);
         checkMsg("Error at ExtractSift\n");
@@ -402,17 +396,6 @@ void TCPFrameCapture::run()
         }
         cudaStreamSynchronize(tcpCaptureStream);
         
-        if (cnt >= 10)
-        {
-            if(ampl_h[0]!=0) {
-            write_data("ampl_352_286",ampl_h,n,352,286);
-            write_data("radial_352_286",radial_h,n,352,286);
-            write_data("ampl_corr_256_205",x_h,n,256,205);
-            write_data("radial_corr_256_205",y_h,n,256,205);
-            n++;
-            }
-        }
-        cnt++;
         if (min_diag > *(best_rotation_h[0][0]))
             min_diag = *(best_rotation_h[0][0]);
         if (min_diag > *(best_rotation_h[1][1]))
@@ -438,7 +421,14 @@ void TCPFrameCapture::run()
         }
         m_lock[write_buf_id].lockW();
         frame_count++;
-        computation->drawSiftData(buffers_d[write_buf_id], siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
+        // std::cout << "writing buffers...?" << std::endl;
+        for (uint16_t* i : outputBuffers) {
+            computation->drawSiftData(i, siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
+            
+            //std::cout << "wrote into buffer: " << (void*)i << std::endl;
+        }
+        // cudaStreamSynchronize(tcpCaptureStream);
+
         // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
         // cudaStreamSynchronize(tcpCaptureStream);
         // Processing finished, change buffer index.
@@ -469,14 +459,13 @@ void TCPFrameCapture::run()
             m_lock[1].unlockW();
         }
         endTime = std::chrono::steady_clock::now();
-        std::chrono::steady_clock::duration timeSpan = endTime - startTime;
-        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-        // std::cout << "ToF Frame by frame time;" << 1/nseconds << ";fps"<<  std::endl;
-        // while(1) {
-        //     std::this_thread::sleep_for(std::chrono::microseconds(5000));
-        // }
-    }
 
-    close(sock);
+        timeSpan = endTime - startTime;
+
+        double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+ 
+        std::cout << "ToF FPS: " << 1/nseconds << std::endl;
+
+    }
     cudaStreamDestroy(tcpCaptureStream);
 }

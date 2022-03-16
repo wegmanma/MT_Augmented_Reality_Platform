@@ -117,5 +117,4 @@ namespace vkh
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
 	std::vector<const char *> getRequiredExtensions(bool enableValidationLayers);
-
 }

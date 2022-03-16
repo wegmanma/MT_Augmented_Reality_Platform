@@ -65,7 +65,6 @@ public:
     PFN_vkGetMemoryFdKHR  fpGetMemoryFdKHR;
     PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;
     PFN_vkGetPhysicalDeviceProperties2 fpGetPhysicalDeviceProperties2;
-    uint8_t  vkDeviceUUID[VK_UUID_SIZE];
 
     int cudaUpdateVkVertexBufSemaphoreHandle;
 
@@ -199,7 +198,9 @@ private:
 
     void createTextureSampler();
 
-    // int getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda);
+    int getVkMemHandle(VkExternalMemoryHandleTypeFlagsKHR externalMemoryHandleType, VkDeviceMemory memory);
+
+    int getVkSemaphoreHandle(VkExternalSemaphoreHandleTypeFlagBitsKHR externalSemaphoreHandleType, VkSemaphore &semVkCuda);
 
     // int getVkMemHandle(VkExternalMemoryHandleTypeFlagsKHR externalMemoryHandleType);
 
