@@ -81,25 +81,6 @@ __device__ inline float clamp(float val, float mn, float mx)
   return (val >= mn) ? ((val <= mx) ? val : mx) : mn;
 }
 
-__global__ void CopyCharToImage(unsigned char *src, float *dst,
-                                unsigned int width, unsigned int height)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx * 2 >= width)
-  {
-    return;
-  }
-
-  for (int i = 0; i < height; ++i)
-  {
-    int y0 = __uint2float_rn(src[i * width * 2 + idx * 4 + 1]);
-    int y1 = __uint2float_rn(src[i * width * 2 + idx * 4 + 3]);
-
-    dst[i * width + idx * 2 + 0] = clamp(y0, 0.0f, 255.0f);
-    dst[i * width + idx * 2 + 1] = clamp(y1, 0.0f, 255.0f);
-  }
-}
-
 #define MAP_HOST_DEVICE_POINTER 1
 
 #define SHIFT_XAVIER 5
@@ -164,9 +145,7 @@ __global__ void bayer_to_rgb(uint16_t *in, uint16_t *out, const int imgw, const 
     r_color = (PIX(in, x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
     g_color = (INTERPOLATE_HV(in, x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
     b_color = (INTERPOLATE_X(in, x + r.x, y + r.y, imgw) >> SHIFT_RESULT);
-    //r_color = SATURATION_RED(r_color, g_color, b_color);
-    //g_color = SATURATION_GREEN(r_color, g_color, b_color);
-    //b_color = SATURATION_BLUE(r_color, g_color, b_color);
+
     r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) - OFFSET_RED) * GAIN_RED);
     g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) - OFFSET_GREEN) * GAIN_GREEN);
     b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) - OFFSET_BLUE) * GAIN_BLUE);
@@ -178,9 +157,7 @@ __global__ void bayer_to_rgb(uint16_t *in, uint16_t *out, const int imgw, const 
     r_color = (INTERPOLATE_H(in, x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
     g_color = (PIX(in, x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
     b_color = (INTERPOLATE_V(in, x + gr.x, y + gr.y, imgw) >> SHIFT_RESULT);
-    //r_color = SATURATION_RED(r_color, g_color, b_color);
-    //g_color = SATURATION_GREEN(r_color, g_color, b_color);
-    //b_color = SATURATION_BLUE(r_color, g_color, b_color);
+
     r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) - OFFSET_RED) * GAIN_RED);
     g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) - OFFSET_GREEN) * GAIN_GREEN);
     b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) - OFFSET_BLUE) * GAIN_BLUE);
@@ -192,9 +169,7 @@ __global__ void bayer_to_rgb(uint16_t *in, uint16_t *out, const int imgw, const 
     r_color = (INTERPOLATE_V(in, x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
     g_color = (PIX(in, x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
     b_color = (INTERPOLATE_H(in, x + gb.x, y + gb.y, imgw) >> SHIFT_RESULT);
-    //r_color = SATURATION_RED(r_color, g_color, b_color);
-    //g_color = SATURATION_GREEN(r_color, g_color, b_color);
-    //b_color = SATURATION_BLUE(r_color, g_color, b_color);
+
     r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) - OFFSET_RED) * GAIN_RED);
     g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) - OFFSET_GREEN) * GAIN_GREEN);
     b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) - OFFSET_BLUE) * GAIN_BLUE);
@@ -206,9 +181,7 @@ __global__ void bayer_to_rgb(uint16_t *in, uint16_t *out, const int imgw, const 
     r_color = (INTERPOLATE_X(in, x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
     g_color = (INTERPOLATE_HV(in, x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
     b_color = (PIX(in, x + b.x, y + b.y, imgw) >> SHIFT_RESULT);
-    //r_color = SATURATION_RED(r_color, g_color, b_color)	;
-    //g_color = SATURATION_GREEN(r_color, g_color, b_color);
-    //b_color = SATURATION_BLUE(r_color, g_color, b_color);
+
     r_color = ((r_color >> 1) < OFFSET_RED) ? 0 : (((r_color >> 1) - OFFSET_RED) * GAIN_RED);
     g_color = ((g_color >> 1) < OFFSET_GREEN) ? 0 : (((g_color >> 1) - OFFSET_GREEN) * GAIN_GREEN);
     b_color = ((b_color >> 1) < OFFSET_BLUE) ? 0 : (((b_color >> 1) - OFFSET_BLUE) * GAIN_BLUE);
@@ -480,258 +453,6 @@ __global__ void LowPassBlockCharYUYV(unsigned char *d_Image, float *d_Result, in
                                 k[0] * (xrows[(ly - 4) % N][tx] + xrows[(ly + 4) % N][tx]);
 }
 
-__global__ void sinewave_gen_kernel(Computation::Vertex2 *vertices, unsigned int width, unsigned int height, float time)
-{
-  unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-  unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
-  // calculate uv coordinates
-  float u = x / (float)width;
-  float v = x / (float)height;
-  u = u * 2.0f - 1.0f;
-  v = v * 2.0f - 1.0f;
-
-  if (y * width + x < 1920)
-  {
-    // write output vertex
-    vertices[y * width + x].pos[0] = u;
-    vertices[y * width + x].pos[1] = -1.0f;
-    vertices[y * width + x].pos[2] = 0.0f;
-    vertices[y * width + x].pos[3] = 1.0f;
-    vertices[y * width + x].color[0] = 1.0;
-    vertices[y * width + x].color[1] = 1.0;
-    vertices[y * width + x].color[2] = 1.0f;
-  }
-  else if (y * width + x < 3840)
-  {
-    // write output vertex
-    vertices[y * width + x].pos[0] = u;
-    vertices[y * width + x].pos[1] = 1.0f;
-    vertices[y * width + x].pos[2] = 0.0;
-    vertices[y * width + x].pos[3] = 1.0f;
-    vertices[y * width + x].color[0] = 1.0;
-    vertices[y * width + x].color[1] = 1.0;
-    vertices[y * width + x].color[2] = 1.0f;
-  }
-  else if (y * width + x < 4920)
-  {
-    // write output vertex
-    vertices[y * width + x].pos[0] = -1.0;
-    vertices[y * width + x].pos[1] = v;
-    vertices[y * width + x].pos[2] = 0.0;
-    vertices[y * width + x].pos[3] = 1.0f;
-    vertices[y * width + x].color[0] = 1.0;
-    vertices[y * width + x].color[1] = 1.0;
-    vertices[y * width + x].color[2] = 1.0f;
-  }
-  else if (y * width + x < 6000)
-  {
-    // write output vertex
-    if (y * width + x < 5760)
-    {
-      v = v - 2.0;
-    }
-    else
-    {
-      v = v + 1.557407;
-    }
-    vertices[y * width + x].pos[0] = 1.0;
-    vertices[y * width + x].pos[1] = v;
-    vertices[y * width + x].pos[2] = 0.0;
-    vertices[y * width + x].pos[3] = 1.0f;
-    vertices[y * width + x].color[0] = 1.0;
-    vertices[y * width + x].color[1] = 1.0;
-    vertices[y * width + x].color[2] = 1.0f;
-  }
-}
-
-__global__ void init_index_kernel(int *indexbuffer)
-{
-
-  unsigned int x = blockIdx.x * blockDim.x + threadIdx.x; // 0 <= x <= 159
-
-  if (x > GRIDSIZEX - 2)
-    return;
-  for (unsigned int y = 0; y < (GRIDSIZEY - 1); y++)
-  {
-    if ((x == 1918) && (y == 1078))
-      printf("x: %d, y: %d, Buffer: %d: Upper Triangle: %d %d %d; lower triangle: %d %d %d\n", x, y, (y * (GRIDSIZEX - 1) + x) * 6, y * GRIDSIZEX + x, y * GRIDSIZEX + x + 1, (y + 1) * GRIDSIZEX + x + 1, (y + 1) * GRIDSIZEX + x + 1, (y + 1) * GRIDSIZEX + x, y * GRIDSIZEX + x);
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 0] = y * GRIDSIZEX + x;
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 1] = y * GRIDSIZEX + x + 1;
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 2] = (y + 1) * GRIDSIZEX + x + 1;
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 3] = (y + 1) * GRIDSIZEX + x + 1;
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 4] = (y + 1) * GRIDSIZEX + x;
-    indexbuffer[(y * (GRIDSIZEX - 1) + x) * 6 + 5] = y * GRIDSIZEX + x;
-  }
-}
-
-__global__ void init_grid_kernel(Computation::Vertex2 *vertices)
-{
-
-  unsigned int x = blockIdx.x * blockDim.x + threadIdx.x; // 0 <= x <= 159
-  if (x > GRIDSIZEX - 1)
-    return;
-
-  float u = (float)x / (float)(GRIDSIZEX - 1);
-  float v = 0;
-  u = u * 2.0f - 1.0f;
-
-  for (unsigned int y = 0; y < GRIDSIZEY; y++)
-  {
-    v = y / (float)(GRIDSIZEY - 1);
-    v = v * 2.0f - 1.0f;
-    //printf("x=%d, u=%f, y=%d, v=%f, pos_in_vector: %d\n", x, u, y, v, y*GRIDSIZEX+x);
-    vertices[y * GRIDSIZEX + x].pos[0] = u;
-    vertices[y * GRIDSIZEX + x].pos[1] = v;
-    vertices[y * GRIDSIZEX + x].pos[2] = 0.0;
-    vertices[y * GRIDSIZEX + x].pos[3] = 1.0f;
-    vertices[y * GRIDSIZEX + x].color[0] = 1.0;
-    vertices[y * GRIDSIZEX + x].color[1] = 1.0;
-    vertices[y * GRIDSIZEX + x].color[2] = 1.0f;
-    vertices[y * GRIDSIZEX + x].texcoords[0] = u;
-    vertices[y * GRIDSIZEX + x].texcoords[0] = v;
-  }
-}
-
-__global__ void clear_heightmap_kernel(float *d_Result, bool *d_Pixelflags, unsigned int width, unsigned int height)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= width)
-    return;
-
-  for (int i = 0; i < height; ++i)
-  {
-    d_Pixelflags[i * width + idx] = false;
-    d_Result[i * width + idx] = 0.0f;
-  }
-}
-
-__global__ void draw_heightmap_kernel(float *d_Result, bool *d_Pixelflags, SiftPoint *d_Sift, unsigned int width, unsigned int height, int numPoints, int maxPoints)
-{
-  unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-  // Sift features
-  if (idx >= maxPoints)
-    return;
-
-  if ((idx <= numPoints) && (d_Sift[idx].score > 0.0f))
-  {
-    //if (20.0>(d_Sift[idx].ypos-d_Sift[idx].match_ypos)*(d_Sift[idx].ypos-d_Sift[idx].match_ypos)) return;
-    //if (d_Sift[idx].xpos<d_Sift[idx].match_xpos)  return;
-    int x = d_Sift[idx].xpos;
-    int y = d_Sift[idx].ypos;
-    d_Pixelflags[x + width * y] = true;
-    d_Result[x + width * y] = d_Sift[idx].match_error;
-  }
-  else
-  {
-    return;
-  }
-}
-
-__global__ void interpolate_heightmap_kernel(float *d_HeightMap, bool *d_Pixelflags, float *d_pixHeight, unsigned int width, unsigned int height)
-{
-
-  unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // 0 <= x <= 159
-  unsigned int idx_y = blockIdx.y * blockDim.y + threadIdx.y; // 0 <= x <= 159
-  if (idx_x > width - 1)
-    return;
-  if (idx_y > height - 1)
-    return;
-
-  int x = idx_x;
-  int y = idx_y;
-
-  int weights = 1;
-  float heights = 0.0f;
-
-  //float max_height = 0.0f;
-  for (int i = -30; i < 30; i++)
-  {
-    x = idx_x + i;
-    if (x < 0)
-      x = 0;
-    if (x > width - 1)
-      x = width - 1;
-    for (int j = -30; j < 30; j++)
-    {
-      y = idx_y + j;
-      if (y < 0)
-        y = 0;
-      if (y > height - 1)
-        y = height - 1;
-      if (d_Pixelflags[y * width + x])
-      {
-        heights += d_HeightMap[y * width + x];
-        if ((i == 0) && (j == 0))
-        {
-          weights += 1;
-        }
-        else if ((i > -2) && (i < 2) && (j > -2) && (j < 2))
-        {
-          weights += 1;
-        }
-        else if ((i > -4) && (i < 4) && (j > -4) && (j < 4))
-        {
-          weights += 1;
-        }
-        else
-        {
-          weights += 1;
-        }
-      }
-    }
-  }
-  d_pixHeight[(idx_y * width + idx_x)] = (heights) / (float)weights;
-}
-
-__global__ void GaussKernelBlock(float *res, float *src, int width, int height, int kernelSize)
-{
-  int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // image-pixel
-  int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  if (idx_x < (kernelSize - 1) / 2)
-    return;
-  if (idx_y < (kernelSize - 1) / 2)
-    return;
-  if (idx_x > width - 1 - (kernelSize - 1) / 2)
-    return;
-  if (idx_y > height - 1 - (kernelSize - 1) / 2)
-    return;
-
-  float result = 0.0f;
-  int x, y; // kernel-pixel
-  for (int i = -((kernelSize - 1) / 2); i <= (kernelSize - 1) / 2; i++)
-  {
-    x = i + (kernelSize - 1) / 2;
-    for (int j = -((kernelSize - 1) / 2); j <= (kernelSize - 1) / 2; j++)
-    {
-      y = j + (kernelSize - 1) / 2;
-      result += (src[idx_x + i + (idx_y + j) * width] * d_GaussKernel[y * kernelSize + x]);
-    }
-  }
-  // printf("result written on x = %d, y = %d", idx_x, idx_y);
-  res[idx_x + (idx_y)*width] = result;
-}
-
-__global__ void visualize_features_kernel(Computation::Vertex2 *vertices, float *d_Heights, float *d_RGB, unsigned int width, unsigned int height)
-{
-  unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // 0 <= x <= 159
-  unsigned int idx_y = blockIdx.y * blockDim.y + threadIdx.y; // 0 <= x <= 159
-  if (idx_x > GRIDSIZEX - 1)
-    return;
-  if (idx_y > GRIDSIZEY - 1)
-    return;
-
-  float r = d_RGB[idx_y * GRIDSIZEX * 3 + 3 * idx_x] / 255;
-  float g = d_RGB[idx_y * GRIDSIZEX * 3 + 3 * idx_x + 1] / 255;
-  float b = d_RGB[idx_y * GRIDSIZEX * 3 + 3 * idx_x + 2] / 255;
-  float h = d_Heights[idx_y * GRIDSIZEX + idx_x];
-
-  vertices[idx_y * GRIDSIZEX + (1919 - idx_x)].pos[2] = h / 50;
-  vertices[idx_y * GRIDSIZEX + (1919 - idx_x)].color[0] = r;
-  vertices[idx_y * GRIDSIZEX + (1919 - idx_x)].color[1] = g;
-  vertices[idx_y * GRIDSIZEX + (1919 - idx_x)].color[2] = b;
-}
 
 __global__ void gpuConvertYUYVtoRGBfloat_kernel(unsigned char *src, float *dst,
                                                 unsigned int width, unsigned int height)
@@ -916,7 +637,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
           v[0][0], v[1][0], v[2][0],
           v[0][1], v[1][1], v[2][1],
           v[0][2], v[1][2], v[2][2]);
-      
+
       mat4x4 u_t;
 
       for (j = 0; j < 4; ++j)
@@ -979,14 +700,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
       det = rot[0][0] * rot[1][1] * rot[2][2] + rot[1][0] * rot[2][1] * rot[0][2] +
             rot[2][0] * rot[0][1] * rot[1][2] - rot[2][0] * rot[1][1] * rot[0][2] -
             rot[1][0] * rot[0][1] * rot[2][2] - rot[0][0] * rot[2][1] * rot[1][2];
-      //if (idx0 == 0) {
-      //  // printf("all_features\n[");
-      //  // for (int idx = 0; idx < numPts; idx++) {
-      //  //   printf("[%f,%f,%f,%f,%f,%f,%f,%f,%f,%f],",ld_gbl_cg(&(point[idx].x_3d)),ld_gbl_cg(&(point[idx].y_3d)),ld_gbl_cg(&(point[idx].z_3d)),ld_gbl_cg(&(point[idx].match_x_3d)),ld_gbl_cg(&(point[idx].match_y_3d)),ld_gbl_cg(&(point[idx].match_z_3d)),ld_gbl_cg(&(point[idx].xpos)),ld_gbl_cg(&(point[idx].ypos)),ld_gbl_cg(&(point[idx].match_xpos)),ld_gbl_cg(&(point[idx].match_ypos)));
-      //  // }
-      //  //printf("]\nfind_rotation on these features:");
-      //  //printf("%d,%d,%d\n",idx0, idx1, idx2);
-      //}
+
       if ((det < 1.1f) && (det > 0.9f) && (rot[0][0] > 0.6) && (rot[1][1] > 0.6) && (rot[2][2] > 0.6))
       {
         float ssd_local;
@@ -1002,13 +716,13 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
             temp_vec_old[1] = ld_gbl_cg(&(point[idx].match_y_3d)); // - centroids.match_y_3d;
             temp_vec_old[2] = ld_gbl_cg(&(point[idx].match_z_3d)); // - centroids.match_z_3d;
             temp_vec_old[3] = 1.0;
-            temp_vec_new[0] = ld_gbl_cg(&(point[idx].x_3d));       // - centroids.x_3d;
-            temp_vec_new[1] = ld_gbl_cg(&(point[idx].y_3d));       // - centroids.y_3d;
-            temp_vec_new[2] = ld_gbl_cg(&(point[idx].z_3d));       // - centroids.z_3d;
+            temp_vec_new[0] = ld_gbl_cg(&(point[idx].x_3d)); // - centroids.x_3d;
+            temp_vec_new[1] = ld_gbl_cg(&(point[idx].y_3d)); // - centroids.y_3d;
+            temp_vec_new[2] = ld_gbl_cg(&(point[idx].z_3d)); // - centroids.z_3d;
             temp_vec_new[3] = 1.0;
 
             vec4 temp_vec_old_rot;
-            //printf("i= %d temp vec 2: %f\n",idx,temp_vec_old[2]);
+            
             for (j = 0; j < 4; ++j)
             {
               temp_vec_old_rot[j] = t[j];
@@ -1024,7 +738,7 @@ __global__ void gpuFindRotationTranslation_step0(SiftPoint *point, float *tempMe
               inliners_metric += ssd_local;
               num_inliners++;
               index_list[idx0 * 512 + idx] = true;
-            } 
+            }
           }
         }
 
@@ -1084,9 +798,8 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
       {
         min_metric_0 = tmp_metric;
         min_idx = i;
-
       }
-    }    
+    }
   }
   for (int i = 0; i < numPts; i++)
   {
@@ -1098,9 +811,8 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
       {
         min_metric_1 = tmp_metric;
         min_idx1 = i;
-
       }
-    }    
+    }
   }
   for (int i = 0; i < numPts; i++)
   {
@@ -1112,20 +824,21 @@ __global__ void gpuFindRotationTranslation_step1(SiftPoint *point, float *tempMe
       {
         min_metric_2 = tmp_metric;
         min_idx2 = i;
-
       }
-    }    
+    }
   }
   inliners0 = tempMemory[6 + min_idx * 15 + 12];
   inliners1 = tempMemory[6 + min_idx1 * 15 + 12];
   inliners2 = tempMemory[6 + min_idx2 * 15 + 12];
 
-  if ((inliners1 > inliners0)&&(inliners1 > inliners2)) {
+  if ((inliners1 > inliners0) && (inliners1 > inliners2))
+  {
     min_idx = min_idx1;
-  } 
-  if ((inliners2 > inliners0)&&(inliners2 > inliners1)) {
+  }
+  if ((inliners2 > inliners0) && (inliners2 > inliners1))
+  {
     min_idx = min_idx2;
-    };
+  };
 
   tempMemory[0] = (float)min_idx;
   tempMemory[1] = (float)max_idx;
@@ -1142,7 +855,6 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   int num_inliners;
   int i, j;
   int k, r, c;
-  // printf("------ BEST TRIO!!!!: %d, %d, %d\n",(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 9]))),(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 10]))),(int)(ld_gbl_cg(&(tempMemory[6 + idx0 * 15 + 11]))));
   for (i = 0; i < 4; ++i)
   {
     for (j = 0; j < 4; ++j)
@@ -1158,12 +870,12 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   centroids.match_y_3d = 0.0f;
   centroids.match_z_3d = 0.0f;
   num_inliners = 0;
-  // printf("min idx = %d, i: ",idx0);
+  
   for (int i = 0; i < numPts; i++)
   {
     if (index_list[idx0 * 512 + i] == true)
     {
-      // printf(" %d,",i);
+      
       centroids.x_3d += (point[i].x_3d);
       centroids.y_3d += (point[i].y_3d);
       centroids.z_3d += (point[i].z_3d);
@@ -1173,21 +885,18 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
       num_inliners++;
     }
   }
-  // printf("\n");
+  
   centroids.x_3d /= num_inliners;
   centroids.y_3d /= num_inliners;
   centroids.z_3d /= num_inliners;
   centroids.match_x_3d /= num_inliners;
   centroids.match_y_3d /= num_inliners;
   centroids.match_z_3d /= num_inliners;
-  int number_matches = 0;
-  // printf("Using these matches: \n[");
+  
   for (int i = 0; i < numPts; i++)
   {
     if (index_list[idx0 * 512 + i] == true)
     {
-      // printf("%d,",i);
-      number_matches++;
       h[0][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_x_3d - centroids.match_x_3d);
       h[1][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_y_3d - centroids.match_y_3d);
       h[2][0] += (point[i].x_3d - centroids.x_3d) * (point[i].match_z_3d - centroids.match_z_3d);
@@ -1197,16 +906,10 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
       h[0][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_x_3d - centroids.match_x_3d);
       h[1][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_y_3d - centroids.match_y_3d);
       h[2][2] += (point[i].z_3d - centroids.z_3d) * (point[i].match_z_3d - centroids.match_z_3d);
-      // printf("idx0: %d index %d: distance: %f \n",idx0,i,sqrt((point[i].x_3d-point[i].match_x_3d)*(point[i].x_3d-point[i].match_x_3d)+
-      //                                           (point[i].y_3d-point[i].match_y_3d)*(point[i].y_3d-point[i].match_y_3d)+
-      //                                           (point[i].z_3d-point[i].match_z_3d)*(point[i].z_3d-point[i].match_z_3d)));
+
       point[i].draw = true;
-    } else {
-        // point[i].draw = false;
-      }
+    }
   }
-  // printf("]\n");
-  // printf("%d;",number_matches);
   mat4x4 u;
   mat4x4 s;
   mat4x4 s_det;
@@ -1273,7 +976,6 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
     for (i = 0; i < 4; ++i)
       rp_dash[j] += rot[i][j] * p_dash[i];
   }
-  // printf("Centroid diff before rematch: %f, %f, %f\n", centroids.x_3d-centroids.match_x_3d, centroids.y_3d- centroids.match_y_3d, centroids.z_3d-centroids.match_z_3d);
   t[0] = isnan(centroids.x_3d - rp_dash[0]) ? 0.0 : centroids.x_3d - rp_dash[0];
   t[1] = isnan(centroids.y_3d - rp_dash[1]) ? 0.0 : centroids.y_3d - rp_dash[1];
   t[2] = isnan(centroids.z_3d - rp_dash[2]) ? 0.0 : centroids.z_3d - rp_dash[2];
@@ -1290,10 +992,7 @@ __global__ void gpuFindRotationTranslation_step2(SiftPoint *point, float *tempMe
   *translation[0] = t[0];
   *translation[1] = t[1];
   *translation[2] = t[2];
-  // printf("rot after\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f\n%f,%f,%f| tx=%f, num_inliers = %d \n",
-  //        rot[0][0], rot[1][0], rot[2][0], t[0],                // matrix 1st row
-  //        rot[0][1], rot[1][1], rot[2][1], t[1],                // matrix 2nd row
-  //        rot[0][2], rot[1][2], rot[2][2], t[2], num_inliners); // matrix 3rd row)
+
 }
 
 #define EXP_LAMBDA 2.0f
@@ -1317,7 +1016,6 @@ __global__ void gpuRansac2d(SiftPoint *point, SiftPoint *point_old, float *tempM
         est_ypos = point[i].ypos - dy;
         temp_distance = sqrt((point[i].match_xpos - est_xpos) * (point[i].match_xpos - est_xpos) + (point[i].match_ypos - est_ypos) * (point[i].match_ypos - est_ypos));
         temp_metric = exp((-1.0 * temp_distance) / (EXP_LAMBDA));
-        // if (idx0 == 0) printf("Idx0: 0 to i: %d, metric: %f\n", i, temp_metric);
         if (temp_metric >= 0.80)
           index_list[512 * idx0 + i] = true;
         else
@@ -1367,7 +1065,7 @@ __global__ void gpuRansac2d(SiftPoint *point, SiftPoint *point_old, float *tempM
     }
     total_dx /= inliers_cnt;
     total_dy /= inliers_cnt;
-    // printf("Index %d says hi! total inliers: %d of %d, dx: %f, dy%f\n", idx0, inliers_cnt, numPts, total_dx, total_dy);
+
     tempMemory[513] = total_dx;
     tempMemory[514] = total_dy;
     *ransac_dx = total_dx;
@@ -1418,12 +1116,6 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
     for (i = 0; i < 4; ++i)
       rot_trans[i][j] = *(rotation[j][i]);
   rot_trans[3][3] = 1.0;
-  // if (idx == 0)
-  //   printf("Rot trans:\n %f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
-  //          rot_trans[0][0], rot_trans[0][1], rot_trans[0][2], rot_trans[0][3],
-  //          rot_trans[1][0], rot_trans[1][1], rot_trans[1][2], rot_trans[1][3],
-  //          rot_trans[2][0], rot_trans[2][1], rot_trans[2][2], rot_trans[2][3],
-  //          rot_trans[3][0], rot_trans[3][1], rot_trans[3][2], rot_trans[3][3]);
 
   for (j = 0; j < 4; ++j)
   {
@@ -1440,8 +1132,8 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
   float distance;
   float distance_min;
   distance_min = 100000;
-  int idx_min = numPts_old+1;
-  
+  int idx_min = numPts_old + 1;
+
   for (i = 0; i < numPts_old; i++)
   {
     d_x = point_old[i].x_3d - coords_est[0];
@@ -1454,43 +1146,27 @@ __global__ void gpuRematchSiftPoints(SiftPoint *point_new, SiftPoint *point_old,
       idx_min = i;
     }
   }
-  // printf("idx: %d min distance to matching point: %f\n", idx, distance_min);
-  
-  if ((distance_min < MIN_THRESH_RANSAC)&&(idx_min < numPts_old)) {
-    
-     point_new[idx].ransac_match = idx_min;
-     float ransac_xpos = point_old[idx_min].xpos;
-     float ransac_ypos = point_old[idx_min].ypos;
-     float ransac_x_3d = point_old[idx_min].x_3d;
-     float ransac_y_3d = point_old[idx_min].y_3d;
-     float ransac_z_3d = point_old[idx_min].z_3d;
-  //   point_new[idx].match_distance = point_old[idx_min].distance;
-     point_new[idx].ransac_xpos_3d = ransac_xpos; // point_old[idx_min].xpos;
-     point_new[idx].ransac_ypos_3d = ransac_ypos;
-     point_new[idx].ransac_x_3d = ransac_x_3d;
-     point_new[idx].ransac_y_3d = ransac_y_3d;
-     point_new[idx].ransac_z_3d = ransac_z_3d;
-     point_new[idx].draw = true;
-  } else {
-     point_new[idx].draw = false;
-  }
-  
-  // point_new[idx].match_distance = coords_est[0];
-  // float x_div = coords_est[1] / coords_est[0];
-  // float x_tan = atan(x_div);
-  // point_new[idx].ransac_xpos_3d = (-128 * (x_tan - (WIDTH_ANGLE))) / (WIDTH_ANGLE);
-  // float y_div = coords_est[2] / coords_est[0];
-  // float y_tan = atan(y_div);
-  // point_new[idx].ransac_ypos_3d = (-102.5 * (y_tan - (HEIGHT_ANGLE))) / (HEIGHT_ANGLE);
-  // point_new[idx].draw = true;
 
-  // if (idx == 0)
-  // {
-  //   printf("orig point: %f, %f, %f ; estimated point: %f, %f, %f, x_div=%f, x_tan = %f\n",
-  //          point_new[idx].x_3d, point_new[idx].y_3d, point_new[idx].z_3d, point_new[idx].match_x_3d, point_new[idx].match_y_3d, point_new[idx].match_z_3d, x_div, x_tan);
-  //   printf("orig img: %f, %f, %f ; estimated img: %f, %f, %f\n",
-  //          point_new[idx].xpos, point_new[idx].ypos, point_new[idx].distance, point_new[idx].match_xpos, point_new[idx].match_ypos, point_new[idx].match_distance);
-  // }
+  if ((distance_min < MIN_THRESH_RANSAC) && (idx_min < numPts_old))
+  {
+
+    point_new[idx].ransac_match = idx_min;
+    float ransac_xpos = point_old[idx_min].xpos;
+    float ransac_ypos = point_old[idx_min].ypos;
+    float ransac_x_3d = point_old[idx_min].x_3d;
+    float ransac_y_3d = point_old[idx_min].y_3d;
+    float ransac_z_3d = point_old[idx_min].z_3d;
+    point_new[idx].ransac_xpos_3d = ransac_xpos; // point_old[idx_min].xpos;
+    point_new[idx].ransac_ypos_3d = ransac_ypos;
+    point_new[idx].ransac_x_3d = ransac_x_3d;
+    point_new[idx].ransac_y_3d = ransac_y_3d;
+    point_new[idx].ransac_z_3d = ransac_z_3d;
+    point_new[idx].draw = true;
+  }
+  else
+  {
+    point_new[idx].draw = false;
+  }
 }
 
 __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempMemory, mat4x4 *rotation, vec4 *translation, int numPts)
@@ -1500,161 +1176,149 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
   mat4x4 h;
   vec4 cent_old;
   vec4 cent_new;
-  int number_matches = 0;
-  // printf("RANSAC Features\n");
-  // printf("[");
-  for (int i = 0; i < numPts; i++) {
-    if (point[i].draw == true) {
-      number_matches++;
-      // printf("[%d,%d,%f,%f,%f,%f,%f],", i, (int)point[i].ransac_match, point[i].ransac_x_3d, point[i].ransac_y_3d,point[i].ransac_z_3d,point[i].ransac_xpos_3d,point[i].ransac_ypos_3d);
+
+  int idx;
+  for (idx = 0; idx < 6; idx++)
+  {
+    int divisor = 0;
+    if (idx == 0)
+      cent_new[0] = 0.f;
+    if (idx == 1)
+      cent_new[1] = 0.f;
+    if (idx == 2)
+      cent_new[2] = 0.f;
+    if (idx == 3)
+      cent_old[0] = 0.f;
+    if (idx == 4)
+      cent_old[1] = 0.f;
+    if (idx == 5)
+      cent_old[2] = 0.f;
+    for (int i = 0; i < numPts; i++)
+    {
+      if (point[i].draw == true)
+      {
+        divisor++;
+
+        if (idx == 0)
+          cent_new[0] += point[i].x_3d;
+        if (idx == 1)
+          cent_new[1] += point[i].y_3d;
+        if (idx == 2)
+          cent_new[2] += point[i].z_3d;
+        if (idx == 3)
+          cent_old[0] += point[i].ransac_x_3d;
+        if (idx == 4)
+          cent_old[1] += point[i].ransac_y_3d;
+        if (idx == 5)
+          cent_old[2] += point[i].ransac_z_3d;
+      }
+    }
+    if (divisor == 0)
+    {
+      return;
+    }
+    if (idx == 0)
+      cent_new[0] /= divisor;
+    if (idx == 1)
+      cent_new[1] /= divisor;
+    if (idx == 2)
+      cent_new[2] /= divisor;
+    if (idx == 3)
+      cent_old[0] /= divisor;
+    if (idx == 4)
+      cent_old[1] /= divisor;
+    if (idx == 5)
+      cent_old[2] /= divisor;
+  }
+
+  for (idx = 0; idx < 9; idx++)
+  {
+    h[0][0] = 0.f;
+    h[1][0] = 0.f;
+    h[2][0] = 0.f;
+    h[0][1] = 0.f;
+    h[1][1] = 0.f;
+    h[2][1] = 0.f;
+    h[0][2] = 0.f;
+    h[1][2] = 0.f;
+    h[2][2] = 0.f;
+    for (int i = 0; i < numPts; i++)
+    {
+      if (point[i].draw == true)
+      {
+        h[0][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_x_3d - cent_old[0]);
+        h[1][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_y_3d - cent_old[1]);
+        h[2][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_z_3d - cent_old[2]);
+        h[0][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_x_3d - cent_old[0]);
+        h[1][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_y_3d - cent_old[1]);
+        h[2][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_z_3d - cent_old[2]);
+        h[0][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_x_3d - cent_old[0]);
+        h[1][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_y_3d - cent_old[1]);
+        h[2][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_z_3d - cent_old[2]);
+      }
     }
   }
-  // printf("]\n");
-  // printf("========================\n");
-  // printf("%d;",number_matches);
-  
-    int idx;
-    for (idx = 0; idx < 6; idx++)
-    {
-      int divisor = 0;
-      if (idx == 0)
-        cent_new[0] = 0.f;
-      if (idx == 1)
-        cent_new[1] = 0.f;
-      if (idx == 2)
-        cent_new[2] = 0.f;
-      if (idx == 3)
-        cent_old[0] = 0.f;
-      if (idx == 4)
-        cent_old[1] = 0.f;
-      if (idx == 5)
-        cent_old[2] = 0.f;
-      for (int i = 0; i < numPts; i++)
-      {
-        if (point[i].draw == true)
-        {
-          divisor++;
-          
-          if (idx == 0)
-            cent_new[0] += point[i].x_3d;
-          if (idx == 1)
-            cent_new[1] += point[i].y_3d;
-          if (idx == 2)
-            cent_new[2] += point[i].z_3d;
-          if (idx == 3)
-            cent_old[0] += point[i].ransac_x_3d;
-          if (idx == 4)
-            cent_old[1] += point[i].ransac_y_3d;
-          if (idx == 5)
-            cent_old[2] += point[i].ransac_z_3d;
-        }
-      }
-      if (divisor == 0) {
-        return;
-      }
-      if (idx == 0)
-        cent_new[0] /= divisor;
-      if (idx == 1)
-        cent_new[1] /= divisor;
-      if (idx == 2)
-        cent_new[2] /= divisor;
-      if (idx == 3)
-        cent_old[0] /= divisor;
-      if (idx == 4)
-        cent_old[1] /= divisor;
-      if (idx == 5)
-        cent_old[2] /= divisor;
-    }
-      
-    // printf("Centroid diff after rematch: %f, %f, %f\n", cent_new[0]-cent_old[0], cent_new[1]-cent_old[1], cent_new[2]-cent_old[2]);
-    for (idx = 0; idx < 9; idx++)
-    {
-        h[0][0] = 0.f;
-        h[1][0] = 0.f;
-        h[2][0] = 0.f;
-        h[0][1] = 0.f;
-        h[1][1] = 0.f;
-        h[2][1] = 0.f;
-        h[0][2] = 0.f;
-        h[1][2] = 0.f;
-        h[2][2] = 0.f;
-      for (int i = 0; i < numPts; i++)
-      {
-        if (point[i].draw == true)
-        {
-            h[0][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_x_3d - cent_old[0]);
-            h[1][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_y_3d - cent_old[1]);
-            h[2][0] += (point[i].x_3d - cent_new[0]) * (point[i].ransac_z_3d - cent_old[2]);
-            h[0][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_x_3d - cent_old[0]);
-            h[1][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_y_3d - cent_old[1]);
-            h[2][1] += (point[i].y_3d - cent_new[1]) * (point[i].ransac_z_3d - cent_old[2]);
-            h[0][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_x_3d - cent_old[0]);
-            h[1][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_y_3d - cent_old[1]);
-            h[2][2] += (point[i].z_3d - cent_new[2]) * (point[i].ransac_z_3d - cent_old[2]);
-        }
-      }
-    }
-    int i, j, k, r, c;
-    mat4x4 u;
-    mat4x4 s;
-    mat4x4 s_det;
-    mat4x4 v;
-    for (i = 0; i < 4; ++i)
-      for (j = 0; j < 4; ++j)
-      {
-        u[i][j] = i == j ? 1.f : 0.f;
-        s[i][j] = i == j ? 1.f : 0.f;
-        s_det[i][j] = i == j ? 1.f : 0.f;
-        v[i][j] = i == j ? 1.f : 0.f;
-      }
-
-    svd(h[0][0], h[1][0], h[2][0],
-        h[0][1], h[1][1], h[2][1],
-        h[0][2], h[1][2], h[2][2],
-        u[0][0], u[1][0], u[2][0],
-        u[0][1], u[1][1], u[2][1],
-        u[0][2], u[1][2], u[2][2],
-        s[0][0], s[1][1], s[2][2],
-        v[0][0], v[1][0], v[2][0],
-        v[0][1], v[1][1], v[2][1],
-        v[0][2], v[1][2], v[2][2]);
-    mat4x4 u_t;
+  int i, j, k, r, c;
+  mat4x4 u;
+  mat4x4 s;
+  mat4x4 s_det;
+  mat4x4 v;
+  for (i = 0; i < 4; ++i)
     for (j = 0; j < 4; ++j)
-      for (i = 0; i < 4; ++i)
-        u_t[i][j] = u[j][i];
-    mat4x4 vu_t;
-    for (c = 0; c < 4; ++c)
-      for (r = 0; r < 4; ++r)
-      {
-        vu_t[c][r] = 0.f;
-        for (k = 0; k < 4; ++k)
-          vu_t[c][r] += v[k][r] * u_t[c][k];
-      }
+    {
+      u[i][j] = i == j ? 1.f : 0.f;
+      s[i][j] = i == j ? 1.f : 0.f;
+      s_det[i][j] = i == j ? 1.f : 0.f;
+      v[i][j] = i == j ? 1.f : 0.f;
+    }
+
+  svd(h[0][0], h[1][0], h[2][0],
+      h[0][1], h[1][1], h[2][1],
+      h[0][2], h[1][2], h[2][2],
+      u[0][0], u[1][0], u[2][0],
+      u[0][1], u[1][1], u[2][1],
+      u[0][2], u[1][2], u[2][2],
+      s[0][0], s[1][1], s[2][2],
+      v[0][0], v[1][0], v[2][0],
+      v[0][1], v[1][1], v[2][1],
+      v[0][2], v[1][2], v[2][2]);
+  mat4x4 u_t;
+  for (j = 0; j < 4; ++j)
+    for (i = 0; i < 4; ++i)
+      u_t[i][j] = u[j][i];
+  mat4x4 vu_t;
+  for (c = 0; c < 4; ++c)
+    for (r = 0; r < 4; ++r)
+    {
+      vu_t[c][r] = 0.f;
+      for (k = 0; k < 4; ++k)
+        vu_t[c][r] += v[k][r] * u_t[c][k];
+    }
 
   float det = vu_t[0][0] * vu_t[1][1] * vu_t[2][2] + vu_t[1][0] * vu_t[2][1] * vu_t[0][2] +
               vu_t[2][0] * vu_t[0][1] * vu_t[1][2] - vu_t[2][0] * vu_t[1][1] * vu_t[0][2] -
               vu_t[1][0] * vu_t[0][1] * vu_t[2][2] - vu_t[0][0] * vu_t[2][1] * vu_t[1][2];
-    s_det[2][2] = det;
-    mat4x4 vs_det;
-    for (c = 0; c < 4; ++c)
-      for (r = 0; r < 4; ++r)
-      {
-        vs_det[c][r] = 0.f;
-        for (k = 0; k < 4; ++k)
-          vs_det[c][r] += v[k][r] * s_det[c][k];
-      }
-    mat4x4 rot_t;
-    for (c = 0; c < 4; ++c)
-      for (r = 0; r < 4; ++r)
-      {
-        rot_t[c][r] = 0.f;
-        for (k = 0; k < 4; ++k)
-          rot_t[c][r] += vs_det[k][r] * u_t[c][k];
-      }
+  s_det[2][2] = det;
+  mat4x4 vs_det;
+  for (c = 0; c < 4; ++c)
+    for (r = 0; r < 4; ++r)
+    {
+      vs_det[c][r] = 0.f;
+      for (k = 0; k < 4; ++k)
+        vs_det[c][r] += v[k][r] * s_det[c][k];
+    }
+  mat4x4 rot_t;
+  for (c = 0; c < 4; ++c)
+    for (r = 0; r < 4; ++r)
+    {
+      rot_t[c][r] = 0.f;
+      for (k = 0; k < 4; ++k)
+        rot_t[c][r] += vs_det[k][r] * u_t[c][k];
+    }
 
-    for (j = 0; j < 4; ++j)
-      for (i = 0; i < 4; ++i)
-        rot[i][j] = rot_t[j][i];
+  for (j = 0; j < 4; ++j)
+    for (i = 0; i < 4; ++i)
+      rot[i][j] = rot_t[j][i];
   vec4 p_dash = {cent_old[0], cent_old[1], cent_old[2], 1.0};
   vec4 rp_dash;
   for (j = 0; j < 4; ++j)
@@ -1663,54 +1327,36 @@ __global__ void gpuFindOptimalRotationTranslation(SiftPoint *point, float *tempM
     for (i = 0; i < 4; ++i)
       rp_dash[j] += rot[i][j] * p_dash[i];
   }
-  
+
   if (idx0 == 0)
   {
-    //printf("centroids\n%f,%f,%f\n%f,%f,%f\n",
-    //       cent_new[0], cent_new[1], cent_new[2],  // matrix 1st row
-    //       cent_old[0], cent_old[1], cent_old[2]); // matrix 3rd row)
-    //
-    //printf("h\n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
-    //       h[0][0], h[1][0], h[2][0],  // matrix 1st row
-    //       h[0][1], h[1][1], h[2][1],  // matrix 2nd row
-    //       h[0][2], h[1][2], h[2][2]); // matrix 3rd row)
-    // printf("rot\n%f,%f,%f\n%f,%f,%f\n%f,%f,%f\n",
-    //        rot[0][0], rot[1][0], rot[2][0],  // matrix 1st row
-    //        rot[0][1], rot[1][1], rot[2][1],  // matrix 2nd row
-    //        rot[0][2], rot[1][2], rot[2][2]); // matrix 3rd row)
-  // t[0] = isnan(centroids.x_3d - rp_dash[0]) ? 0.0 : centroids.x_3d - rp_dash[0];
-  // t[1] = isnan(centroids.y_3d - rp_dash[1]) ? 0.0 : centroids.y_3d - rp_dash[1];
-  // t[2] = isnan(centroids.z_3d - rp_dash[2]) ? 0.0 : centroids.z_3d - rp_dash[2];
-  // t[3] = 1.0;
-  *rotation[0][0] = isnan(rot[0][0]) ? 1.0 : rot[0][0];
-  *rotation[0][1] = isnan(rot[0][1]) ? 0.0 : rot[0][1];
-  *rotation[0][2] = isnan(rot[0][2]) ? 0.0 : rot[0][2];
-  *rotation[1][0] = isnan(rot[1][0]) ? 0.0 : rot[1][0];
-  *rotation[1][1] = isnan(rot[1][1]) ? 1.0 : rot[1][1];
-  *rotation[1][2] = isnan(rot[1][2]) ? 0.0 : rot[1][2];
-  *rotation[2][0] = isnan(rot[2][0]) ? 0.0 : rot[2][0];
-  *rotation[2][1] = isnan(rot[2][1]) ? 0.0 : rot[2][1];
-  *rotation[2][2] = isnan(rot[2][2]) ? 1.0 : rot[2][2];
-  *translation[0] = isnan(cent_new[0] - rp_dash[0]) ? 0.0 : cent_new[0] - rp_dash[0];
-  *translation[1] = isnan(cent_new[1] - rp_dash[1]) ? 0.0 : cent_new[1] - rp_dash[1];
-  *translation[2] = isnan(cent_new[2] - rp_dash[2]) ? 0.0 : cent_new[2] - rp_dash[2];
-  *translation[3] = 1.0;
+
+    *rotation[0][0] = isnan(rot[0][0]) ? 1.0 : rot[0][0];
+    *rotation[0][1] = isnan(rot[0][1]) ? 0.0 : rot[0][1];
+    *rotation[0][2] = isnan(rot[0][2]) ? 0.0 : rot[0][2];
+    *rotation[1][0] = isnan(rot[1][0]) ? 0.0 : rot[1][0];
+    *rotation[1][1] = isnan(rot[1][1]) ? 1.0 : rot[1][1];
+    *rotation[1][2] = isnan(rot[1][2]) ? 0.0 : rot[1][2];
+    *rotation[2][0] = isnan(rot[2][0]) ? 0.0 : rot[2][0];
+    *rotation[2][1] = isnan(rot[2][1]) ? 0.0 : rot[2][1];
+    *rotation[2][2] = isnan(rot[2][2]) ? 1.0 : rot[2][2];
+    *translation[0] = isnan(cent_new[0] - rp_dash[0]) ? 0.0 : cent_new[0] - rp_dash[0];
+    *translation[1] = isnan(cent_new[1] - rp_dash[1]) ? 0.0 : cent_new[1] - rp_dash[1];
+    *translation[2] = isnan(cent_new[2] - rp_dash[2]) ? 0.0 : cent_new[2] - rp_dash[2];
+    *translation[3] = 1.0;
   }
 }
 
 __global__ void gpuUndistort(float *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  // printf("hoi\n");
   if (idx >= width_dst)
   {
     return;
   }
-  //int x = 50;
-  //int y = 50;
+
   for (int i = 0; i < height_dst; ++i)
   {
-    // Calculate new coordinates
     dst[i * width_dst + idx + 0] = src[yCoords[i * 265 + idx] * width_src + xCoords[i * 265 + idx] + 0];
   }
 }
@@ -1718,7 +1364,6 @@ __global__ void gpuUndistort(float *dst, uint16_t *src, uint16_t *xCoords, uint1
 __global__ void gpuUndistortCosAlpha(float *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst, float *cosAlpha)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  // printf("hoi\n");
   if (idx >= width_dst)
   {
     return;
@@ -1726,19 +1371,13 @@ __global__ void gpuUndistortCosAlpha(float *dst, uint16_t *src, uint16_t *xCoord
 
   for (int i = 0; i < height_dst; ++i)
   {
-    // Calculate new coordinates
     dst[i * width_dst + idx] = (float)(cosAlpha[i * 265 + idx] * src[yCoords[i * 265 + idx] * width_src + xCoords[i * 265 + idx]]);
   }
-  // if (idx == 128)
-  // {
-  //   printf("Distance: %f\n", dst[100 * width_dst + 128]);
-  // }
 }
 
 __global__ void gpuUndistort_uint16(uint16_t *dst, uint16_t *src, uint16_t *xCoords, uint16_t *yCoords, int width_src, int height_src, int width_dst, int height_dst)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  // printf("hoi\n");
   if (idx >= width_dst)
   {
     return;
@@ -1746,8 +1385,6 @@ __global__ void gpuUndistort_uint16(uint16_t *dst, uint16_t *src, uint16_t *xCoo
 
   for (int i = 0; i < height_dst; ++i)
   {
-    // Calculate new coordinates
-    // dst[i*width_dst*4+idx+0] = 255; // src[i*width_dst*4+idx+0];
     dst[i * width_dst * 4 + idx * 4] = src[yCoords[i * width_dst + idx] * width_src * 4 + xCoords[i * width_dst + idx] * 4 + 0];
     dst[i * width_dst * 4 + idx * 4 + 1] = src[yCoords[i * width_dst + idx] * width_src * 4 + xCoords[i * width_dst + idx] * 4 + 1];
     dst[i * width_dst * 4 + idx * 4 + 2] = src[yCoords[i * width_dst + idx] * width_src * 4 + xCoords[i * width_dst + idx] * 4 + 2];
@@ -1768,102 +1405,81 @@ __global__ void gpuNormalizeToInt16(uint16_t *dst, float *src, const int width, 
   }
 }
 
-__global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, int nPoints, const int width, const int height)
+__global__ void gpuDrawSiftData(uint16_t *dst, float *src, SiftPoint *d_sift, int nPoints, const int width, const int height, KMeansCluster *kMeansClusters, int numClusters)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < width)
   {
-    // if (idx == width/2) printf("Pixels: ");
     for (int i = 0; i < height; ++i)
     {
-
-      // if (idx == width/2) printf("%d ",(uint16_t)(src[i * width + idx] * 255));
       dst[i * width * 4 + idx * 4 + 0] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 1] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 2] = (uint16_t)(src[i * width + idx] * 255);
       dst[i * width * 4 + idx * 4 + 3] = 255 * 255;
     }
-    // if (idx == width/2) printf("\n");
   }
   if (nPoints <= 0)
     return;
   __syncthreads();
-#define FILTER_ZONE 500
-  // if (idx == 0)
-  // { 
-  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 0] = 255 * 255;
-  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 1] = 0;
-  //   dst[((int)((int)(128))) * width * 4 + ((int)(128)) * 4 + 2] = 0;
-  // }
-  if (idx < nPoints)
-  {
-    // if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
-    //     (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos)) < height) &&
-    //     (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos)) < width))
-    // {
-    //   if (d_sift[idx].ypos < d_sift[idx].ransac_ypos)
-    //   {
-    //     for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos - 1; i++)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos; i--)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 255 * 255;
-    //   }
-    //   if (d_sift[idx].xpos < d_sift[idx].ransac_xpos)
-    //   {
-    //     for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos - 1; i++)
-    //       dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos; i--)
-    //       dst[((int)(d_sift[idx].ransac_ypos)) * width * 4 + ((int)(i)) * 4 + 0] = 255 * 255;
-    //   }
-    // }
 
-    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
-    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = 0;
-    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 2] = 0;
-    // if ((d_sift[idx].score > MIN_SCORE) && (d_sift[idx].draw == true) &&
-    // (((int)(d_sift[idx].ypos)) < height) && (((int)(d_sift[idx].ransac_ypos_3d)) < height) &&
-    // (((int)(d_sift[idx].xpos)) < width) && (((int)(d_sift[idx].ransac_xpos_3d)) < width))
-    // {
-// 
-    //   
-    //   if (d_sift[idx].ypos < d_sift[idx].ransac_ypos_3d)
-    //   {
-    //     for (int i = d_sift[idx].ypos; i < d_sift[idx].ransac_ypos_3d - 1; i++)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].ypos - 1; i > d_sift[idx].ransac_ypos_3d; i--)
-    //       dst[((int)(i)) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = 255 * 255;
-    //   }
-    //   if (d_sift[idx].xpos < d_sift[idx].ransac_xpos_3d)
-    //   {
-    //     for (int i = d_sift[idx].xpos; i < d_sift[idx].ransac_xpos_3d - 1; i++)
-    //       dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
-    //   }
-    //   else
-    //   {
-    //     for (int i = d_sift[idx].xpos - 1; i > d_sift[idx].ransac_xpos_3d; i--)
-    //       dst[((int)(d_sift[idx].ransac_ypos_3d)) * width * 4 + ((int)(i)) * 4 + 1] = 255 * 255;
-    //   }
-    //   //printf("New;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].xpos, d_sift[idx].ypos, d_sift[idx].distance, d_sift[idx].x_3d, d_sift[idx].y_3d, d_sift[idx].z_3d);
-    //   //printf("Old;%d;%f;%f;%f;%d;%d;%d\n", idx, d_sift[idx].match_xpos, d_sift[idx].match_ypos, d_sift[idx].match_distance, d_sift[idx].match_x_3d, d_sift[idx].match_y_3d, d_sift[idx].match_z_3d);
-// 
-    //   //else {
-    //   //  //printf("Filtered - score = %f, scale= %f, sharpness= %f, ambiguity= %f, edgeness= %f\n",d_sift[idx].score, d_sift[idx].scale, d_sift[idx].sharpness, d_sift[idx].ambiguity, d_sift[idx].edgeness);
-    //   //}
-    // }
-  }
-  __syncthreads();
-  if (idx == 0)
+  if ((idx < nPoints) && (d_sift[idx].draw) && (kMeansClusters[d_sift[idx].clusterIndex].n_matches > 10))
   {
-    dst[(int)(100 * width * 4 + (128) * 4 + 2)] = 255 * 255;
+
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 0] = kMeansClusters[d_sift[idx].clusterIndex].color_red;
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 1] = kMeansClusters[d_sift[idx].clusterIndex].color_green;
+    dst[((int)((int)(d_sift[idx].ypos))) * width * 4 + ((int)(d_sift[idx].xpos)) * 4 + 2] = kMeansClusters[d_sift[idx].clusterIndex].color_blue;
+  }
+  if (idx < numClusters)
+  {
+    int xpos = (int)(-220. * ((float)kMeansClusters[idx].y_mean / ((float)kMeansClusters[idx].x_mean)) + 128.);
+    int ypos = (int)(220. * ((float)kMeansClusters[idx].z_mean / ((float)kMeansClusters[idx].x_mean)) + 102.5);
+    if ((xpos >= 0) && (xpos < width) && (ypos >= 0) && (ypos < height) && (kMeansClusters[idx].n_matches > 5))
+    {
+      // Distance based cluster coloring:
+      // dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 1] = 0;
+      // dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 0] = 255 * 255 - kMeansClusters[idx].x_mean * 64 * 255;
+      // dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 2] = kMeansClusters[idx].x_mean * 64 * 255;
+
+      // Cluster Index based coloring
+      if (kMeansClusters[idx].n_matches > 10)
+      {
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 0] = 255 * 255;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 1] = 0;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos)) * 4 + 2] = 0;
+
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos - 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos + 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos - 1))) * width * 4 + ((int)(xpos)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos + 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos + 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos + 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos - 1)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos - 1)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos))) * width * 4 + ((int)(xpos - 1)) * 4 + 2] = kMeansClusters[idx].color_blue;
+
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos)) * 4 + 0] = kMeansClusters[idx].color_red;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos)) * 4 + 1] = kMeansClusters[idx].color_green;
+        dst[((int)((int)(ypos + 1))) * width * 4 + ((int)(xpos)) * 4 + 2] = kMeansClusters[idx].color_blue;
+      }
+    }
   }
 }
 
@@ -1876,108 +1492,7 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   {
     return;
   }
-// overwrite first three with test data
-#ifdef USE_TEST_DATA
-  if (idx == 0)
-  {
-    data[idx].match = idx;
-    data[idx].score = 0.99;
-    data[idx].match_xpos = 100.0;
-    data[idx].match_ypos = 100.0;
-    data[idx].match_distance = 1000.00;
-    data[idx].match_x_3d = data[idx].match_distance;
-    data[idx].match_y_3d = data[idx].match_distance * tan(WIDTH_ANGLE * (128 - data[idx].match_xpos) / 128);
-    data[idx].match_z_3d = data[idx].match_distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].match_ypos) / 102.5);
-    data[idx].xpos = 102.99331315;
-    data[idx].ypos = 124.96098776;
-    data[idx].distance = 1192.66243651;
-    data[idx].draw = true;
-    data[idx].x_3d = data[idx].distance;
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
-    return;
-  }
-  if (idx == 1)
-  {
-    data[idx].match = idx;
-    data[idx].score = 0.99;
-    data[idx].match_xpos = 130.0;
-    data[idx].match_ypos = 100.0;
-    data[idx].match_distance = 800.00;
-    data[idx].match_x_3d = data[idx].match_distance;
-    data[idx].match_y_3d = data[idx].match_distance * tan(WIDTH_ANGLE * (128 - data[idx].match_xpos) / 128);
-    data[idx].match_z_3d = data[idx].match_distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].match_ypos) / 102.5);
-    data[idx].xpos = 127.91434393;
-    data[idx].ypos = 127.31468943 * 2;
-    data[idx].distance = 993.15426132;
-    data[idx].draw = true;
-    data[idx].x_3d = data[idx].distance;
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
-    return;
-  }
-  if (idx == 2)
-  {
-    data[idx].match = idx;
-    data[idx].score = 0.99;
-    data[idx].match_xpos = 100.0;
-    data[idx].match_ypos = 130.0;
-    data[idx].match_distance = 1200.00;
-    data[idx].match_x_3d = data[idx].match_distance;
-    data[idx].match_y_3d = data[idx].match_distance * tan(WIDTH_ANGLE * (128 - data[idx].match_xpos) / 128);
-    data[idx].match_z_3d = data[idx].match_distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].match_ypos) / 102.5);
-    data[idx].xpos = 98.05438935;
-    data[idx].ypos = 151.20425739;
-    data[idx].distance = 1369.64237417;
-    data[idx].draw = true;
-    data[idx].x_3d = data[idx].distance;
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
-    return;
-  }
-  if (idx == 3)
-  {
-    data[idx].match = idx;
-    data[idx].score = 0.99;
-    data[idx].match_xpos = 110.0;
-    data[idx].match_ypos = 110.0;
-    data[idx].match_distance = 1500.00;
-    data[idx].match_x_3d = data[idx].match_distance;
-    data[idx].match_y_3d = data[idx].match_distance * tan(WIDTH_ANGLE * (128 - data[idx].match_xpos) / 128);
-    data[idx].match_z_3d = data[idx].match_distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].match_ypos) / 102.5);
-    data[idx].xpos = 108.91867911;
-    data[idx].ypos = 136.2342138;
-    data[idx].distance = 1679.43575987;
-    data[idx].draw = true;
-    data[idx].x_3d = data[idx].distance;
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
-    return;
-  }
-  if (idx == 4)
-  {
-    data[idx].match = idx;
-    data[idx].score = 0.99;
-    data[idx].match_xpos = 70.0;
-    data[idx].match_ypos = 90.0;
-    data[idx].match_distance = 900.00;
-    data[idx].match_x_3d = data[idx].match_distance;
-    data[idx].match_y_3d = data[idx].match_distance * tan(WIDTH_ANGLE * (128 - data[idx].match_xpos) / 128);
-    data[idx].match_z_3d = data[idx].match_distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].match_ypos) / 102.5);
-    data[idx].xpos = 80.22861221;
-    data[idx].ypos = 113.04208145;
-    data[idx].distance = 1099.89691147;
-    data[idx].draw = true;
-    data[idx].x_3d = data[idx].distance;
-    data[idx].y_3d = data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);
-    data[idx].z_3d = data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5);
-    return;
-  }
-  return;
-#endif
-// if (idx == 0) {
-//   printf("%f;",depthData[(int)(128) + 256 * 128]);
-// }
+
   if ((depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] > 60000) || (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)] == 0))
   {
     data[idx].distance = 0.0;
@@ -1989,11 +1504,10 @@ __global__ void gpuAddDepthInfoToSift(SiftPoint *data, float *depthData, int nPo
   else
   {
     data[idx].conf = conf[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)];
-    data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) *0.0002+0.2408;
-    data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) *0.0002+0.2408; //(depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / (2048*4);   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].y_3d = -(data[idx].xpos-128)/220*data[idx].distance; // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    data[idx].z_3d = (data[idx].ypos-102.5)/220*data[idx].distance; //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
-    // printf("distance = x_3d = %f, y_3d = %f, z_3d = %f, xpos = %f, ypos = %f\n", data[idx].x_3d, data[idx].y_3d, data[idx].z_3d, data[idx].xpos, data[idx].ypos);
+    data[idx].distance = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) * 0.0002 + 0.2408;
+    data[idx].x_3d = (depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) * 0.0002 + 0.2408; //(depthData[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]) / (2048*4);   //x[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].y_3d = -(data[idx].xpos - 128) / 220 * data[idx].distance;                                 // data[idx].distance * tan(WIDTH_ANGLE * (128 - data[idx].xpos) / 128);      //y[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
+    data[idx].z_3d = (data[idx].ypos - 102.5) / 220 * data[idx].distance;                                //data[idx].distance * tan(HEIGHT_ANGLE * (102.5 - data[idx].ypos) / 102.5); //z[(int)(data[idx].xpos) + 256 * (int)(data[idx].ypos)]; //
   }
   data[idx].match = -1;
   data[idx].ransac_match = -1;
@@ -2027,7 +1541,6 @@ __global__ void gpuScaleFloat2Float(float *dst, float *src, const int width, con
       if (min_value[0] > min_value[i])
         min_value[0] = min_value[i];
     }
-    // printf("min value: %f\n", min_value[0]);
   }
   if (idx == 1)
   {
@@ -2036,21 +1549,14 @@ __global__ void gpuScaleFloat2Float(float *dst, float *src, const int width, con
       if (max_value[0] < max_value[i])
         max_value[0] = max_value[i];
     }
-    // printf("max value: %f\n", max_value[0]);
   }
   __syncthreads();
-  //int x = 50;
-  //int y = 50;
   for (int i = 0; i < height; ++i)
   {
-    // Calculate new coordinates
-    // if ((idx == 5)||(idx == 10)) {
-    //   printf("Idx = %d, min_value = %f, max_value = %f\n", idx, min_value[0], max_value[0]);
-    // }
-    if (((src[i * width + idx + 0] - min_value[0])/2.0) > 255.0)
+    if (((src[i * width + idx + 0] - min_value[0]) / 2.0) > 255.0)
       dst[i * width + idx + 0] = 255.0;
     else
-      dst[i * width + idx + 0] = (src[i * width + idx + 0] - min_value[0])/2.0; // ) / (max_value[0] - min_value[0]) * 255.0;
+      dst[i * width + idx + 0] = (src[i * width + idx + 0] - min_value[0]) / 2.0; // ) / (max_value[0] - min_value[0]) * 255.0;
   }
 }
 
@@ -2081,7 +1587,6 @@ __global__ void gpuNormalizeToInt16_SCALE(uint16_t *dst, float *src, const int w
       if (min_value[0] > min_value[i])
         min_value[0] = min_value[i];
     }
-    // printf("min value: %f\n", min_value[0]);
   }
   if (idx == 1)
   {
@@ -2090,7 +1595,6 @@ __global__ void gpuNormalizeToInt16_SCALE(uint16_t *dst, float *src, const int w
       if (max_value[0] < max_value[i])
         max_value[0] = max_value[i];
     }
-    // printf("max value: %f\n", max_value[0]);
   }
   __syncthreads();
   for (int i = 0; i < height; ++i)
@@ -2113,44 +1617,6 @@ __global__ void gpuNormalizeToFloat(float *dst, uint16_t *src, const int width, 
   {
     dst[i * width + idx] = (float)(src[i * width * 4 + idx * 4 + 0]);
   }
-}
-
-__global__ void gpuSobelToF(float *dst_mag, float *dst_phase, float *src,
-                            unsigned int width, unsigned int height)
-{
-  int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // image-pixel
-  int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  float result_x = 0;
-  float result_y = 0;
-
-  if ((idx_x != 0) && (idx_x != width - 1) && (idx_y != 0) && (idx_y != height - 1))
-  {
-    // sobel
-    result_x += 1 * src[(idx_x - 1) + (idx_y - 1) * width];
-    result_x += 2 * src[(idx_x - 1) + (idx_y)*width];
-    result_x += 1 * src[(idx_x - 1) + (idx_y + 1) * width];
-    result_x += -1 * src[(idx_x + 1) + (idx_y - 1) * width];
-    result_x += -2 * src[(idx_x + 1) + (idx_y)*width];
-    result_x += -1 * src[(idx_x + 1) + (idx_y + 1) * width];
-    //
-    result_y += 1 * src[(idx_x - 1) + (idx_y - 1) * width];
-    result_y += 2 * src[(idx_x) + (idx_y - 1) * width];
-    result_y += 1 * src[(idx_x + 1) + (idx_y - 1) * width];
-    result_y += -1 * src[(idx_x - 1) + (idx_y + 1) * width];
-    result_y += -2 * src[(idx_x) + (idx_y + 1) * width];
-    result_y += -1 * src[(idx_x + 1) + (idx_y + 1) * width];
-  }
-  //result_x = result_x/9.0f;
-  float result = (sqrt(result_x * result_x + result_y * result_y));
-
-  // printf("result written on x = %d, y = %d", idx_x, idx_y);
-  dst_mag[idx_x + (idx_y)*width] = result;
-  if (dst_phase == NULL)
-    return;
-  if (result_x == 0.0)
-    result_x = 0.000000001;
-  dst_phase[idx_x + (idx_y)*width] = tan(result_y / result_x);
 }
 
 __global__ void gpuMaxfilterToF(float *dst, float *src,
@@ -2359,70 +1825,10 @@ __global__ void gpuMedianfilterToF(float *dst_mag, float *src,
     {
       median_val = values[i];
     }
-    
   }
   dst_mag[idx_x + (idx_y)*width] = median_val;
 }
 
-__global__ void gpuFillAreaToF(float *mask, float *src,
-                               unsigned int width, unsigned int height, int seed_x, int seed_y, float thresh)
-{
-  int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // image-pixel
-  int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  float seed_value = src[(seed_x) + (seed_y)*width];
-
-  if ((src[(idx_x) + (idx_y)*width] >= seed_value - thresh) && ((src[(idx_x) + (idx_y)*width] <= seed_value + thresh)))
-  {
-    mask[(idx_x) + (idx_y)*width] = 256.0 * 256.0 - 1;
-  }
-  else
-  {
-    mask[(idx_x) + (idx_y)*width] = 0.0;
-  }
-}
-__global__ void gpuSharpenImageToGrayscale(unsigned char *src, float *dst,
-                                           unsigned int width, unsigned int height, float amount)
-{
-  int idx_x = blockIdx.x * blockDim.x + threadIdx.x; // image-pixel
-  int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  float result_x = 0;
-  float result_y = 0;
-
-  if ((idx_x != 0) && (idx_x != width - 1) && (idx_y != 0) && (idx_y != height - 1))
-  {
-    // sobel
-    result_x += 1 * src[(idx_x - 1) * 2 + 1 + (idx_y - 1) * width * 2];
-    result_x += 2 * src[(idx_x - 1) * 2 + 1 + (idx_y)*width * 2];
-    result_x += 1 * src[(idx_x - 1) * 2 + 1 + (idx_y + 1) * width * 2];
-    result_x += -1 * src[(idx_x + 1) * 2 + 1 + (idx_y - 1) * width * 2];
-    result_x += -2 * src[(idx_x + 1) * 2 + 1 + (idx_y)*width * 2];
-    result_x += -1 * src[(idx_x + 1) * 2 + 1 + (idx_y + 1) * width * 2];
-    //
-    result_y += 1 * src[(idx_x - 1) * 2 + 1 + (idx_y - 1) * width * 2];
-    result_y += 2 * src[(idx_x)*2 + 1 + (idx_y - 1) * width * 2];
-    result_y += 1 * src[(idx_x + 1) * 2 + 1 + (idx_y - 1) * width * 2];
-    result_y += -1 * src[(idx_x - 1) * 2 + 1 + (idx_y + 1) * width * 2];
-    result_y += -2 * src[(idx_x)*2 + 1 + (idx_y + 1) * width * 2];
-    result_y += -1 * src[(idx_x + 1) * 2 + 1 + (idx_y + 1) * width * 2];
-    //for (int i = -1; i<=1; i++) {
-    //  for (int j = -1; j<=1; j++) {
-    //    result_x += src[(idx_x+i)*2+1+(idx_y+j)*width*2];
-    //  }
-    //}
-  }
-  //result_x = result_x/9.0f;
-  float result = (src[idx_x * 2 + 1 + (idx_y)*width * 2] * (1 - amount)) + (amount * sqrt(result_x * result_x + result_y * result_y));
-  result = (result - 80.0f) / 130.0f * 255.0f;
-  if (result < 0)
-    result = 0;
-  if (result > 255)
-    result = 255;
-
-  // printf("result written on x = %d, y = %d", idx_x, idx_y);
-  dst[idx_x + (idx_y)*width] = result;
-}
 
 __global__ void LaplaceMultiMem(float *d_Image, float *d_Result, int width, int pitch, int height, int octave)
 {
@@ -2871,551 +2277,7 @@ __global__ void CleanMatches(SiftPoint *sift1, int numPts1)
   sift1[p1].score = 0.0f;
 }
 
-#define M7W 32
-#define M7H 32
-#define M7R 4
-#define NRX 2
-#define NDIM 128
-
-__global__ void FindMaxCorr10(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
-{
-  __shared__ float4 buffer1[M7W * NDIM / 4];
-  __shared__ float4 buffer2[M7H * NDIM / 4];
-  int tx = threadIdx.x;
-  int ty = threadIdx.y;
-  int bp1 = M7W * blockIdx.x;
-  for (int j = ty; j < M7W; j += M7H / M7R)
-  {
-    int p1 = min(bp1 + j, numPts1 - 1);
-    for (int d = tx; d < NDIM / 4; d += M7W)
-      buffer1[j * NDIM / 4 + (d + j) % (NDIM / 4)] = ((float4 *)&sift1[p1].data)[d];
-  }
-
-  float max_score[NRX];
-  float sec_score[NRX];
-  int index[NRX];
-  for (int i = 0; i < NRX; i++)
-  {
-    max_score[i] = 0.0f;
-    sec_score[i] = 0.0f;
-    index[i] = -1;
-  }
-  int idx = ty * M7W + tx;
-  int ix = idx % (M7W / NRX);
-  int iy = idx / (M7W / NRX);
-  for (int bp2 = 0; bp2 < numPts2 - M7H + 1; bp2 += M7H)
-  {
-    for (int j = ty; j < M7H; j += M7H / M7R)
-    {
-      int p2 = min(bp2 + j, numPts2 - 1);
-      for (int d = tx; d < NDIM / 4; d += M7W)
-        buffer2[j * NDIM / 4 + d] = ((float4 *)&sift2[p2].data)[d];
-    }
-    __syncthreads();
-
-    if (idx < M7W * M7H / M7R / NRX)
-    {
-      float score[M7R][NRX];
-      for (int dy = 0; dy < M7R; dy++)
-        for (int i = 0; i < NRX; i++)
-          score[dy][i] = 0.0f;
-      for (int d = 0; d < NDIM / 4; d++)
-      {
-        float4 v1[NRX];
-        for (int i = 0; i < NRX; i++)
-          v1[i] = buffer1[((M7W / NRX) * i + ix) * NDIM / 4 + (d + (M7W / NRX) * i + ix) % (NDIM / 4)];
-        for (int dy = 0; dy < M7R; dy++)
-        {
-          float4 v2 = buffer2[(M7R * iy + dy) * (NDIM / 4) + d];
-          for (int i = 0; i < NRX; i++)
-          {
-            score[dy][i] += v1[i].x * v2.x;
-            score[dy][i] += v1[i].y * v2.y;
-            score[dy][i] += v1[i].z * v2.z;
-            score[dy][i] += v1[i].w * v2.w;
-          }
-        }
-      }
-      for (int dy = 0; dy < M7R; dy++)
-      {
-        for (int i = 0; i < NRX; i++)
-        {
-          if (score[dy][i] > max_score[i])
-          {
-            sec_score[i] = max_score[i];
-            max_score[i] = score[dy][i];
-            index[i] = min(bp2 + M7R * iy + dy, numPts2 - 1);
-          }
-          else if (score[dy][i] > sec_score[i])
-            sec_score[i] = score[dy][i];
-        }
-      }
-    }
-    __syncthreads();
-  }
-
-  float *scores1 = (float *)buffer1;
-  float *scores2 = &scores1[M7W * M7H / M7R];
-  int *indices = (int *)&scores2[M7W * M7H / M7R];
-  if (idx < M7W * M7H / M7R / NRX)
-  {
-    for (int i = 0; i < NRX; i++)
-    {
-      scores1[iy * M7W + (M7W / NRX) * i + ix] = max_score[i];
-      scores2[iy * M7W + (M7W / NRX) * i + ix] = sec_score[i];
-      indices[iy * M7W + (M7W / NRX) * i + ix] = index[i];
-    }
-  }
-  __syncthreads();
-
-  if (ty == 0)
-  {
-    float max_score = scores1[tx];
-    float sec_score = scores2[tx];
-    int index = indices[tx];
-    for (int y = 0; y < M7H / M7R; y++)
-      if (index != indices[y * M7W + tx])
-      {
-        if (scores1[y * M7W + tx] > max_score)
-        {
-          sec_score = max(max_score, sec_score);
-          max_score = scores1[y * M7W + tx];
-          index = indices[y * M7W + tx];
-        }
-        else if (scores1[y * M7W + tx] > sec_score)
-          sec_score = scores1[y * M7W + tx];
-        if (scores2[y * M7W + tx] > sec_score)
-          sec_score = scores2[y * M7W + tx];
-      }
-    sift1[bp1 + tx].score = max_score;
-    sift1[bp1 + tx].match = index;
-    sift1[bp1 + tx].match_xpos = sift2[index].xpos;
-    sift1[bp1 + tx].match_ypos = sift2[index].ypos;
-    sift1[bp1 + tx].ambiguity = sec_score / (max_score + 1e-6f);
-    sift1[bp1 + tx].match_x_3d = sift2[index].x_3d;
-    sift1[bp1 + tx].match_y_3d = sift2[index].y_3d;
-    sift1[bp1 + tx].match_z_3d = sift2[index].z_3d;
-    sift1[bp1 + tx].match_distance = sift2[index].distance;
-    sift1[bp1 + tx].ambiguity = sec_score / (max_score + 1e-6f);
-  }
-}
-
-#define FMC_GH 512
-#define FMC_BW 32
-#define FMC_BH 32
-#define FMC_BD 16
-#define FMC_TW 1
-#define FMC_TH 4
-#define FMC_NW (FMC_BW / FMC_TW) //  32
-#define FMC_NH (FMC_BH / FMC_TH) //   8
-#define FMC_NT (FMC_NW * FMC_NH) // 256 = 8 warps
-
 __device__ volatile int lock = 0;
-
-__global__ void FindMaxCorr9(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
-{
-  __shared__ float4 siftParts1[FMC_BW * FMC_BD]; // 4*32*8 = 1024
-  __shared__ float4 siftParts2[FMC_BH * FMC_BD]; // 4*32*8 = 1024
-  //__shared__ float blksums[FMC_BW*FMC_BH];     // 32*32  = 1024
-  const int tx = threadIdx.x;
-  const int ty = threadIdx.y;
-  const int idx = ty * FMC_NW + tx;
-  float4 *pts1 = 0, *pts2 = 0;
-  if (idx < FMC_BW)
-  {
-    const int p1l = min(blockIdx.x * FMC_BW + idx, numPts1 - 1);
-    pts1 = (float4 *)sift1[p1l].data;
-  }
-  float maxScore = -1.0f;
-  float maxScor2 = -1.0f;
-  int maxIndex = 0;
-  for (int k = 0; k < min(FMC_GH, numPts2 - FMC_BH + 1); k += FMC_BH)
-  {
-    if (idx < FMC_BH)
-    {
-      const int p2l = min(blockIdx.y * FMC_GH + k + idx, numPts2 - 1);
-      pts2 = (float4 *)sift2[p2l].data;
-    }
-    float sums[FMC_TW * FMC_TH];
-    for (int i = 0; i < FMC_TW * FMC_TH; i++)
-      sums[i] = 0.0f;
-
-    if (idx < FMC_BW)
-      for (int i = 0; i < FMC_BD / 2; i++)
-        siftParts1[(i + 0) * FMC_BW + idx] = pts1[0 + i];
-    if (idx < FMC_BH)
-      for (int i = 0; i < FMC_BD / 2; i++)
-        siftParts2[(i + 0) * FMC_BH + idx] = pts2[0 + i];
-    __syncthreads();
-
-    int b = FMC_BD / 2;
-    for (int d = FMC_BD / 2; d < 32; d += FMC_BD / 2)
-    {
-      if (idx < FMC_BW)
-        for (int i = 0; i < FMC_BD / 2; i++)
-          siftParts1[(i + b) * FMC_BW + idx] = pts1[d + i];
-      if (idx < FMC_BH)
-        for (int i = 0; i < FMC_BD / 2; i++)
-          siftParts2[(i + b) * FMC_BH + idx] = pts2[d + i];
-
-      b ^= FMC_BD / 2;
-      for (int i = 0; i < FMC_BD / 2; i++)
-      {
-        float4 v1[FMC_TW];
-        for (int ix = 0; ix < FMC_TW; ix++)
-          v1[ix] = siftParts1[(i + b) * FMC_BW + (tx * FMC_TW + ix)];
-        for (int iy = 0; iy < FMC_TH; iy++)
-        {
-          float4 v2 = siftParts2[(i + b) * FMC_BH + (ty * FMC_TH + iy)];
-          for (int ix = 0; ix < FMC_TW; ix++)
-          {
-            sums[iy * FMC_TW + ix] += v1[ix].x * v2.x;
-            sums[iy * FMC_TW + ix] += v1[ix].y * v2.y;
-            sums[iy * FMC_TW + ix] += v1[ix].z * v2.z;
-            sums[iy * FMC_TW + ix] += v1[ix].w * v2.w;
-          }
-        }
-      }
-      __syncthreads();
-    }
-
-    b ^= FMC_BD / 2;
-    for (int i = 0; i < FMC_BD / 2; i++)
-    {
-      float4 v1[FMC_TW];
-      for (int ix = 0; ix < FMC_TW; ix++)
-        v1[ix] = siftParts1[(i + b) * FMC_BW + (tx * FMC_TW + ix)];
-      for (int iy = 0; iy < FMC_TH; iy++)
-      {
-        float4 v2 = siftParts2[(i + b) * FMC_BH + (ty * FMC_TH + iy)];
-        for (int ix = 0; ix < FMC_TW; ix++)
-        {
-          sums[iy * FMC_TW + ix] += v1[ix].x * v2.x;
-          sums[iy * FMC_TW + ix] += v1[ix].y * v2.y;
-          sums[iy * FMC_TW + ix] += v1[ix].z * v2.z;
-          sums[iy * FMC_TW + ix] += v1[ix].w * v2.w;
-        }
-      }
-    }
-    __syncthreads();
-
-    float *blksums = (float *)siftParts1;
-    for (int iy = 0; iy < FMC_TH; iy++)
-      for (int ix = 0; ix < FMC_TW; ix++)
-        blksums[(ty * FMC_TH + iy) * FMC_BW + (tx * FMC_TW + ix)] = sums[iy * FMC_TW + ix];
-    __syncthreads();
-    if (idx < FMC_BW)
-    {
-      for (int j = 0; j < FMC_BH; j++)
-      {
-        float sum = blksums[j * FMC_BW + idx];
-        if (sum > maxScore)
-        {
-          maxScor2 = maxScore;
-          maxScore = sum;
-          maxIndex = min(blockIdx.y * FMC_GH + k + j, numPts2 - 1);
-        }
-        else if (sum > maxScor2)
-          maxScor2 = sum;
-      }
-    }
-    __syncthreads();
-  }
-  const int p1 = min(blockIdx.x * FMC_BW + idx, numPts1 - 1);
-  if (idx == 0)
-    while (atomicCAS((int *)&lock, 0, 1) != 0)
-      ;
-  __syncthreads();
-  if (idx < FMC_BW)
-  {
-    float maxScor2Old = sift1[p1].ambiguity * (sift1[p1].score + 1e-6f);
-    if (maxScore > sift1[p1].score)
-    {
-      maxScor2 = max(sift1[p1].score, maxScor2);
-      sift1[p1].ambiguity = maxScor2 / (maxScore + 1e-6f);
-      sift1[p1].score = maxScore;
-      sift1[p1].match = maxIndex;
-      sift1[p1].match_xpos = sift2[maxIndex].xpos;
-      sift1[p1].match_ypos = sift2[maxIndex].ypos;
-    }
-    else if (maxScore > maxScor2Old)
-      sift1[p1].ambiguity = maxScore / (sift1[p1].score + 1e-6f);
-  }
-  __syncthreads();
-  if (idx == 0)
-    atomicExch((int *)&lock, 0);
-}
-
-__global__ void FindMaxCorr8(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
-{
-  __shared__ float4 siftParts1[FMC_BW * FMC_BD]; // 4*32*8 = 1024
-  __shared__ float4 siftParts2[FMC_BH * FMC_BD]; // 4*32*8 = 1024
-  __shared__ float blksums[FMC_BW * FMC_BH];     // 32*32  = 1024
-  const int tx = threadIdx.x;
-  const int ty = threadIdx.y;
-  const int idx = ty * FMC_NW + tx;
-  float4 *pts1 = 0, *pts2 = 0;
-  if (idx < FMC_BW)
-  {
-    const int p1l = min(blockIdx.x * FMC_BW + idx, numPts1 - 1);
-    pts1 = (float4 *)sift1[p1l].data;
-  }
-  float maxScore = -1.0f;
-  float maxScor2 = -1.0f;
-  int maxIndex = 0;
-  for (int k = 0; k < min(FMC_GH, numPts2 - FMC_BH + 1); k += FMC_BH)
-  {
-    if (idx < FMC_BH)
-    {
-      const int p2l = min(blockIdx.y * FMC_GH + k + idx, numPts2 - 1);
-      pts2 = (float4 *)sift2[p2l].data;
-    }
-    float sums[FMC_TW * FMC_TH];
-    for (int i = 0; i < FMC_TW * FMC_TH; i++)
-      sums[i] = 0.0f;
-    for (int d = 0; d < 32; d += FMC_BD)
-    {
-      if (idx < FMC_BW)
-        for (int i = 0; i < FMC_BD; i++)
-          siftParts1[i * FMC_BW + idx] = pts1[d + i];
-      if (idx < FMC_BH)
-        for (int i = 0; i < FMC_BD; i++)
-          siftParts2[i * FMC_BH + idx] = pts2[d + i];
-      __syncthreads();
-
-      for (int i = 0; i < FMC_BD; i++)
-      {
-        float4 v1[FMC_TW];
-        for (int ix = 0; ix < FMC_TW; ix++)
-          v1[ix] = siftParts1[i * FMC_BW + (tx * FMC_TW + ix)];
-        for (int iy = 0; iy < FMC_TH; iy++)
-        {
-          float4 v2 = siftParts2[i * FMC_BH + (ty * FMC_TH + iy)];
-          for (int ix = 0; ix < FMC_TW; ix++)
-          {
-            sums[iy * FMC_TW + ix] += v1[ix].x * v2.x;
-            sums[iy * FMC_TW + ix] += v1[ix].y * v2.y;
-            sums[iy * FMC_TW + ix] += v1[ix].z * v2.z;
-            sums[iy * FMC_TW + ix] += v1[ix].w * v2.w;
-          }
-        }
-      }
-      __syncthreads();
-    }
-    //float *blksums = (float*)siftParts1;
-    for (int iy = 0; iy < FMC_TH; iy++)
-      for (int ix = 0; ix < FMC_TW; ix++)
-        blksums[(ty * FMC_TH + iy) * FMC_BW + (tx * FMC_TW + ix)] = sums[iy * FMC_TW + ix];
-    __syncthreads();
-    if (idx < FMC_BW)
-    {
-      for (int j = 0; j < FMC_BH; j++)
-      {
-        float sum = blksums[j * FMC_BW + idx];
-        if (sum > maxScore)
-        {
-          maxScor2 = maxScore;
-          maxScore = sum;
-          maxIndex = min(blockIdx.y * FMC_GH + k + j, numPts2 - 1);
-        }
-        else if (sum > maxScor2)
-          maxScor2 = sum;
-      }
-    }
-    __syncthreads();
-  }
-  const int p1 = min(blockIdx.x * FMC_BW + idx, numPts1 - 1);
-  if (idx == 0)
-    while (atomicCAS((int *)&lock, 0, 1) != 0)
-      ;
-  __syncthreads();
-  if (idx < FMC_BW)
-  {
-    float maxScor2Old = sift1[p1].ambiguity * (sift1[p1].score + 1e-6f);
-    if (maxScore > sift1[p1].score)
-    {
-      maxScor2 = max(sift1[p1].score, maxScor2);
-      sift1[p1].ambiguity = maxScor2 / (maxScore + 1e-6f);
-      sift1[p1].score = maxScore;
-      sift1[p1].match = maxIndex;
-      sift1[p1].match_xpos = sift2[maxIndex].xpos;
-      sift1[p1].match_ypos = sift2[maxIndex].ypos;
-    }
-    else if (maxScore > maxScor2Old)
-      sift1[p1].ambiguity = maxScore / (sift1[p1].score + 1e-6f);
-  }
-  __syncthreads();
-  if (idx == 0)
-    atomicExch((int *)&lock, 0);
-}
-
-__global__ void FindMaxCorr7(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
-{
-  __shared__ float siftParts1[17 * 64]; // features in columns
-  __shared__ float siftParts2[16 * 64]; // one extra to avoid shared conflicts
-  float4 *pts1 = (float4 *)siftParts1;
-  float4 *pts2 = (float4 *)siftParts2;
-  const int tx = threadIdx.x;
-  const int ty = threadIdx.y;
-  const int p1l = min(blockIdx.x * 16 + ty, numPts1 - 1);
-  const float4 *p1l4 = (float4 *)sift1[p1l].data;
-  float maxScore = -1.0f;
-  float maxScor2 = -1.0f;
-  int maxIndex = 0;
-  for (int k = 0; k < 512 / 16; k++)
-  {
-    const int p2l = min(blockIdx.y * 512 + k * 16 + ty, numPts2 - 1);
-    const float4 *p2l4 = (float4 *)sift2[p2l].data;
-#define NUM 4
-    float sum[NUM];
-    if (ty < (16 / NUM))
-      for (int l = 0; l < NUM; l++)
-        sum[l] = 0.0f;
-    __syncthreads();
-    for (int i = 0; i < 2; i++)
-    {
-      pts1[17 * tx + ty] = p1l4[i * 16 + tx];
-      pts2[16 * ty + tx] = p2l4[i * 16 + tx];
-      __syncthreads();
-      if (ty < (16 / NUM))
-      {
-#pragma unroll
-        for (int j = 0; j < 16; j++)
-        {
-          float4 p1v = pts1[17 * j + tx];
-#pragma unroll
-          for (int l = 0; l < NUM; l++)
-          {
-            float4 p2v = pts2[16 * (ty + l * (16 / NUM)) + j];
-            sum[l] += p1v.x * p2v.x;
-            sum[l] += p1v.y * p2v.y;
-            sum[l] += p1v.z * p2v.z;
-            sum[l] += p1v.w * p2v.w;
-          }
-        }
-      }
-      __syncthreads();
-    }
-    float *sums = siftParts1;
-    if (ty < (16 / NUM))
-      for (int l = 0; l < NUM; l++)
-        sums[16 * (ty + l * (16 / NUM)) + tx] = sum[l];
-    __syncthreads();
-    if (ty == 0)
-    {
-      for (int j = 0; j < 16; j++)
-      {
-        float sum = sums[16 * j + tx];
-        if (sum > maxScore)
-        {
-          maxScor2 = maxScore;
-          maxScore = sum;
-          maxIndex = min(blockIdx.y * 512 + k * 16 + j, numPts2 - 1);
-        }
-        else if (sum > maxScor2)
-          maxScor2 = sum;
-      }
-    }
-    __syncthreads();
-  }
-  const int p1 = min(blockIdx.x * 16 + tx, numPts1 - 1);
-  if (tx == 0 && ty == 0)
-    while (atomicCAS((int *)&lock, 0, 1) != 0)
-      ;
-  __syncthreads();
-  if (ty == 0)
-  {
-    float maxScor2Old = sift1[p1].ambiguity * (sift1[p1].score + 1e-6f);
-    if (maxScore > sift1[p1].score)
-    {
-      maxScor2 = max(sift1[p1].score, maxScor2);
-      sift1[p1].ambiguity = maxScor2 / (maxScore + 1e-6f);
-      sift1[p1].score = maxScore;
-      sift1[p1].match = maxIndex;
-      sift1[p1].match_xpos = sift2[maxIndex].xpos;
-      sift1[p1].match_ypos = sift2[maxIndex].ypos;
-    }
-    else if (maxScore > maxScor2Old)
-      sift1[p1].ambiguity = maxScore / (sift1[p1].score + 1e-6f);
-  }
-  __syncthreads();
-  if (tx == 0 && ty == 0)
-    atomicExch((int *)&lock, 0);
-}
-
-__global__ void FindMaxCorr6(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
-{
-  //__shared__ float siftParts1[128*16]; // features in columns
-  __shared__ float siftParts2[128 * 16]; // one extra to avoid shared conflicts
-  __shared__ float sums[16 * 16];
-  const int tx = threadIdx.x;
-  const int ty = threadIdx.y;
-  const int p1l = min(blockIdx.x * 16 + ty, numPts1 - 1);
-  float *pt1l = sift1[p1l].data;
-  float4 part1 = reinterpret_cast<float4 *>(pt1l)[tx];
-  float maxScore = -1.0f;
-  float maxScor2 = -1.0f;
-  int maxIndex = 0;
-  for (int k = 0; k < 512; k += 16)
-  {
-    const int p2l = min(blockIdx.y * 512 + k + ty, numPts2 - 1);
-    float *pt2l = sift2[p2l].data;
-    reinterpret_cast<float4 *>(siftParts2)[32 * ty + tx] = reinterpret_cast<float4 *>(pt2l)[tx];
-    __syncthreads();
-    for (int i = 0; i < 16; i++)
-    {
-      float4 part2 = reinterpret_cast<float4 *>(siftParts2)[32 * i + tx];
-      float sum = part1.x * part2.x + part1.y * part2.y + part1.z * part2.z + part1.w * part2.w;
-      sum += ShiftDown(sum, 16);
-      sum += ShiftDown(sum, 8);
-      sum += ShiftDown(sum, 4);
-      sum += ShiftDown(sum, 2);
-      sum += ShiftDown(sum, 1);
-      if (tx == 0)
-        sums[16 * i + ty] = sum;
-    }
-    __syncthreads();
-    if (ty == 0 && tx < 16)
-    {
-      for (int j = 0; j < 16; j++)
-      {
-        float sum = sums[16 * j + tx];
-        if (sum > maxScore)
-        {
-          maxScor2 = maxScore;
-          maxScore = sum;
-          maxIndex = min(blockIdx.y * 512 + k + j, numPts2 - 1);
-        }
-        else if (sum > maxScor2)
-          maxScor2 = sum;
-      }
-    }
-    __syncthreads();
-  }
-  if (tx == 0 && ty == 0)
-    while (atomicCAS((int *)&lock, 0, 1) != 0)
-      ;
-  __syncthreads();
-  if (ty == 0 && tx < 16)
-  {
-    const int p1 = min(blockIdx.x * 16 + tx, numPts1 - 1);
-    float maxScor2Old = sift1[p1].ambiguity * (sift1[p1].score + 1e-6f);
-    if (maxScore > sift1[p1].score)
-    {
-      maxScor2 = max(sift1[p1].score, maxScor2);
-      sift1[p1].ambiguity = maxScor2 / (maxScore + 1e-6f);
-      sift1[p1].score = maxScore;
-      sift1[p1].match = maxIndex;
-      sift1[p1].match_xpos = sift2[maxIndex].xpos;
-      sift1[p1].match_ypos = sift2[maxIndex].ypos;
-    }
-    else if (maxScore > maxScor2Old)
-      sift1[p1].ambiguity = maxScore / (sift1[p1].score + 1e-6f);
-  }
-  __syncthreads();
-  if (tx == 0 && ty == 0)
-    atomicExch((int *)&lock, 0);
-}
 
 __global__ void FindMaxCorr5(SiftPoint *sift1, SiftPoint *sift2, int numPts1, int numPts2)
 {
@@ -3517,58 +2379,53 @@ void Computation::initCuda()
 
 void Computation::setupCudaForSharingVulkan()
 {
-        setCudaVkDevice();
-        // cudaVkImportSemaphore();
-        cudaVkImportMem();
+  setCudaVkDevice();
+  // cudaVkImportSemaphore();
+  cudaVkImportMem();
 }
 
 void Computation::cudaVkImportSemaphore()
 {
-    cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc;
-    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
-    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
-    externalSemaphoreHandleDesc.handle.fd = cudaUpdateVkVertexBufSemaphoreHandle;
-    externalSemaphoreHandleDesc.flags = 0;
-    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtCudaUpdateVkVertexBufSemaphore, &externalSemaphoreHandleDesc));
-    memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
-    externalSemaphoreHandleDesc.type      = cudaExternalSemaphoreHandleTypeOpaqueFd;
-    externalSemaphoreHandleDesc.handle.fd = vkUpdateCudaVertexBufSemaphoreHandle;
-    externalSemaphoreHandleDesc.flags = 0;
-    checkCudaErrors(cudaImportExternalSemaphore(&cudaExtVkUpdateCudaVertexBufSemaphore, &externalSemaphoreHandleDesc));
-    printf("CUDA Imported Vulkan semaphore\n");
+  cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc;
+  memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
+  externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeOpaqueFd;
+  externalSemaphoreHandleDesc.handle.fd = cudaUpdateVkVertexBufSemaphoreHandle;
+  externalSemaphoreHandleDesc.flags = 0;
+  checkCudaErrors(cudaImportExternalSemaphore(&cudaExtCudaUpdateVkVertexBufSemaphore, &externalSemaphoreHandleDesc));
+  memset(&externalSemaphoreHandleDesc, 0, sizeof(externalSemaphoreHandleDesc));
+  externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeOpaqueFd;
+  externalSemaphoreHandleDesc.handle.fd = vkUpdateCudaVertexBufSemaphoreHandle;
+  externalSemaphoreHandleDesc.flags = 0;
+  checkCudaErrors(cudaImportExternalSemaphore(&cudaExtVkUpdateCudaVertexBufSemaphore, &externalSemaphoreHandleDesc));
+  printf("CUDA Imported Vulkan semaphore\n");
 }
 
 void Computation::cudaVkImportMem()
 {
-    cudaExternalMemoryHandleDesc projectedCudaExtMemHandleDesc;
-    memset(&projectedCudaExtMemHandleDesc, 0, sizeof(projectedCudaExtMemHandleDesc));
-    projectedCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
-    projectedCudaExtMemHandleDesc.handle.fd = projectedMemHandleVkBuffer;
-    projectedCudaExtMemHandleDesc.size = projectedVkBufSize;
-    checkCudaErrors(cudaImportExternalMemory(&projectedCudaExtMemBuffer, &projectedCudaExtMemHandleDesc));
-    cudaExternalMemoryBufferDesc projectedCudaExtBufferDesc;
-    projectedCudaExtBufferDesc.offset = 0;
-    projectedCudaExtBufferDesc.size = projectedVkBufSize;
-    projectedCudaExtBufferDesc.flags = 0;
-    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&projectedCudaDevBuffptr, projectedCudaExtMemBuffer, &projectedCudaExtBufferDesc));
+  cudaExternalMemoryHandleDesc projectedCudaExtMemHandleDesc;
+  memset(&projectedCudaExtMemHandleDesc, 0, sizeof(projectedCudaExtMemHandleDesc));
+  projectedCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+  projectedCudaExtMemHandleDesc.handle.fd = projectedMemHandleVkBuffer;
+  projectedCudaExtMemHandleDesc.size = projectedVkBufSize;
+  checkCudaErrors(cudaImportExternalMemory(&projectedCudaExtMemBuffer, &projectedCudaExtMemHandleDesc));
+  cudaExternalMemoryBufferDesc projectedCudaExtBufferDesc;
+  projectedCudaExtBufferDesc.offset = 0;
+  projectedCudaExtBufferDesc.size = projectedVkBufSize;
+  projectedCudaExtBufferDesc.flags = 0;
+  checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&projectedCudaDevBuffptr, projectedCudaExtMemBuffer, &projectedCudaExtBufferDesc));
 
-    cudaExternalMemoryHandleDesc mainCudaExtMemHandleDesc;
-    memset(&mainCudaExtMemHandleDesc, 0, sizeof(mainCudaExtMemHandleDesc));
-    mainCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
-    mainCudaExtMemHandleDesc.handle.fd = mainMemHandleVkBuffer;
-    mainCudaExtMemHandleDesc.size = mainVkBufSize;
-    checkCudaErrors(cudaImportExternalMemory(&mainCudaExtMemBuffer, &mainCudaExtMemHandleDesc));
-    cudaExternalMemoryBufferDesc mainCudaExtBufferDesc;
-    mainCudaExtBufferDesc.offset = 0;
-    mainCudaExtBufferDesc.size = mainVkBufSize;
-    mainCudaExtBufferDesc.flags = 0;
-    checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&mainCudaDevBuffptr, mainCudaExtMemBuffer, &mainCudaExtBufferDesc));
-
-
-
+  cudaExternalMemoryHandleDesc mainCudaExtMemHandleDesc;
+  memset(&mainCudaExtMemHandleDesc, 0, sizeof(mainCudaExtMemHandleDesc));
+  mainCudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+  mainCudaExtMemHandleDesc.handle.fd = mainMemHandleVkBuffer;
+  mainCudaExtMemHandleDesc.size = mainVkBufSize;
+  checkCudaErrors(cudaImportExternalMemory(&mainCudaExtMemBuffer, &mainCudaExtMemHandleDesc));
+  cudaExternalMemoryBufferDesc mainCudaExtBufferDesc;
+  mainCudaExtBufferDesc.offset = 0;
+  mainCudaExtBufferDesc.size = mainVkBufSize;
+  mainCudaExtBufferDesc.flags = 0;
+  checkCudaErrors(cudaExternalMemoryGetMappedBuffer(&mainCudaDevBuffptr, mainCudaExtMemBuffer, &mainCudaExtBufferDesc));
 }
-
-
 
 void Computation::cleanup()
 {
@@ -3670,38 +2527,233 @@ void Computation::LowPass_prepareKernel(void)
   cudaMemcpyToSymbol(d_GaussKernel, gausskernel, kernelSize * kernelSize * sizeof(float));
 }
 
-void Computation::LowPass_forSubImages(float *res, float *src, int width, int height)
-{
-  int kernelSize{GAUSSIANSIZE};
 
-  dim3 block(16, 16, 1);
-  dim3 grid(width / block.x + 1, height / block.y + 1, 1);
-
-  GaussKernelBlock<<<grid, block, 0>>>(res, src, width, height, kernelSize);
-
-  return;
-}
+#define CLUSTER_XMAX 7
+#define CLUSTER_YMAX 5
+#define CLUSTER_ZMAX 3
 
 void Computation::InitClusterSet(KMeansClusterSet &data, int numPoints, bool host, bool dev, bool shared)
 {
   data.numClusters = 0;
+  if (CLUSTER_XMAX * CLUSTER_YMAX * CLUSTER_ZMAX > numPoints)
+    numPoints = CLUSTER_XMAX * CLUSTER_YMAX * CLUSTER_ZMAX;
   data.maxClusters = numPoints;
   int sz = sizeof(KMeansCluster) * numPoints;
   data.h_clusters = NULL;
-  if (shared) {
+  if (shared)
+  {
     host = false;
     dev = false;
-    cudaHostAlloc((void **)&data.h_clusters, sz, cudaHostAllocMapped);
-    cudaHostGetDevicePointer((void **)&data.d_clusters, (void *)data.h_clusters, 0);
+    cudaHostAlloc((void **)&(data.h_clusters), sz, cudaHostAllocMapped);
+    cudaHostGetDevicePointer((void **)&(data.d_clusters), (void *)(data.h_clusters), 0);
   }
   if (host)
+  {
     data.h_clusters = (KMeansCluster *)malloc(sz);
     data.d_clusters = NULL;
+  }
   if (dev)
     cudaMalloc((void **)&data.d_clusters, sz);
+
+  if (data.h_clusters)
+  {
+    for (int idx = 0; idx < numPoints; idx++)
+    {
+      data.h_clusters[idx].color_red = rand() % 255 * 255;
+      data.h_clusters[idx].color_green = rand() % 255 * 255;
+      data.h_clusters[idx].color_blue = (255 * 255) - (max(data.h_clusters[idx].color_red, data.h_clusters[idx].color_green));
+    }
+  }
 }
 
-void Computation::InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev)
+// Fill volume with seed points evenly distributed.
+
+void Computation::InitSeedPoints(KMeansClusterSet &data)
+{
+
+  for (int z = 0; z < CLUSTER_ZMAX; z++)
+  {
+    for (int y = 0; y < CLUSTER_YMAX; y++)
+    {
+      for (int x = 0; x < CLUSTER_XMAX; x++)
+      {
+        int idx = x + (CLUSTER_XMAX * y) + (CLUSTER_XMAX * CLUSTER_YMAX * z);
+        // std::cout << "index: " << idx << std::endl;
+        data.h_clusters[idx].x_mean = (8. / (float)CLUSTER_XMAX / 2.) * ((x + 1) * 2 - 1);
+        data.h_clusters[idx].y_mean = -3 + (6. / (float)CLUSTER_YMAX / 2.) * ((y + 1) * 2 - 1);
+        data.h_clusters[idx].z_mean = -2 + (4. / (float)CLUSTER_ZMAX / 2.) * ((z + 1) * 2 - 1);
+        data.h_clusters[idx].n_matches = 0;
+        // data.h_clusters[idx].color_red = rand() % 255*255;
+        // data.h_clusters[idx].color_green = rand() % 255*255;
+        // data.h_clusters[idx].color_blue = (255*255)-(max(data.h_clusters[idx].color_red,data.h_clusters[idx].color_green));
+        // printf("idx: %d, cluster: [ %f, %f, %f]\n",idx, data.h_clusters[idx].x_mean, data.h_clusters[idx].y_mean, data.h_clusters[idx].z_mean);
+      }
+    }
+  }
+  data.numClusters = CLUSTER_XMAX * CLUSTER_YMAX * CLUSTER_ZMAX;
+}
+
+void Computation::kMeansClustering(KMeansClusterSet &clusters, SiftData &cloud)
+{
+  bool modified = true;
+  float sqDistance = 65000.;
+  int runCounter = 0;
+  int clusterIndex;
+  float tempDistance;
+  {
+    // float xmin = 400., xmax = -400., ymin = 400., ymax = -400., zmin = 400., zmax = -400.;
+    for (int i = 0; i < cloud.numPts; i++)
+    {
+      if (cloud.h_data[i].draw)
+      {
+        cloud.h_data[i].clusterIndex = clusters.numClusters;
+        // if (cloud.h_data[i].x_3d < xmin)
+        //   xmin = cloud.h_data[i].x_3d;
+        // if (cloud.h_data[i].y_3d < ymin)
+        //   ymin = cloud.h_data[i].y_3d;
+        // if (cloud.h_data[i].z_3d < zmin)
+        //   zmin = cloud.h_data[i].z_3d;
+        // if (cloud.h_data[i].x_3d > xmax)
+        //   xmax = cloud.h_data[i].x_3d;
+        // if (cloud.h_data[i].y_3d > ymax)
+        //   ymax = cloud.h_data[i].y_3d;
+        // if (cloud.h_data[i].z_3d > zmax)
+        //   zmax = cloud.h_data[i].z_3d;
+      }
+    }
+    // printf("Area spans from: (%f,%f,%f) to (%f,%f,%f)\n", xmin, ymin, zmin, xmax, ymax, zmax);
+  }
+  {
+    // float xmin = 400., xmax = -400., ymin = 400., ymax = -400., zmin = 400., zmax = -400.;
+    for (int i = 0; i < clusters.numClusters; i++)
+    {
+      clusters.h_clusters[i].n_matches = 0;
+      // if (clusters.h_clusters[i].x_mean < xmin)
+      //   xmin = clusters.h_clusters[i].x_mean;
+      // if (clusters.h_clusters[i].y_mean < ymin)
+      //   ymin = clusters.h_clusters[i].y_mean;
+      // if (clusters.h_clusters[i].z_mean < zmin)
+      //   zmin = clusters.h_clusters[i].z_mean;
+      // if (clusters.h_clusters[i].x_mean > xmax)
+      //   xmax = clusters.h_clusters[i].x_mean;
+      // if (clusters.h_clusters[i].y_mean > ymax)
+      //   ymax = clusters.h_clusters[i].y_mean;
+      // if (clusters.h_clusters[i].z_mean > zmax)
+      //   zmax = clusters.h_clusters[i].z_mean;
+    }
+    // printf("Clusters spans from: (%f,%f,%f) to (%f,%f,%f)\n", xmin, ymin, zmin, xmax, ymax, zmax);
+  }
+  while (modified)
+  {
+    modified = false;
+    for (int i = 0; i < cloud.numPts; i++)
+    {
+      sqDistance = 65000.;
+      if (cloud.h_data[i].draw)
+      {
+        for (int j = 0; j < clusters.numClusters; j++)
+        {
+          tempDistance = pow(clusters.h_clusters[j].x_mean - cloud.h_data[i].x_3d, 2.) + pow(clusters.h_clusters[j].y_mean - cloud.h_data[i].y_3d, 2.) + pow(clusters.h_clusters[j].z_mean - cloud.h_data[i].z_3d, 2.);
+          if (tempDistance < sqDistance)
+          {
+
+            clusterIndex = j;
+            sqDistance = tempDistance;
+          }
+        }
+        if (cloud.h_data[i].clusterIndex != clusterIndex)
+        { // cluster Index for element changed, make another go!
+          cloud.h_data[i].clusterIndex = clusterIndex;
+          clusters.h_clusters[clusterIndex].n_matches++;
+          if (clusters.h_clusters[clusterIndex].n_matches == 1)
+          {
+            clusters.h_clusters[clusterIndex].x_mean = cloud.h_data[i].x_3d;
+            clusters.h_clusters[clusterIndex].y_mean = cloud.h_data[i].y_3d;
+            clusters.h_clusters[clusterIndex].z_mean = cloud.h_data[i].z_3d;
+          }
+          else
+          {
+            clusters.h_clusters[clusterIndex].x_mean = clusters.h_clusters[clusterIndex].x_mean + (cloud.h_data[i].x_3d - clusters.h_clusters[clusterIndex].x_mean) / ((float)clusters.h_clusters[clusterIndex].n_matches);
+            clusters.h_clusters[clusterIndex].y_mean = clusters.h_clusters[clusterIndex].y_mean + (cloud.h_data[i].y_3d - clusters.h_clusters[clusterIndex].y_mean) / ((float)clusters.h_clusters[clusterIndex].n_matches);
+            clusters.h_clusters[clusterIndex].z_mean = clusters.h_clusters[clusterIndex].z_mean + (cloud.h_data[i].z_3d - clusters.h_clusters[clusterIndex].z_mean) / ((float)clusters.h_clusters[clusterIndex].n_matches);
+          }
+          modified = true;
+        }
+      }
+    }
+    runCounter++;
+  }
+
+  //print info!
+  // for (int i = 0; i < clusters.numClusters; i++)
+  // {
+  //   // float xmin = 400., xmax = -400., ymin = 400., ymax = -400., zmin = 400., zmax = -400.;
+  //   for (int j = 0; j < cloud.numPts; j++)
+  //   {
+  //     if (cloud.h_data[j].draw == true)
+  //       if (cloud.h_data[j].clusterIndex == i)
+  //       {
+  //         //if (cloud.h_data[j].x_3d < xmin)
+  //         //  xmin = cloud.h_data[j].x_3d;
+  //         //if (cloud.h_data[j].y_3d < ymin)
+  //         //  ymin = cloud.h_data[j].y_3d;
+  //         //if (cloud.h_data[j].z_3d < zmin)
+  //         //  zmin = cloud.h_data[j].z_3d;
+  //         //if (cloud.h_data[j].x_3d > xmax)
+  //         //  xmax = cloud.h_data[j].x_3d;
+  //         //if (cloud.h_data[j].y_3d > ymax)
+  //         //  ymax = cloud.h_data[j].y_3d;
+  //         //if (cloud.h_data[j].z_3d > zmax)
+  //         //  zmax = cloud.h_data[j].z_3d;
+  //       }
+  //   }
+  //   if (xmin < 300)
+  //     printf("Cluster %d spans from: (%f,%f,%f) to (%f,%f,%f), center at: (%f, %f, %f) number of points: %d\n", i, xmin, ymin, zmin, xmax, ymax, zmax, clusters.h_clusters[i].x_mean, clusters.h_clusters[i].y_mean, clusters.h_clusters[i].z_mean, clusters.h_clusters[i].n_matches);
+  // }
+}
+
+void Computation::StoreClusterPositions(KMeansClusterSet &input, KMeansClusterSet &storage, quat &rotation, quat &translation, int thresh_update, int thresh_new_cluster, float min_distance)
+{
+  if (thresh_update >= thresh_new_cluster)
+  {
+    printf("ERROR: Launched StoreClusterPositions with thresh_new_cluster thresh_update >= thresh_new_cluster!!\n");
+    exit(1);
+  }
+  for (int i = 0; i < input.numClusters; i++)
+  {
+    if (input.h_clusters[i].n_matches >= thresh_update)
+    {
+      bool found = false;
+      for (int j = 0; j < storage.numClusters; j++)
+      {
+        float tempDistance = pow(input.h_clusters[i].x_mean - storage.h_clusters[j].x_mean, 2.) + pow(input.h_clusters[i].y_mean - storage.h_clusters[j].y_mean, 2.) + pow(input.h_clusters[i].z_mean - storage.h_clusters[j].z_mean, 2.);
+        if (tempDistance <= min_distance)
+        {
+          found = true;
+          storage.h_clusters[j].x_mean = storage.h_clusters[j].x_mean + (input.h_clusters[i].x_mean - storage.h_clusters[j].x_mean) / ((float)storage.h_clusters[j].n_matches);
+          storage.h_clusters[j].y_mean = storage.h_clusters[j].y_mean + (input.h_clusters[i].y_mean - storage.h_clusters[j].y_mean) / ((float)storage.h_clusters[j].n_matches);
+          storage.h_clusters[j].z_mean = storage.h_clusters[j].z_mean + (input.h_clusters[i].z_mean - storage.h_clusters[j].z_mean) / ((float)storage.h_clusters[j].n_matches);
+          storage.h_clusters[j].n_matches++;
+        }
+      }
+      if ((found == false) && (storage.numClusters >= storage.maxClusters))
+      {
+        printf("WARNING: Storage Clusterset full!\n");
+        exit(1);
+      }
+      if ((input.h_clusters[i].n_matches >= thresh_new_cluster) && (found == false))
+      {
+        storage.h_clusters[storage.numClusters].x_mean = input.h_clusters[i].x_mean;
+        storage.h_clusters[storage.numClusters].y_mean = input.h_clusters[i].y_mean;
+        storage.h_clusters[storage.numClusters].z_mean = input.h_clusters[i].z_mean;
+        storage.h_clusters[storage.numClusters].n_matches = 1;
+        storage.numClusters++;
+      }
+    }
+  }
+}
+
+void Computation::InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev, bool shared)
 {
   data.numPts = 0;
   data.maxPts = numPoints * numSlices;
@@ -3710,9 +2762,18 @@ void Computation::InitSiftData(SiftData &data, int numPoints, int numSlices, boo
   cudaMallocManaged((void **)&data.m_data, sz);
 #else
   data.h_data = NULL;
+  if (shared)
+  {
+    host = false;
+    dev = false;
+    cudaHostAlloc((void **)&(data.h_data), sz, cudaHostAllocMapped);
+    cudaHostGetDevicePointer((void **)&(data.d_data), (void *)(data.h_data), 0);
+  }
   if (host)
+  {
     data.h_data = (SiftPoint *)malloc(sz);
-  data.d_data = NULL;
+    data.d_data = NULL;
+  }
   if (dev)
     cudaMalloc((void **)&data.d_data, sz);
 #endif
@@ -4337,96 +3398,6 @@ __global__ void ComputeHomographies(float *coord, int *randPts, float *homo,
   __syncthreads();
 }
 
-void Computation::FindHomography(SiftData &data, float *homography, int *numMatches, int numLoops, float minScore, float maxAmbiguity, float thresh)
-{
-  *numMatches = 0;
-  homography[0] = homography[4] = homography[8] = 1.0f;
-  homography[1] = homography[2] = homography[3] = 0.0f;
-  homography[5] = homography[6] = homography[7] = 0.0f;
-#ifdef MANAGEDMEM
-  SiftPoint *d_sift = data.m_data;
-#else
-  if (data.d_data == NULL)
-    return;
-  SiftPoint *d_sift = data.d_data;
-#endif
-  numLoops = iDivUp(numLoops, 16) * 16;
-  int numPts = data.numPts;
-  if (numPts < 8)
-    return;
-  int numPtsUp = iDivUp(numPts, 16) * 16;
-  float *d_coord, *d_homo;
-  int *d_randPts, *h_randPts;
-  int randSize = 4 * sizeof(int) * numLoops;
-  int szFl = sizeof(float);
-  int szPt = sizeof(SiftPoint);
-  cudaMalloc((void **)&d_coord, 4 * sizeof(float) * numPtsUp);
-  cudaMalloc((void **)&d_randPts, randSize);
-  cudaMalloc((void **)&d_homo, 8 * sizeof(float) * numLoops);
-  h_randPts = (int *)malloc(randSize);
-  float *h_scores = (float *)malloc(sizeof(float) * numPtsUp);
-  float *h_ambiguities = (float *)malloc(sizeof(float) * numPtsUp);
-  cudaMemcpy2D(h_scores, szFl, &d_sift[0].score, szPt, szFl, numPts, cudaMemcpyDeviceToHost);
-  cudaMemcpy2D(h_ambiguities, szFl, &d_sift[0].ambiguity, szPt, szFl, numPts, cudaMemcpyDeviceToHost);
-  int *validPts = (int *)malloc(sizeof(int) * numPts);
-  int numValid = 0;
-  for (int i = 0; i < numPts; i++)
-  {
-    if (h_scores[i] > minScore && h_ambiguities[i] < maxAmbiguity)
-      validPts[numValid++] = i;
-  }
-  free(h_scores);
-  free(h_ambiguities);
-  if (numValid >= 8)
-  {
-    for (int i = 0; i < numLoops; i++)
-    {
-      int p1 = rand() % numValid;
-      int p2 = rand() % numValid;
-      int p3 = rand() % numValid;
-      int p4 = rand() % numValid;
-      while (p2 == p1)
-        p2 = rand() % numValid;
-      while (p3 == p1 || p3 == p2)
-        p3 = rand() % numValid;
-      while (p4 == p1 || p4 == p2 || p4 == p3)
-        p4 = rand() % numValid;
-      h_randPts[i + 0 * numLoops] = validPts[p1];
-      h_randPts[i + 1 * numLoops] = validPts[p2];
-      h_randPts[i + 2 * numLoops] = validPts[p3];
-      h_randPts[i + 3 * numLoops] = validPts[p4];
-    }
-    cudaMemcpy(d_randPts, h_randPts, randSize, cudaMemcpyHostToDevice);
-    cudaMemcpy2D(&d_coord[0 * numPtsUp], szFl, &d_sift[0].xpos, szPt, szFl, numPts, cudaMemcpyDeviceToDevice);
-    cudaMemcpy2D(&d_coord[1 * numPtsUp], szFl, &d_sift[0].ypos, szPt, szFl, numPts, cudaMemcpyDeviceToDevice);
-    cudaMemcpy2D(&d_coord[2 * numPtsUp], szFl, &d_sift[0].match_xpos, szPt, szFl, numPts, cudaMemcpyDeviceToDevice);
-    cudaMemcpy2D(&d_coord[3 * numPtsUp], szFl, &d_sift[0].match_ypos, szPt, szFl, numPts, cudaMemcpyDeviceToDevice);
-    ComputeHomographies<<<numLoops / 16, 16>>>(d_coord, d_randPts, d_homo, numPtsUp);
-    cudaDeviceSynchronize();
-    checkMsg("ComputeHomographies() execution failed\n");
-    dim3 blocks(1, numLoops / TESTHOMO_LOOPS);
-    dim3 threads(TESTHOMO_TESTS, TESTHOMO_LOOPS);
-    TestHomographies<<<blocks, threads>>>(d_coord, d_homo, d_randPts, numPtsUp, thresh * thresh);
-    cudaDeviceSynchronize();
-    checkMsg("TestHomographies() execution failed\n");
-    cudaMemcpy(h_randPts, d_randPts, sizeof(int) * numLoops, cudaMemcpyDeviceToHost);
-    int maxIndex = -1, maxCount = -1;
-    for (int i = 0; i < numLoops; i++)
-      if (h_randPts[i] > maxCount)
-      {
-        maxCount = h_randPts[i];
-        maxIndex = i;
-      }
-    *numMatches = maxCount;
-    cudaMemcpy2D(homography, szFl, &d_homo[maxIndex], sizeof(float) * numLoops, szFl, 8, cudaMemcpyDeviceToHost);
-  }
-  free(validPts);
-  free(h_randPts);
-  cudaFree(d_homo);
-  cudaFree(d_randPts);
-  cudaFree(d_coord);
-}
-
 void CudaImage::Allocate(int w, int h, int p, bool host, float *devmem, float *hostmem, bool withPixelFlags)
 {
   width = w;
@@ -4532,97 +3503,12 @@ void Computation::MatchSiftData(SiftData &data1, SiftData &data2, cudaStream_t s
   SiftPoint *sift2 = data2.d_data;
 #endif
 
-// Original version with correlation and maximization in two different kernels
-// Global memory reguirement: O(N^2)
-#if 0
-  float *d_corrData; 
-  int corrWidth = iDivUp(numPts2, 16)*16;
-  int corrSize = sizeof(float)*numPts1*corrWidth;
-  safeCall(cudaMalloc((void **)&d_corrData, corrSize));
-#if 0 // K40c 10.9ms, 1080 Ti 3.8ms
-  dim3 blocks1(numPts1, iDivUp(numPts2, 16));
-  dim3 threads1(16, 16); // each block: 1 points x 16 points
-  MatchSiftPoints<<<blocks1, threads1>>>(sift1, sift2, d_corrData, numPts1, numPts2);
-#else // K40c 7.6ms, 1080 Ti 1.4ms
-  dim3 blocks(iDivUp(numPts1,16), iDivUp(numPts2, 16));
-  dim3 threads(16, 16); // each block: 16 points x 16 points
-  MatchSiftPoints2<<<blocks, threads>>>(sift1, sift2, d_corrData, numPts1, numPts2);
-#endif
-  safeCall(cudaDeviceSynchronize());
-  dim3 blocksMax(iDivUp(numPts1, 16));
-  dim3 threadsMax(16, 16);
-  FindMaxCorr<<<blocksMax, threadsMax>>>(d_corrData, sift1, sift2, numPts1, corrWidth, sizeof(SiftPoint));
-  safeCall(cudaDeviceSynchronize());
-  checkMsg("FindMaxCorr() execution failed\n");
-  safeCall(cudaFree(d_corrData));
-#endif
-
-// Version suggested by Nicholas Lin with combined correlation and maximization
-// Global memory reguirement: O(N)
-#if 0 // K40c 51.2ms, 1080 Ti 9.6ms
-  int block_dim = 16;
-  float *d_corrData;
-  int corrSize = numPts1 * block_dim * 2;
-  safeCall(cudaMalloc((void **)&d_corrData, sizeof(float) * corrSize));
-  dim3 blocks(iDivUp(numPts1, block_dim));
-  dim3 threads(block_dim, block_dim); 
-  FindMaxCorr3<<<blocks, threads >>>(d_corrData, sift1, sift2, numPts1, numPts2);
-  safeCall(cudaDeviceSynchronize());
-  checkMsg("FindMaxCorr3() execution failed\n");
-  safeCall(cudaFree(d_corrData));
-#endif
-
-// Combined version with no global memory requirement using one 1 point per block
-#if 0 // K40c 8.9ms, 1080 Ti 2.1ms, 2080 Ti 1.0ms
-  dim3 blocksMax(numPts1);
-  dim3 threadsMax(FMC2W, FMC2H);
-  FindMaxCorr2<<<blocksMax, threadsMax>>>(sift1, sift2, numPts1, numPts2);
-  safeCall(cudaDeviceSynchronize());
-  checkMsg("FindMaxCorr2() execution failed\n");
-#endif
-
-// Combined version with no global memory requirement using one FMC2H points per block
-#if 0 // K40c 9.2ms, 1080 Ti 1.3ms, 2080 Ti 1.1ms
-  dim3 blocksMax2(iDivUp(numPts1, FMC2H));
-  dim3 threadsMax2(FMC2W, FMC2H);
-  FindMaxCorr4<<<blocksMax2, threadsMax2>>>(sift1, sift2, numPts1, numPts2);
-  safeCall(cudaDeviceSynchronize());
-  checkMsg("FindMaxCorr4() execution failed\n");
-#endif
-
 // Combined version with no global memory requirement using global locks
 #if 1
   dim3 blocksMax3(iDivUp(numPts1, 16), iDivUp(numPts2, 512));
   dim3 threadsMax3(16, 16);
   CleanMatches<<<iDivUp(numPts1, 64), 64>>>(sift1, numPts1);
-  int mode = 5;
-  if (mode == 5) // K40c 5.0ms, 1080 Ti 1.2ms, 2080 Ti 0.83ms
-    FindMaxCorr5<<<blocksMax3, threadsMax3, 0, stream>>>(sift1, sift2, numPts1, numPts2);
-  else if (mode == 6)
-  { // 2080 Ti 0.89ms
-    threadsMax3 = dim3(32, 16);
-    FindMaxCorr6<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  }
-  else if (mode == 7) // 2080 Ti 0.50ms
-    FindMaxCorr7<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  else if (mode == 8)
-  { // 2080 Ti 0.45ms
-    blocksMax3 = dim3(iDivUp(numPts1, FMC_BW), iDivUp(numPts2, FMC_GH));
-    threadsMax3 = dim3(FMC_NW, FMC_NH);
-    FindMaxCorr8<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  }
-  else if (mode == 9)
-  { // 2080 Ti 0.46ms
-    blocksMax3 = dim3(iDivUp(numPts1, FMC_BW), iDivUp(numPts2, FMC_GH));
-    threadsMax3 = dim3(FMC_NW, FMC_NH);
-    FindMaxCorr9<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  }
-  else if (mode == 10)
-  { // 2080 Ti 0.24ms
-    blocksMax3 = dim3(iDivUp(numPts1, M7W));
-    threadsMax3 = dim3(M7W, M7H / M7R);
-    FindMaxCorr10<<<blocksMax3, threadsMax3>>>(sift1, sift2, numPts1, numPts2);
-  }
+  FindMaxCorr5<<<blocksMax3, threadsMax3, 0, stream>>>(sift1, sift2, numPts1, numPts2);
   cudaDeviceSynchronize();
   checkMsg("FindMaxCorr5() execution failed\n");
 #endif
@@ -4648,20 +3534,12 @@ void Computation::yuvToRGB_Convert(CudaImage &RGBImage, unsigned char *yuvdata)
   gpuConvertYUYVtoRGBfloat_kernel<<<blocks, threads>>>(yuvdata, RGBImage.d_data, width, height);
 }
 
-void Computation::sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata, float amount)
-{
-
-  dim3 block(16, 16, 1);
-  dim3 grid(1920 / block.x + 1, 1080 / block.y + 1, 1);
-
-  gpuSharpenImageToGrayscale<<<grid, block, 0>>>(yuvdata, greyscaleImage.d_data, 1920, 1080, amount);
-}
-
-void Computation::drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream)
+void Computation::drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream, KMeansClusterSet kMeansClusters)
 {
   dim3 blocks = dim3(2048);
   dim3 threads = dim3(1);
-  gpuDrawSiftData<<<blocks, threads, 0, stream>>>(rgbImage, greyscaleImage.d_data, siftData.d_data, siftData.numPts, width, height);
+  gpuDrawSiftData<<<blocks, threads, 0, stream>>>(rgbImage, greyscaleImage.d_data, siftData.d_data, siftData.numPts, width, height, kMeansClusters.d_clusters, kMeansClusters.numClusters);
+  cudaDeviceSynchronize();
   checkMsg("gpuDrawSiftData:\n");
 }
 
@@ -4733,53 +3611,6 @@ void Computation::buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width,
   checkMsg("Problem with gpuNormalizeToInt16:\n");
 }
 
-void Computation::tof_sobel(float *dst_mag, float *dst_phase, float *src, cudaStream_t stream)
-{
-
-  int width = 265;
-  int height = 205;
-
-  dim3 block(16, 16, 1);
-  dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
-  gpuSobelToF<<<grid, block, 0, stream>>>(dst_mag, dst_phase, src, width, height);
-  checkMsg("Problem with gpuSobelToF:\n");
-}
-
-void Computation::tof_maxfilter_3x3(float *dst_mag, float *src, cudaStream_t stream)
-{
-
-  int width = 256;
-  int height = 205;
-
-  dim3 block(16, 16, 1);
-  dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
-  gpuMaxfilterToF<<<grid, block, 0, stream>>>(dst_mag, src, width, height);
-  checkMsg("Problem with gpuMaxFilter:\n");
-}
-
-void Computation::tof_minfilter_3x3(float *dst_mag, float *src, cudaStream_t stream)
-{
-
-  int width = 256;
-  int height = 205;
-
-  dim3 block(16, 16, 1);
-  dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
-  gpuMinfilterToF<<<grid, block, 0, stream>>>(dst_mag, src, width, height);
-  checkMsg("Problem with gpuMaxFilter:\n");
-}
-
-void Computation::tof_meanfilter_3x3(float *dst_mag, float *src, cudaStream_t stream)
-{
-
-  int width = 256;
-  int height = 205;
-
-  dim3 block(16, 16, 1);
-  dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
-  gpuMeanfilterToF<<<grid, block, 0, stream>>>(dst_mag, src, width, height);
-  checkMsg("Problem with gpuMaxFilter:\n");
-}
 
 void Computation::tof_medianfilter_3x3(float *dst_mag, float *src, cudaStream_t stream)
 {
@@ -4790,18 +3621,6 @@ void Computation::tof_medianfilter_3x3(float *dst_mag, float *src, cudaStream_t 
   dim3 block(16, 16, 1);
   dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
   gpuMedianfilterToF<<<grid, block, 0, stream>>>(dst_mag, src, width, height);
-  checkMsg("Problem with gpuMaxFilter:\n");
-}
-
-void Computation::tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh, cudaStream_t stream)
-{
-
-  int width = 265;
-  int height = 205;
-
-  dim3 block(16, 16, 1);
-  dim3 grid(265 / block.x + 1, 205 / block.y + 1, 1);
-  gpuFillAreaToF<<<grid, block, 0, stream>>>(mask, src, width, height, seed_x, seed_y, thresh);
   checkMsg("Problem with gpuMaxFilter:\n");
 }
 
@@ -4917,6 +3736,7 @@ void Computation::addDepthInfoToSift(SiftData &data, float *depthData, cudaStrea
   data.numPts = 5;
 #endif
   gpuAddDepthInfoToSift<<<blocks, threads, 0, stream>>>(data.d_data, depthData, data.numPts, x, y, z, conf);
+  cudaStreamSynchronize(stream);
   checkMsg("Problem with gpuAddDepthInfoToSift:\n");
 }
 

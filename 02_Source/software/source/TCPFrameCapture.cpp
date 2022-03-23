@@ -100,10 +100,6 @@ size_t TCPFrameCapture::receive_all(int socket_desc, char *client_message, struc
 void TCPFrameCapture::start(Computation *computation_p)
 {
     computation = computation_p;
-    // buffers[0] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
-    // buffers[1] = (uint16_t *)malloc(352 * 286 * 6 * sizeof(uint16_t));
-    // image_x = (uint16_t *)malloc(205 * 265 * sizeof(uint16_t));
-    // image_y = (uint16_t *)malloc(205 * 265 * sizeof(uint16_t));
     cudaSetDeviceFlags(cudaDeviceMapHost);
 
     buffers_h[0] = NULL;
@@ -166,17 +162,16 @@ void TCPFrameCapture::start(Computation *computation_p)
 
     cudaMalloc((void **)&index_list_d, 512 * 512 * sizeof(bool));
 // checkMsg("Problem with cudaMalloc [3]");
-#ifdef PRINT_DATA
-    computation->InitSiftData(siftData[0], 512, 1, true, true);
-    computation->InitSiftData(siftData[1], 512, 1, true, true);
-#else
-    computation->InitSiftData(siftData[0], 512, 1, false, true);
-    computation->InitSiftData(siftData[1], 512, 1, false, true);
-#endif
+
+    computation->InitSiftData(siftData[0], 512, 1, false, false, true);
+    computation->InitSiftData(siftData[1], 512, 1, false, false, true);
+
     siftImage.Allocate(256, 205, 256, false, NULL, NULL);
     memoryTmp = computation->AllocSiftTempMemory(256, 205, 5, true);
-    computation->InitClusterSet(kMeansClusters, 160, false, false, true);
-    computation->InitClusterSet(spatialObjects, 200, false, false, true);
+    computation->InitClusterSet(kMeansClusters, 20, false, false, true);
+    computation->InitClusterSet(kMeansClusterStorage, 200, false, false, true);
+
+    
 
     FILE *datfile;
     char buff[256];
@@ -286,30 +281,17 @@ void TCPFrameCapture::run()
     servaddr.sin_port = htons(23999);
     servaddr.sin_addr.s_addr = inet_addr("10.42.0.58");
 
-    
-    double quality = 0.0f;
-    int inliers_count = 0;
-    int frame_count = 0;
-    int outliers_count = 0;
-    float x_traveled = 0.;
-    float y_traveled = 0.;
-    float z_traveled = 0.;
-    float min_diag = 1.0;
     float initBlur = 0.0f;
     float thresh = 2.0f;
     float lowestScale = 0.0f;
     newdata = false;
     standing_still = false;
-    int frame_counter = -5;
     std::cout << "Start loop" << std::endl;
     while (running)
     {
         
-       
-        // std::cout << "Start of loop" << std::endl;
         //Receive a reply from the server
         size_t len = receive_all(sockfd, buffer, servaddr);
-        // std::cout << +(buffer[ELEMENT*2]) << ":"<< +(buffer[ELEMENT*2+1]) << " ";
         if (len < 0)
         {
             printf("recv failed");
@@ -317,39 +299,21 @@ void TCPFrameCapture::run()
         }
         if (len != 503360)
             continue;
+
+        // If data is valid:  Copy data to 
         startTime = std::chrono::steady_clock::now();
-        // printf("Server reply len: = %ld\n", len);
 
-        int offset_src = 0;
+        memcpy(ampl_h, buffer, 352 * 286 * sizeof(uint16_t));
+        int offset_radial = 302016;
+        memcpy(radial_h, buffer + offset_radial, 352 * 286 * sizeof(uint16_t));
 
-        // std::cout << "locking W" << write_buf_id << std::endl;
-        memcpy(ampl_h, buffer + offset_src, 352 * 286 * sizeof(uint16_t));
-        offset_src += 352 * 286 * sizeof(uint16_t);
-        //memcpy(conf_h, server_data + offset_src, 352 * 286 * sizeof(uint8_t));
-        // std::cout << (ampl_h)[ELEMENT] << std::endl;
-        for (int i = 0; i < 352 * 286; i++)
-        {
-            uint16_t *ptr = conf_h + i;
-            *ptr = buffer[offset_src + i] * 255;
-        }
-        offset_src += 352 * 286 * sizeof(uint8_t);
-        memcpy(radial_h, buffer + offset_src, 352 * 286 * sizeof(uint16_t));
-
-        // std::cout << "start undistorting" << std::endl;
         cudaStreamSynchronize(tcpCaptureStream);
-        // std::cout << "[" << frame_counter << ";";
-        frame_counter++;
 
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[1], radial_d, image_x_d, image_y_d, tcpCaptureStream, cos_alpha_map_d);
-        // computation->buffer_Float_to_uInt16x4(y_d,temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
         computation->tof_medianfilter_3x3(temp_mem_265x205xfloat_0_d[0], temp_mem_265x205xfloat_0_d[1], tcpCaptureStream);
         checkMsg("Error at tof_camera_undistort\n");        
         computation->tof_camera_undistort(temp_mem_265x205xfloat_0_d[5], ampl_d, image_x_d, image_y_d, tcpCaptureStream);
-        // computation->buffer_Float_to_uInt16x4(x_d,temp_mem_265x205xfloat_0_d[5],256,205, tcpCaptureStream);
         computation->scale_float_to_float(siftImage.d_data, temp_mem_265x205xfloat_0_d[5], 256, 205, tcpCaptureStream);
-
-        cudaStreamSynchronize(tcpCaptureStream);
-        // std::this_thread::sleep_for(std::chrono::microseconds(50000));
         checkMsg("Error at cudaStreamSynchronize\n");
         computation->ExtractSift(siftData[write_buf_id], siftImage, 4, initBlur, thresh, 0.0f, false, memoryTmp, NULL, tcpCaptureStream);
         checkMsg("Error at ExtractSift\n");
@@ -359,13 +323,8 @@ void TCPFrameCapture::run()
             continue;
         }
         
-        // std::cout << "Undistorted data, adding Deptht Info to Sift features" << std::endl;
-        computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]);
-        
-        cudaStreamSynchronize(tcpCaptureStream);
-        // std::cout << siftData[write_buf_id].numPts << ";";
-        // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[1],256,205, tcpCaptureStream);
-        // std::cout << std::endl << std::endl << cnt << "n:" << n << std::endl;
+        computation->addDepthInfoToSift(siftData[write_buf_id], temp_mem_265x205xfloat_0_d[0], tcpCaptureStream, temp_mem_265x205xfloat_0_d[1], temp_mem_265x205xfloat_0_d[2], temp_mem_265x205xfloat_0_d[3], temp_mem_265x205xfloat_0_d[4]); 
+        computation->InitSeedPoints(kMeansClusters);
         if (write_buf_id == 0)
         {
             computation->MatchSiftData(siftData[0], siftData[1], tcpCaptureStream);
@@ -375,6 +334,7 @@ void TCPFrameCapture::run()
             computation->findRotationTranslation_step2(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->ransacFromFoundRotationTranslation(siftData[0], siftData[1], best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->findOptimalRotationTranslation(siftData[0], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
+            computation->kMeansClustering(kMeansClusters,siftData[0]);
         }
         else
         {
@@ -385,7 +345,9 @@ void TCPFrameCapture::run()
             computation->findRotationTranslation_step2(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->ransacFromFoundRotationTranslation(siftData[1], siftData[0], best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->findOptimalRotationTranslation(siftData[1], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
+            computation->kMeansClustering(kMeansClusters,siftData[1]);
         }
+        
         if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 0.1) || (0))
         {
             standing_still = false;
@@ -395,43 +357,14 @@ void TCPFrameCapture::run()
             standing_still = true;
         }
         cudaStreamSynchronize(tcpCaptureStream);
-        
-        if (min_diag > *(best_rotation_h[0][0]))
-            min_diag = *(best_rotation_h[0][0]);
-        if (min_diag > *(best_rotation_h[1][1]))
-            min_diag = *(best_rotation_h[1][1]);
-        if (min_diag > *(best_rotation_h[2][2]))
-            min_diag = *(best_rotation_h[2][2]);
-        //
-        if ((*(best_rotation_h[0][0]) < 0.9995) || (*(best_rotation_h[1][1]) < 0.9995) || (*(best_rotation_h[2][2]) < 0.9995))
-        {
-            outliers_count++;
-        }
-        else
-        {
-            x_traveled += *(best_translation_h[0]);
-            y_traveled += *(best_translation_h[1]);
-            z_traveled += *(best_translation_h[2]);
-            quality += ((double)(*(best_rotation_h[0][0]) + *(best_rotation_h[1][1]) + *(best_rotation_h[2][2]))) / 3.0;
-            inliers_count++;
-        }
 
-        if ((frame_count > 0) && (frame_count % 100 == 0))
-        {
-        }
         m_lock[write_buf_id].lockW();
-        frame_count++;
-        // std::cout << "writing buffers...?" << std::endl;
+        quat rot;
+        quat trans;
+        computation->StoreClusterPositions(kMeansClusters, kMeansClusterStorage, rot, trans, 10, 30, 0.5);
         for (uint16_t* i : outputBuffers) {
-            computation->drawSiftData(i, siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream);
-            
-            //std::cout << "wrote into buffer: " << (void*)i << std::endl;
+            computation->drawSiftData(i, siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream, kMeansClusterStorage);
         }
-        // cudaStreamSynchronize(tcpCaptureStream);
-
-        // computation->buffer_Float_to_uInt16x4(buffers_d[write_buf_id],temp_mem_265x205xfloat_0_d[0],256,205, tcpCaptureStream);
-        // cudaStreamSynchronize(tcpCaptureStream);
-        // Processing finished, change buffer index.
         for (int i = 0; i < 4; i++)
         {
             for (int j = 0; j < 4; j++)

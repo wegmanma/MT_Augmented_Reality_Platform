@@ -135,7 +135,10 @@ typedef struct{
   int n_matches;
   float x_mean;
   float y_mean;
-  float z_mean; 
+  float z_mean;
+  int color_red;
+  int color_green;
+  int color_blue; 
 } KMeansCluster ;
 
 typedef struct{
@@ -227,8 +230,14 @@ struct Vertex2 {
     void cleanup();
 
 void InitClusterSet(KMeansClusterSet &data, int numPoints, bool host, bool dev, bool shared);
+
+void InitSeedPoints(KMeansClusterSet &data);
+
+void kMeansClustering(KMeansClusterSet &clusters, SiftData &cloud);
+
+void StoreClusterPositions(KMeansClusterSet &input, KMeansClusterSet &storage, quat &rotation, quat &translation, int thresh_update, int thresh_new_cluster, float min_distance);
     
-void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev);
+void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev, bool shared);
 
 float *AllocSiftTempMemory(int width, int height, int numOctaves, bool scaleUp);
 
@@ -238,25 +247,13 @@ void MatchSiftData(SiftData &data1, SiftData &data2, cudaStream_t stream);
 
 void yuvToRGB_Convert(CudaImage &RGBImage, unsigned char *yuvdata);
 
-void sharpenImage(CudaImage &greyscaleImage, unsigned char *yuvdata, float amount);
-
 void LowPass_prepareKernel(void);
 
 void tof_camera_undistort(float *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream, float *cosAlpha = NULL);
 
 void rpi_camera_undistort(uint16_t *dst, uint16_t *src, uint16_t *xCoordsPerPixel, uint16_t *yCoordsPerPixel, cudaStream_t stream);
 
-void tof_sobel(float *dst_mag, float *dst_phase, float *src, cudaStream_t stream);
-
-void tof_maxfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
-
-void tof_minfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
-
-void tof_meanfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
-
 void tof_medianfilter_3x3(float *dst_mag, float *src, cudaStream_t stream);
-
-void tof_fill_area(float *mask, float *src, int seed_x, int seed_y, float thresh, cudaStream_t stream);
 
 void scale_float_to_float(float *dst, float *src, int width, int height, cudaStream_t stream);
 
@@ -268,9 +265,7 @@ void buffer_uint16x4_to_Float(float *dst, uint16_t *src, int width, int height, 
 
 int8_t gpuConvertBayer10toRGB(uint16_t * src, uint16_t * dst, const int width, const int height, const enum AVPixelFormat format, const uint8_t bpp, cudaStream_t stream);
 
-void drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream);
-
-void FindHomography(SiftData &data, float *homography, int *numMatches, int numLoops, float minScore, float maxAmbiguity, float thresh);
+void drawSiftData(uint16_t *rgbImage, CudaImage &greyscaleImage, SiftData &siftData, int width, int height, cudaStream_t stream, KMeansClusterSet kMeansClusters);
 
 void addDepthInfoToSift(SiftData &data, float* depthData, cudaStream_t stream, float *x, float *y, float *z, float *conf);
 
@@ -303,8 +298,6 @@ void FreeSiftTempMemory(float *memoryTmp);
 void PrepareLaplaceKernels(int numOctaves, float initBlur, float *kernel);
 
 void LowPass(CudaImage &res, CudaImage &src, float scale, unsigned char *chardata = NULL);
-
-void LowPass_forSubImages(float *res, float *src, int width, int height);
 
 int ExtractSiftLoop(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh, float lowestScale, float subsampling, float *memoryTmp, float *memorySub);
 

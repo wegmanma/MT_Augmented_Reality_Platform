@@ -46,10 +46,8 @@ private:
 
     std::vector<uint16_t*> outputBuffers{};
 
-    KMeansClusterSet kMeansClusters; //Clusters in current image abc-coords
-    KMeansClusterSet spatialObjects; //Clusters in scene, xyz-coords
-
-    
+    KMeansClusterSet kMeansClusters; //Clusters in current image abc-coords    
+    KMeansClusterSet kMeansClusterStorage; //Clusters in scene, xyz-coords
 
     float *cos_alpha_map_h;
     float *cos_alpha_map_d;
