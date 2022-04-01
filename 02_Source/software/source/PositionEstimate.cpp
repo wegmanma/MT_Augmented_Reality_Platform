@@ -189,17 +189,19 @@ void kalmanCorrectionStep(mat4x17 H_k, mat17x17 P_apriori, mat17x17 P_aposterior
     }
 }
 
-void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
+void PositionEstimate::get_gyro_matrix(mat4x4 &gyro_matrix, mat4x4 &translation)
 {
     mat4x4 ToFrotation;
     quat ToFQuaterion;
     int newdata;
     float vec_len_i;
     int ToFmtx = tcpCapture->lockMutex();
+    
     newdata = tcpCapture->getRotationTranslation(ToFmtx, ToFrotation, tof_translation_abc);
     tcpCapture->unlockMutex(ToFmtx);
     if (newdata > 0)
     {
+        std::cout << "Step 3: Get Gyro Matrix" << std::endl;
         int meas_cnt_i;
         mtx.lock();
         vec4 accel_m_per_sq_s_i;
@@ -567,14 +569,17 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
             //std::cout << nseconds_i << ";";
             // print_quat("quat_gyro", quat_gyro, true, true);
             // print_quat("ToFquaternion", ToFQuaterion, true, true);
-            // print_quat("kalman_rotation", kalman_rotation, true, true);
+            
             // print_quat("kalman_rot_speed", kalman_rot_speed, true, true);
             // print_quat("delta_vector_xyz", delta_vector_xyz, true, true);
             // print_vec4("tof_translation_xyz", tof_translation_xyz, true, true);
-            print_quat("kalman_translation", kalman_translation, false, false);
-            print_quat("kalman_velocity", kalman_velocity, false, false);
+            quat position_from_clustering;
+            tcpCapture->setRotationTranslation(kalman_rotation,kalman_translation_from_velocity, position_from_clustering);
+            // print_quat("kalman_rotation", kalman_rotation, false, false);
+            // print_quat("kalman_translation", kalman_translation, false, false);
+            // print_quat("kalman_velocity", kalman_velocity, false, false);
             // print_quat("kalman_acceleration", kalman_acceleration, true, true);
-            // print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, true, true);
+            // print_vec4("kalman_translation_from_velocity", kalman_translation_from_velocity, false, false);
             // std::cout << "]," << std::endl;
             //
         }
@@ -591,6 +596,10 @@ void PositionEstimate::get_gyro_matrix(mat4x4 gyro_matrix)
 
     // update the matrix
     mat4x4_from_quat(quat_matrix, kalman_rotation);
+    //mat4x4_translate(quat_matrix, kalman_translation_from_velocity[0],kalman_translation_from_velocity[1],kalman_translation_from_velocity[2]);
+    mat4x4_identity(translation);
+    mat4x4_translate(translation,kalman_translation_from_velocity[0],kalman_translation_from_velocity[1],kalman_translation_from_velocity[2]);
+    
     mat4x4_dup(gyro_matrix, quat_matrix);
 }
 

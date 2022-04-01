@@ -13,7 +13,7 @@ public:
 PositionEstimate(TCPFrameCapture *tcpCapture_p);
 ~PositionEstimate();
 
-void get_gyro_matrix(mat4x4 gyro_matrix);
+void get_gyro_matrix(mat4x4 &gyro_matrix, mat4x4 &translation);
 
 private:
 

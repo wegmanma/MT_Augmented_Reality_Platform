@@ -110,7 +110,6 @@ void TCPFrameCapture::start(Computation *computation_p)
     ampl_h = NULL;
     conf_h = NULL;
     cos_alpha_map_h = NULL;
-    
 
     cudaHostAlloc((void **)&buffers_h[0], 205 * 265 * 4 * sizeof(uint16_t), cudaHostAllocMapped);
     cudaHostAlloc((void **)&buffers_h[1], 205 * 265 * 4 * sizeof(uint16_t), cudaHostAllocMapped);
@@ -287,6 +286,8 @@ void TCPFrameCapture::run()
     newdata = false;
     standing_still = false;
     std::cout << "Start loop" << std::endl;
+
+    framecount = 0;
     while (running)
     {
         
@@ -299,10 +300,11 @@ void TCPFrameCapture::run()
         }
         if (len != 503360)
             continue;
-
+        std::cout << "Step 1: Got ToF image, frame " << framecount << std::endl;
+        
         // If data is valid:  Copy data to 
+        framecount++;
         startTime = std::chrono::steady_clock::now();
-
         memcpy(ampl_h, buffer, 352 * 286 * sizeof(uint16_t));
         int offset_radial = 302016;
         memcpy(radial_h, buffer + offset_radial, 352 * 286 * sizeof(uint16_t));
@@ -333,8 +335,9 @@ void TCPFrameCapture::run()
             computation->findRotationTranslation_step1(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->findRotationTranslation_step2(siftData[0], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->ransacFromFoundRotationTranslation(siftData[0], siftData[1], best_rotation_d, best_translation_d, tcpCaptureStream);
-            computation->findOptimalRotationTranslation(siftData[0], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
-            computation->kMeansClustering(kMeansClusters,siftData[0]);
+            computation->findOptimalRotationTranslation(siftData[0], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, framecount, tcpCaptureStream);
+            cudaStreamSynchronize(tcpCaptureStream);
+            computation->kMeansClustering(kMeansClusters,siftData[0],framecount);
         }
         else
         {
@@ -344,8 +347,9 @@ void TCPFrameCapture::run()
             computation->findRotationTranslation_step1(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->findRotationTranslation_step2(siftData[1], temp_mem_265x205xfloat_nocache_d, index_list_d, best_rotation_d, best_translation_d, tcpCaptureStream);
             computation->ransacFromFoundRotationTranslation(siftData[1], siftData[0], best_rotation_d, best_translation_d, tcpCaptureStream);
-            computation->findOptimalRotationTranslation(siftData[1], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, tcpCaptureStream);
-            computation->kMeansClustering(kMeansClusters,siftData[1]);
+            computation->findOptimalRotationTranslation(siftData[1], temp_mem_265x205xfloat_nocache_d, opt_rotation_d, opt_translation_d, framecount, tcpCaptureStream);
+            cudaStreamSynchronize(tcpCaptureStream);
+            computation->kMeansClustering(kMeansClusters,siftData[1], framecount);
         }
         
         if ((sqrt((*ransac_dy_h) * (*ransac_dy_h) + (*ransac_dx_h) * (*ransac_dx_h)) > 0.1) || (0))
@@ -359,9 +363,7 @@ void TCPFrameCapture::run()
         cudaStreamSynchronize(tcpCaptureStream);
 
         m_lock[write_buf_id].lockW();
-        quat rot;
-        quat trans;
-        computation->StoreClusterPositions(kMeansClusters, kMeansClusterStorage, rot, trans, 10, 30, 0.5);
+        std::cout << "Step 2: Analyzed ToF Image, writing to output data" << std::endl;
         for (uint16_t* i : outputBuffers) {
             computation->drawSiftData(i, siftImage, siftData[write_buf_id], 256, 205, tcpCaptureStream, kMeansClusterStorage);
         }
@@ -398,7 +400,30 @@ void TCPFrameCapture::run()
         double nseconds = double(timeSpan.count()) * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
  
         std::cout << "ToF FPS: " << 1/nseconds << std::endl;
+        
 
     }
     cudaStreamDestroy(tcpCaptureStream);
+}
+
+void TCPFrameCapture::setRotationTranslation(quat &rot, quat &trans, quat &pos) {
+    std::cout << "Step 4: Cluster-Housekeeping" << std::endl;
+    rotation[0] = rot[0];
+    rotation[1] = rot[1];
+    rotation[2] = rot[2];
+    rotation[3] = rot[3];
+    translation[0] = trans[0];
+    translation[1] = trans[1];
+    translation[2] = trans[2];
+    translation[3] = trans[3];
+    int valp;
+    computation->StoreClusterPositions(kMeansClusters, kMeansClusterStorage, rot, trans, 2, 10, 0.5,framecount);
+    computation->CleanStoredClusters(kMeansClusterStorage,0.2,rot, trans);
+
+    pos[0] = 0.;
+    pos[1] = 0.;
+    pos[2] = 0.;// (float)framecount/1000.;
+    pos[3] = 0.;
+
+
 }

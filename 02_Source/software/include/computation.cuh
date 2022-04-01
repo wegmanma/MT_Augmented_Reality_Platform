@@ -139,6 +139,7 @@ typedef struct{
   int color_red;
   int color_green;
   int color_blue; 
+  int active; // relevant for storage housekeeping
 } KMeansCluster ;
 
 typedef struct{
@@ -146,6 +147,7 @@ typedef struct{
   KMeansCluster *d_clusters;
   int maxClusters;
   int numClusters;
+  float averageDistance;
 
 } KMeansClusterSet;
 
@@ -233,10 +235,12 @@ void InitClusterSet(KMeansClusterSet &data, int numPoints, bool host, bool dev, 
 
 void InitSeedPoints(KMeansClusterSet &data);
 
-void kMeansClustering(KMeansClusterSet &clusters, SiftData &cloud);
+void kMeansClustering(KMeansClusterSet &clusters, SiftData &cloud, int framecount = 0);
 
-void StoreClusterPositions(KMeansClusterSet &input, KMeansClusterSet &storage, quat &rotation, quat &translation, int thresh_update, int thresh_new_cluster, float min_distance);
+void StoreClusterPositions(KMeansClusterSet &input, KMeansClusterSet &storage, quat &rotation, quat &translation, int thresh_update, int thresh_new_cluster, float min_distance, int framecount=0);
     
+void CleanStoredClusters(KMeansClusterSet &storage, float distance, quat &rotation, quat &translation);
+
 void InitSiftData(SiftData &data, int numPoints, int numSlices, bool host, bool dev, bool shared);
 
 float *AllocSiftTempMemory(int width, int height, int numOctaves, bool scaleUp);
@@ -277,7 +281,7 @@ void findRotationTranslation_step2(SiftData &data, float *tempMemory, bool *inde
 
 void ransacFromFoundRotationTranslation(SiftData &data, SiftData &data_old, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
 
-void findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, cudaStream_t stream);
+void findOptimalRotationTranslation(SiftData &data, float *tempMemory, mat4x4 *rotation, vec4 *translation, int framecount, cudaStream_t stream);
 
 void ransac2d(SiftData &data, SiftData &data_old, float *tempMemory, bool *index_list, float *dx, float *dy, cudaStream_t stream);
 

@@ -20,6 +20,8 @@ public:
 
     int getRotationTranslation(int buffer, mat4x4 rotation, vec4 translation);
 
+    void setRotationTranslation(quat &rotation, quat &translation, quat &pos);
+
     int lockMutex();
 
     void unlockMutex(int mtx_nr);
@@ -36,8 +38,12 @@ private:
     std::chrono::steady_clock::time_point endTime;
     std::chrono::steady_clock::duration timeSpan;
 
-
+    int framecount{};
     Computation* computation;
+
+    // Cluster-Storage needs rotation and translation info
+    quat rotation{};
+    quat translation{};
 
     uint16_t *image_x_h;
     uint16_t *image_y_h;

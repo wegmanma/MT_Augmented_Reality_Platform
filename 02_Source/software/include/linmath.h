@@ -584,8 +584,13 @@ static inline void print_quat(std::string name, quat e, bool semicolon_separated
             std::cout << std::endl;
     }
 
-    else
+    else {
+        if (e[3] > 0.98)
+        std::cout << std::setw(20) << name << " = (" << "\033[32m" << std::setw(8) << e[3] << "\033[0m" << " | " << std::setw(8) << e[0] << ", " << std::setw(8) << e[1] << ", " << std::setw(8) << e[2] << ")" << std::endl;
+        else
         std::cout << std::setw(20) << name << " = (" << std::setw(8) << e[3] << " | " << std::setw(8) << e[0] << ", " << std::setw(8) << e[1] << ", " << std::setw(8) << e[2] << ")" << std::endl;
+
+    }
     std::cout << std::defaultfloat << std::setprecision(6);
 }
 
