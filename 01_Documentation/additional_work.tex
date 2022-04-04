@@ -1,0 +1,93 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  _____       ______   ____									%
+% |_   _|     |  ____|/ ____|  Institute of Embedded Systems	%
+%   | |  _ __ | |__  | (___    Wireless Group					%
+%   | | | '_ \|  __|  \___ \   Zuercher Hochschule Winterthur	%
+%  _| |_| | | | |____ ____) |  (University of Applied Sciences)	%
+% |_____|_| |_|______|_____/   8401 Winterthur, Switzerland		%
+%																%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% The ZHAW INES latex style scrip
+\documentclass{clsFile/zhawines}
+
+% Command redefinitions
+
+% To use new glossaries package uncomment this line. This requires Perl to be installed on the computer (http://strawberryperl.com/)
+% Comment this line if you want to use the old manual glossary (see file /content/glossar)
+%\newcommand*{\USEGLOSSARIES}{} 
+
+%Include your own packages that are needed for you document, here the packages for the example are added
+\usepackage{scrlayer-scrpage}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage[squaren]{SIunits}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{float}
+\usepackage{pbox}
+\usepackage{caption}
+\usepackage{subcaption}
+\ifdefined\USEGLOSSARIES
+	\usepackage[acronyms]{glossaries}
+	\makeglossaries
+	\include{glossaries/glossaries}
+\fi
+
+\DeclareCaptionFormat{myformat}{#1#2#3}
+\captionsetup[figure]{format=myformat}
+
+\begin{document}
+%How the hyperlinks are shown, remove this or change it if you want the colorful links
+\hypersetup{
+    colorlinks = true,
+    urlbordercolor = {1 1 1},
+    linkbordercolor = {white},
+}
+
+%Select language, all generated content will be in the selected language
+\selectlanguage{english} %possible german/english
+
+% Generate your title page, it takes the arguments author, title
+% and email. The title page is then generated with maketitle
+\author{Marcel Wegmann \newline }
+\title{Addition to: Augmented Reality Platform using Sensor Fusion and embedded GPU Processing}
+\email{wegr@zhaw.ch}
+\newcommand{\version}{1.0}
+
+% Add Copyright informations and Contact infos
+ \newcommand{\confidential}{no}  %write yes to have a confidential mark on every normal page
+
+\maketitle
+
+
+% Generate the header and footer of the document
+\headings
+
+% Stop page numbering for abstract and anti-plagiarism statement
+\pagenumbering{gobble}
+
+
+
+%Include table of content
+\tableofcontents
+\newpage
+% Start page numbering
+\pagenumbering{arabic}
+% Starts the page count from here, pdf viewers will be able to jump to the corret page.
+\setcounter{page}{1}
+\setcounter{MaxMatrixCols}{17}
+%Include all chapters. Chapters itself are in the content subfolder
+% \include{content/howtoLaTeX} % Remove for final document
+\include{content/weitere_arbeiten}
+% \include{content/motivation}
+
+
+% Generate title for lists
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Verzeichnisse}
+
+
+\end{document}

@@ -1,0 +1,36 @@
+%!TEX root = ../additional_work.tex
+\chapter{Introduction}
+\label{sec:Introduction}
+After implementing the entire pipeline during the Master's thesis, the system is targeted to become a suitable demo-object for the InES HPMM group. As the position estimation has not been stable, additional functions need to get implemented.
+\begin{itemize} %
+	\item Performance improvement (currently, only 10FPS of ToF-Camera-Data can be processed, ToF-Camera itself delivers up to 20fps)
+	\item Use of ToF Data to estimate position with auto-generating a database of noteable feature clusters to generate a position estimation for stabilizing the translation-data in the Kalman filter
+	\item Maybe posh it up visually
+\end{itemize}
+
+\chapter{Performance}
+\label{sec:Terminology}
+The Texture dataflow for the Main-Camera and the Projection objects have been rewritten. Initially, the texture data was written to host-memory space and copied by Vulkan again to the device-memory space. Vulkan-Cuda interoperability allows a zero-copy mode between the two API.\\
+A multitude of functions is required for doing so, listed in calling order. 
+
+\begin{itemize} %
+	\item At Vulkan VkInstance creation: get FunctionDescriptor from VkInstance for: "vkGetPhysicalDeviceProperties2" (Used to query DeviceUUID for comparison with CUDA DeviceUUID -> Both need to be on the same device)
+	\item At Vulkan VkInstance creation: get FunctionDescriptor from VkInstance for: "vkGetMemoryFdKHR" (Used to get Vulkan-Memory File Descriptor. Buffer managed by Vulkan, CUDA gets access to it)
+	\item After Vulkan VkLogicalDevice creation: get FunctionDescriptor from VkLogicalDevice for: "vkGetSemaphoreFdKHR" (Semaphores are managed by vkLogicalDevice, multiple logical devices can be invoked by one instance)
+    \item TextureImage object's staging-buffer created with ExternalMemory Bits ("VK\_SHARING\_ MODE\_EXCLUSIVE" and "VK\_EXTERNAL\_MEMORY\_HANDLE\_TYPE\_OPAQUE\_\\FD\_BIT") for both the MainCamera and the ProjectedImage objects.
+    \item SetCudaVkDevice will then validate that everything will run on the same device (UUID- Comparison + Flag-Check if everything is supported. Pointless on a Jetson Device, but necessary on a Desktop)
+    \item cudaVkImportMem will then import the external memory and incorporate it as a Cuda Memory with size and everything needed.
+\end{itemize}
+
+Even though, the former solution incorporated a shared buffer between Host and Cuda-Device, eliminating the copy from host to Vulkan-Device greatly improved performance. The Vulkan-Device memory is now shared with Cuda. \\
+Synchronization is currently solved by forcing cuda to finish its calculations by a "cudaDeviceSynchronize()" call, before calling the Vulkan Function that copies the data from the Vulkan-Device Staging Buffer to the VkImage object. Copying from CUDA directly to the VkImage object may be possible but resulted in segmentation faults. Semaphores during the render stage might be required. The performance with only the staging-buffer being shared is sufficient - roughly 60fps could be achieved, the ToF Camera only delivers up to 20fps - no more investigation is done in that regard.
+
+\chapter{Clustering}
+For the algorighm of the Master's Thesis (velocity and rotation-velocity estimation), Sift features already get extracted from the ToF image, and mapped into a 3D space. Rejecting any feature metric other than it's spatial location should allow detecting entire objects (Lamps, Chairs etc) in the scene. Assuming that these objects do not move, it should be possible to estimate the current position and orientation of the camera. As rotation estimation already works fine, the focus lies on position estimation.
+\section{Pruned K-Means Clustering}
+The algorithm of K-Means clustering usually expects the user to know the number of feature-clusters apriori. Smart placement of seed points - one for each cluster - in the feature space allows the algorithm to find the closest points to these seeds. Each point gets allocated to a cluster. Filling the feature space with a vast amount of clusters allows filtering (or pruning) out small clusters aposteriori. The amount and positioning of the seed points influences whether a larger object gets recognized as one or multiple clusters. 
+
+\section{Storing prominent cluster centers}
+
+
+
